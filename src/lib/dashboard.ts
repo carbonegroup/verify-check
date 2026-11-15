@@ -6,8 +6,15 @@
 
 import { SCHOOL_TIME_ZONE } from "./time.ts";
 
+/**
+ * Vrai uniquement pour une date calendaire réelle `YYYY-MM-DD`.
+ * Le format seul ne suffit pas : `2026-13-45` ou `2026-02-31` passeraient le
+ * regex mais produiraient une `Date` invalide (`Invalid time value` plus loin).
+ */
 export function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 
 export function nextDayIso(date: string): string {
