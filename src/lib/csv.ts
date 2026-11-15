@@ -1,7 +1,12 @@
 /**
  * Export CSV des absences (Sprint 3) — logique pure, testable sans base.
  * Une ligne par (élève × cours prévu ce jour scolaire) sans scan.
+ * La règle « cours terminé » est partagée avec la liste des absences
+ * (`./absences.ts`).
  */
+
+import { isCourseFinished } from "./absences.ts";
+import { minutesOf } from "./time.ts";
 
 export function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -45,16 +50,12 @@ export function buildAbsencesCsv(
   // Honnêteté métier : un élève sans scan n'est PAS absent tant que le cours
   // n'est pas terminé (journée passée = tous terminés ; journée du jour =
   // seulement les cours dont l'heure de fin est passée).
-  const termines = planned.filter((c) => {
-    if (!options.now || options.date < options.now.jour) return true;
-    if (options.date > options.now.jour) return false;
-    if (!c.heure_fin) return false; // inconnu → on ne déclare pas absent
-    const [h, m] = c.heure_fin.split(":").map(Number);
-    const fin = (h ?? 0) * 60 + (m ?? 0);
-    const [nh, nm] = options.now.heure.split(":").map(Number);
-    const maintenant = (nh ?? 0) * 60 + (nm ?? 0);
-    return fin <= maintenant;
-  });
+  const now = options.now
+    ? { jour: options.now.jour, minutes: minutesOf(options.now.heure) }
+    : undefined;
+  const termines = planned.filter((c) =>
+    isCourseFinished(options.date, c.heure_fin, now)
+  );
   const scannedPairs = new Set(raw.attendance.map((a) => `${a.student_id}|${a.course_id}`));
 
   const lines: string[] = [

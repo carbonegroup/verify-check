@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { buildAbsences, isCourseFinished } from "@/lib/absences";
 import styles from "./Dashboard.module.css";
 
 /**
@@ -39,10 +40,11 @@ type DashboardData = {
   eleves: Eleve[];
 };
 
-type Vue = "general" | "classes" | "cours" | "eleves" | "cartes";
+type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes";
 
 const VUES: { id: Vue; label: string }[] = [
   { id: "general", label: "Vue générale" },
+  { id: "absences", label: "Absences" },
   { id: "classes", label: "Classes" },
   { id: "cours", label: "Cours" },
   { id: "eleves", label: "Élèves" },
@@ -83,19 +85,15 @@ function nowMinutesConakry(): number {
   return get("hour") * 60 + get("minute");
 }
 
-function minutesOf(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-
 /** Statut métier d'un élève pour un cours, à l'heure Conakry actuelle. */
 type Statut = "present" | "non-pointe" | "absent";
 function statutEleve(eleve: Eleve, cours: Cours, date: string): Statut {
   const present = eleve.presences.some((p) => p.course_id === cours.id);
   if (present) return "present";
-  const termine =
-    date < todayConakry() ||
-    (date === todayConakry() && minutesOf(cours.heure_fin) <= nowMinutesConakry());
+  const termine = isCourseFinished(date, cours.heure_fin, {
+    jour: todayConakry(),
+    minutes: nowMinutesConakry(),
+  });
   return termine ? "absent" : "non-pointe";
 }
 
@@ -164,6 +162,18 @@ export default function DashboardClient() {
     () => (data?.eleves ?? []).filter((e) => !classe || e.classe_id === classe),
     [data, classe]
   );
+  // Liste des absences : même règle que l'export CSV (cours terminé sans scan).
+  const absences = useMemo(
+    () =>
+      data
+        ? buildAbsences(
+            { classes: data.classes, cours: data.cours_prevus, eleves: data.eleves },
+            { date, now: { jour: todayConakry(), minutes: nowMinutesConakry() } }
+          )
+        : [],
+    [data, date]
+  );
+  const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
 
   return (
     <div className={styles.root}>
@@ -171,7 +181,7 @@ export default function DashboardClient() {
         <div>
           <div className={styles.brand}>VerifyCheck</div>
           <p className={styles.subtitle}>
-            {dateLabelFormatter.format(new Date(`${date}T12:00:00Z`))} · {TIME_ZONE}
+            {dateLabel} · {TIME_ZONE}
           </p>
         </div>
         <div className={styles.filters}>
@@ -281,6 +291,63 @@ export default function DashboardClient() {
               <p className={styles.actionsRow}>
                 <a className={styles.button} href={exportUrl}>Exporter les absences (CSV)</a>
               </p>
+            </>
+          )}
+
+          {/* ----------------------------------------------- ABSENCES */}
+          {vue === "absences" && (
+            <>
+              <div className={styles.actionsRow}>
+                <a className={styles.button} href={exportUrl}>
+                  Exporter en CSV
+                </a>
+                <button className={styles.button} onClick={() => window.print()}>
+                  Imprimer la liste
+                </button>
+              </div>
+
+              <h2 className={styles.printTitle}>
+                Liste des absences — {dateLabel}
+                {classeNom ? ` · ${classeNom}` : ""}
+              </h2>
+              <p className={styles.summaryLine}>
+                <strong>{absences.length}</strong> absence{absences.length > 1 ? "s" : ""} ·{" "}
+                {data.cours_prevus.length} cours prévu{data.cours_prevus.length > 1 ? "s" : ""} ·
+                cours terminé sans scan
+              </p>
+
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Élève</th>
+                    <th>Classe</th>
+                    <th>Cours</th>
+                    <th>Horaire</th>
+                    <th>Salle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {absences.map((a) => (
+                    <tr key={`${a.eleve_id}|${a.cours_id}`}>
+                      <td>{a.eleve}</td>
+                      <td>{a.classe}</td>
+                      <td>{a.cours}</td>
+                      <td className={styles.num}>
+                        {a.heure_debut.slice(0, 5)}
+                        {a.heure_fin ? `–${a.heure_fin.slice(0, 5)}` : ""}
+                      </td>
+                      <td>{a.salle ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {absences.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className={styles.empty}>
+                        Aucune absence déclarée pour ces filtres.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </>
           )}
 

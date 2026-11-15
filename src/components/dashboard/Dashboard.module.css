@@ -193,7 +193,21 @@
 }
 
 .actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin: 16px 0;
+}
+
+.summaryLine {
+  margin: 0 0 12px;
+  color: var(--ink-soft, #5b6b7c);
+  font-size: 13px;
+}
+
+.summaryLine strong {
+  color: var(--ink, #1c2733);
+  font-variant-numeric: tabular-nums;
 }
 
 .button {
@@ -310,6 +324,28 @@
 
   .root {
     background: #fff;
+  }
+
+  .main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .table {
+    font-size: 12px;
+  }
+
+  .table thead {
+    display: table-header-group;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 8px;
+  }
+
+  .summaryLine {
+    margin: 0 0 8px;
   }
 
   .cards {

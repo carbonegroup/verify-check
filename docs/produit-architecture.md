@@ -17,11 +17,12 @@
 
 ### Direction (dashboard web `/dashboard`)
 1. Vue générale du jour : planning réel (cours prévus), effectif, présences.
-2. Vues Classes / Cours / Élèves + filtres date, classe, cours, élève.
+2. Vues Absences / Classes / Cours / Élèves + filtres date, classe, cours, élève.
 3. Distinction : **présent** (scan serveur), **non pointé** (cours pas encore
    terminé), **absent** (cours terminé sans scan). Jamais « absent » pour un
    cours futur ou en cours.
-4. Export CSV des absences (uniquement cours terminés ou journée passée).
+4. Vue **Absences** : liste imprimable (élève × cours terminé sans scan) avec
+   **export CSV** et **impression** (`window.print`, mise en page dédiée).
 5. Cartes : génération/impression des cartes QR depuis les élèves réels.
 
 ### Élève (carte physique)
