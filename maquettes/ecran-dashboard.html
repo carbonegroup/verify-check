@@ -10,7 +10,11 @@
      Surfaces papier claires, filets, un seul accent. Aucun effet décoratif.
      Le dashboard réel (données via GET /api/dashboard) est dans
      src/components/dashboard/ — ce fichier ne s'y connecte pas.
-     Les filtres Date / Classe / Cours sont fonctionnels (recalcul des vues). */
+
+     Classes organisées par niveau (système guinéen) :
+       Maternelle · Primaire · Collège · Lycée, puis l'Université à part.
+     Chaque classe porte son option (section, série ou filière).
+     Les filtres Date / Classe / Cours sont fonctionnels. */
   :root{
     --paper:#faf7f0; --surface:#fffdf8; --ink:#1c2733; --ink-soft:#5b6b7c;
     --accent:#14604a; --accent-ink:#0c3d2f; --warn:#9a5b00; --danger:#a32e2e;
@@ -53,6 +57,7 @@
   .filters input,.filters select{height:36px;min-width:150px;border:1px solid var(--line);border-radius:4px;
     background:#fff;color:var(--ink);padding:0 8px;font:inherit}
   .filters select:focus,.filters input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .filters optgroup{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft)}
 
   .nav{display:flex;flex-wrap:wrap;gap:2px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--surface)}
   .nav button{border:0;background:none;padding:12px 14px;font:inherit;font-size:14px;color:var(--ink-soft);
@@ -77,7 +82,15 @@
   .table tbody tr:last-child td{border-bottom:0}
   .num{text-align:right;font-variant-numeric:tabular-nums}
   .code{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px}
+  .option{color:var(--ink-soft)}
   .empty{color:var(--ink-soft);text-align:center;padding:24px 12px}
+
+  /* vue Classes : une section par niveau, l'Université détachée */
+  .niveau{margin:0 0 22px}
+  .niveau.sep{border-top:2px solid var(--line);padding-top:18px;margin-top:26px}
+  .niveauTitle{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);
+    font-weight:700;margin:0 0 8px}
+  .niveauTitle .compte{color:var(--ink-soft);font-weight:500;letter-spacing:.02em;text-transform:none}
 
   .error{margin:16px 24px;padding:10px 14px;border:1px solid var(--danger);border-radius:4px;
     color:var(--danger);background:#fdf3f3;font-size:14px}
@@ -109,7 +122,7 @@
 
   @media print{
     body{background:#fff;display:block;padding:0}
-    .controls,.nav,.filters,.header,.actionsRow,.view[data-view="cartes"] > .actionsRow{display:none !important}
+    .controls,.nav,.filters,.header,.actionsRow{display:none !important}
     .screen{border:0;box-shadow:none;width:100%}
     .view:not([data-view="cartes"]){display:none !important}
   }
@@ -139,9 +152,9 @@
     <button type="button" id="loadBtn" aria-pressed="false">Chargement…</button>
     <button type="button" id="errBtn" aria-pressed="false">Erreur serveur</button>
     <div class="sep"></div>
-    <p class="note">Filtres <strong>Date / Classe / Cours</strong> fonctionnels :
-      ils recalculent toutes les vues. Période d'exemple : 9–13 nov. 2026
-      (le mercredi 11 n'a aucun cours → état vide).</p>
+    <p class="note"><strong>Niveaux</strong> : Maternelle · Primaire · Collège · Lycée,
+      puis l'<strong>Université à part</strong>. Chaque classe a son option.
+      Filtres <strong>Date / Classe / Cours</strong> fonctionnels (9–13 nov. 2026).</p>
   </aside>
 
   <!-- Écran -->
@@ -190,10 +203,7 @@
 
       <!-- -------------------------------------------------- CLASSES -->
       <section class="view" data-view="classes" hidden>
-        <table class="table">
-          <thead><tr><th>Classe</th><th>Élèves</th><th>Présents aujourd'hui</th><th>Cours prévus</th></tr></thead>
-          <tbody id="classesBody"></tbody>
-        </table>
+        <div id="classesGrouped"></div>
       </section>
 
       <!-- ---------------------------------------------------- COURS -->
@@ -223,46 +233,71 @@
   </div>
 
 <script>
-  // ------------------------------------------------------------------
-  // Données d'exemple (aucune donnée réelle) — miroir de la forme de
-  // GET /api/dashboard. Le dashboard réel est dans src/components/dashboard/.
-  // ------------------------------------------------------------------
+  // ==================================================================
+  // Référentiel des niveaux — système guinéen.
+  // Maternelle, Primaire, Collège et Lycée sont regroupés ; l'Université
+  // est présentée à part (vue Classes et filtre Classe).
+  // ==================================================================
+  const NIVEAUX = [
+    { id: "maternelle", nom: "Maternelle" },
+    { id: "primaire",   nom: "Primaire" },
+    { id: "college",    nom: "Collège" },
+    { id: "lycee",      nom: "Lycée" }
+  ];
+  const UNIVERSITE = { id: "universite", nom: "Université" };
 
-  // 0 = dimanche … 6 = samedi (cf. supabase/schema.sql).
+  // Chaque classe porte son option : section (primaire/collège),
+  // série (lycée) ou filière (université). « — » quand il n'y en a pas.
   const CLASSES = [
-    { id: "6a", nom: "6ème A" },
-    { id: "5b", nom: "5ème B" }
+    { id: "m-gs",   code: "GS",   niveau: "maternelle", nom: "Grande Section",      option: "—" },
+    { id: "p-5a",   code: "5A",   niveau: "primaire",   nom: "5ème Année",          option: "A" },
+    { id: "p-6a",   code: "6A",   niveau: "primaire",   nom: "6ème Année",          option: "A" },
+    { id: "c-7a",   code: "7A",   niveau: "college",    nom: "7ème Année",          option: "A" },
+    { id: "c-8b",   code: "8B",   niveau: "college",    nom: "8ème Année",          option: "B" },
+    { id: "l-11sm", code: "11SM", niveau: "lycee",      nom: "11ème Année",         option: "Sciences Mathématiques" },
+    { id: "l-12ss", code: "12SS", niveau: "lycee",      nom: "12ème Année",         option: "Sciences Sociales" },
+    { id: "l-tsm",  code: "TSM",  niveau: "lycee",      nom: "Terminale",           option: "Sciences Mathématiques" },
+    { id: "u-sci",  code: "USCI", niveau: "universite", nom: "Faculté des Sciences", option: "Licence 1 — Informatique" },
+    { id: "u-med",  code: "UMED", niveau: "universite", nom: "Faculté de Médecine",  option: "2ème année" }
   ];
 
-  const ELEVES = [
-    { code: "VC-6A-0001", nom: "Fatoumata Diallo", classe: "6a" },
-    { code: "VC-6A-0002", nom: "Mamadou Camara",   classe: "6a" },
-    { code: "VC-6A-0003", nom: "Aïssatou Barry",   classe: "6a" },
-    { code: "VC-6A-0004", nom: "Ibrahima Sow",     classe: "6a" },
-    { code: "VC-5B-0001", nom: "Kadiatou Keïta",   classe: "5b" },
-    { code: "VC-5B-0002", nom: "Ousmane Condé",    classe: "5b" },
-    { code: "VC-5B-0003", nom: "Mariam Touré",     classe: "5b" },
-    { code: "VC-5B-0004", nom: "Alpha Bah",        classe: "5b" }
+  // Élèves générés (3 par classe) — noms fictifs, aucune donnée réelle.
+  const NOMS = [
+    "Fatoumata Diallo", "Mamadou Camara", "Aïssatou Barry", "Ibrahima Sow",
+    "Kadiatou Keïta", "Ousmane Condé", "Mariam Touré", "Alpha Bah",
+    "Binta Sylla", "Sékou Touré", "Awa Diop", "Thierno Baldé",
+    "Hawa Bangoura", "Lansana Kourouma", "Néné Traoré", "Mory Cissé",
+    "Fanta Doumbouya", "Amadou Keïta", "Djenabou Bah", "Souleymane Diallo",
+    "Ramata Soumah", "Boubacar Sylla", "Aminata Camara", "Mohamed Lamine Camara",
+    "Hadja Binta Diallo", "Alseny Camara", "Saran Kaba", "Abdoulaye Diallo",
+    "M'mah Soumah", "Facinet Sylla"
   ];
+  const ELEVES = [];
+  CLASSES.forEach((c) => {
+    for (let i = 0; i < 3; i++) {
+      ELEVES.push({
+        code: "VC-" + c.code + "-" + String(i + 1).padStart(4, "0"),
+        nom: NOMS[ELEVES.length % NOMS.length],
+        classe: c.id
+      });
+    }
+  });
 
+  // Cours : jours de la semaine (0 = dimanche … 6 = samedi), indices des
+  // élèves présents (scan serveur), et « terminé » (sinon non pointé).
   const COURS = [
-    { id: "m", nom: "Mathématiques", classe: "6a", salle: "Salle 12",    debut: "08:00", fin: "10:00", jours: [1, 5] },
-    { id: "f", nom: "Français",      classe: "6a", salle: "Salle 12",    debut: "10:15", fin: "12:15", jours: [2, 4, 5] },
-    { id: "s", nom: "Sciences",      classe: "5b", salle: "Laboratoire", debut: "08:00", fin: "10:00", jours: [1, 4, 5] },
-    { id: "a", nom: "Anglais",       classe: "5b", salle: "Salle 7",     debut: "14:00", fin: "16:00", jours: [2, 5] }
+    { id: "ev",   nom: "Éveil",           classe: "m-gs",   salle: "Salle M1", debut: "08:30", fin: "10:00", jours: [1, 5],   presentsIdx: [0, 1],    termine: true  },
+    { id: "sci",  nom: "Sciences",        classe: "p-6a",   salle: "Salle 4",  debut: "08:00", fin: "10:00", jours: [1, 4, 5], presentsIdx: [0, 1],    termine: true  },
+    { id: "fra",  nom: "Français",        classe: "p-5a",   salle: "Salle 3",  debut: "10:15", fin: "12:15", jours: [2, 4, 5], presentsIdx: [0, 1, 2], termine: true  },
+    { id: "mat",  nom: "Mathématiques",   classe: "c-7a",   salle: "Salle 12", debut: "08:00", fin: "10:00", jours: [1, 5],   presentsIdx: [0, 1, 2], termine: true  },
+    { id: "ang",  nom: "Anglais",         classe: "c-7a",   salle: "Salle 12", debut: "10:15", fin: "12:15", jours: [2, 4, 5], presentsIdx: [0, 2],    termine: true  },
+    { id: "hg",   nom: "Histoire-Géo",    classe: "c-8b",   salle: "Salle 9",  debut: "08:00", fin: "10:00", jours: [1, 5],   presentsIdx: [0, 1],    termine: true  },
+    { id: "mats", nom: "Mathématiques",   classe: "l-11sm", salle: "Salle 21", debut: "08:00", fin: "10:00", jours: [2, 5],   presentsIdx: [0, 2],    termine: true  },
+    { id: "pc",   nom: "Physique-Chimie", classe: "l-11sm", salle: "Labo",     debut: "10:15", fin: "12:15", jours: [2, 5],   presentsIdx: [0, 1],    termine: false },
+    { id: "svt",  nom: "SVT",             classe: "l-tsm",  salle: "Labo",     debut: "14:00", fin: "16:00", jours: [2, 5],   presentsIdx: [0],       termine: false },
+    { id: "algo", nom: "Algorithmique",   classe: "u-sci",  salle: "Amphi A",  debut: "08:00", fin: "10:00", jours: [1, 5],   presentsIdx: [0, 1, 2], termine: true  },
+    { id: "anat", nom: "Anatomie",        classe: "u-med",  salle: "Amphi B",  debut: "10:15", fin: "12:15", jours: [2, 5],   presentsIdx: [0, 1],    termine: true  }
   ];
-
-  // Présences serveur (scans) par jour de semaine : jour -> cours -> codes présents.
-  const PRESENTS = {
-    1: { m: ["VC-6A-0001", "VC-6A-0002", "VC-6A-0004"], s: ["VC-5B-0001", "VC-5B-0002"] },
-    2: { f: ["VC-6A-0001", "VC-6A-0003"], a: [] },
-    4: { f: ["VC-6A-0001", "VC-6A-0003"], s: ["VC-5B-0001", "VC-5B-0002"] },
-    5: { m: ["VC-6A-0001", "VC-6A-0002", "VC-6A-0003"], f: ["VC-6A-0001", "VC-6A-0002"], s: ["VC-5B-0001", "VC-5B-0002"], a: ["VC-5B-0001", "VC-5B-0003"] }
-  };
-
-  // Cours déjà terminés ce jour-là : les non-présents y sont ABSENTS,
-  // sinon NON POINTÉS (cours encore en cours).
-  const TERMINES = { 1: ["m", "s"], 2: ["f"], 4: ["f", "s"], 5: ["m", "f"] };
 
   const STATUTS = {
     present:      { label: "PRÉSENT",    cls: "present" },
@@ -281,14 +316,20 @@
   const classeById = (id) => CLASSES.find((c) => c.id === id);
   const elevesDeClasse = (id) => ELEVES.filter((e) => e.classe === id);
 
-  function jourSemaine(dateStr) {
-    const p = dateStr.split("-").map(Number);
-    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+  // Libellé d'une classe = nom + option (si elle existe).
+  function classeLabel(c) {
+    if (!c) return "—";
+    return c.option && c.option !== "—" ? c.nom + " — " + c.option : c.nom;
   }
 
   const JOURS_NOMS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
   const MOIS_NOMS = ["janvier", "février", "mars", "avril", "mai", "juin",
     "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+  function jourSemaine(dateStr) {
+    const p = dateStr.split("-").map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+  }
 
   // Format français déterministe (indépendant du support ICU du navigateur).
   function labelDate(dateStr) {
@@ -299,11 +340,13 @@
 
   const coursDuJour = (jour) => COURS.filter((c) => c.jours.indexOf(jour) !== -1);
 
-  function statut(code, coursId, jour) {
-    const presents = (PRESENTS[jour] || {})[coursId] || [];
-    if (presents.indexOf(code) !== -1) return "present";
-    if ((TERMINES[jour] || []).indexOf(coursId) !== -1) return "absent";
-    return "non-pointe";
+  // Statut métier d'un élève pour un cours : présent (scan) / non pointé
+  // (cours non terminé) / absent (cours terminé sans scan).
+  function statutEleve(eleve, cours) {
+    const eleves = elevesDeClasse(cours.classe);
+    const idx = eleves.findIndex((e) => e.code === eleve.code);
+    if (cours.presentsIdx.indexOf(idx) !== -1) return "present";
+    return cours.termine ? "absent" : "non-pointe";
   }
 
   // État des filtres (période d'exemple : semaine du 9 au 13 nov. 2026).
@@ -329,16 +372,17 @@
   }
 
   function renderGeneral() {
-    const jour = jourSemaine(state.date);
     const cours = coursAffiches();
     const codes = {};
     const presentsSet = {};
     let scans = 0;
 
     cours.forEach((c) => {
-      elevesDeClasse(c.classe).forEach((e) => { codes[e.code] = true; });
-      const pres = (PRESENTS[jour] || {})[c.id] || [];
-      pres.forEach((code) => { presentsSet[code] = true; scans++; });
+      const eleves = elevesDeClasse(c.classe);
+      eleves.forEach((e) => {
+        codes[e.code] = true;
+        if (statutEleve(e, c) === "present") { presentsSet[e.code] = true; scans++; }
+      });
     });
 
     $("#kpiCours").textContent = cours.length;
@@ -352,36 +396,47 @@
       return;
     }
     body.innerHTML = cours.map((c) => {
-      const effectif = elevesDeClasse(c.classe).length;
-      const pres = ((PRESENTS[jour] || {})[c.id] || []).length;
-      const termine = (TERMINES[jour] || []).indexOf(c.id) !== -1;
-      const absents = termine ? effectif - pres : 0;
-      return "<tr><td>" + esc(classeById(c.classe).nom) + "</td><td>" + esc(c.nom) + "</td>" +
+      const eleves = elevesDeClasse(c.classe);
+      const pres = eleves.filter((e) => statutEleve(e, c) === "present").length;
+      const absents = c.termine ? eleves.length - pres : 0;
+      return "<tr><td>" + esc(classeLabel(classeById(c.classe))) + "</td><td>" + esc(c.nom) + "</td>" +
         "<td>" + esc(c.salle) + '</td><td class="num">' + c.debut + "–" + c.fin + "</td>" +
-        '<td class="num">' + pres + "/" + effectif + "</td>" +
+        '<td class="num">' + pres + "/" + eleves.length + "</td>" +
         '<td class="num">' + absents + "</td></tr>";
     }).join("");
   }
 
+  // Vue Classes : une section par niveau, l'Université détachée en bas.
   function renderClasses() {
     const jour = jourSemaine(state.date);
-    const rows = CLASSES
-      .filter((c) => state.classe === "all" || c.id === state.classe)
-      .map((c) => {
+    const sel = state.classe;
+
+    function bloc(niveauId, niveauNom, sep) {
+      const classes = CLASSES.filter((c) => c.niveau === niveauId && (sel === "all" || c.id === sel));
+      if (!classes.length) return "";
+      const rows = classes.map((c) => {
         const eleves = elevesDeClasse(c.id);
         const coursClasse = coursDuJour(jour).filter((x) => x.classe === c.id);
         const presents = eleves.filter((e) =>
-          coursClasse.some((x) => statut(e.code, x.id, jour) === "present")).length;
-        return "<tr><td>" + esc(c.nom) + '</td><td class="num">' + eleves.length +
-          '</td><td class="num">' + presents + '</td><td class="num">' + coursClasse.length + "</td></tr>";
-      });
-    $("#classesBody").innerHTML = rows.length
-      ? rows.join("")
-      : '<tr><td class="empty" colspan="4">Aucune classe.</td></tr>';
+          coursClasse.some((x) => statutEleve(e, x) === "present")).length;
+        return "<tr><td>" + esc(c.nom) + '</td><td class="option">' + esc(c.option) + "</td>" +
+          '<td class="num">' + eleves.length + '</td><td class="num">' + presents + "</td>" +
+          '<td class="num">' + coursClasse.length + "</td></tr>";
+      }).join("");
+      return '<section class="niveau' + (sep ? " sep" : "") + '">' +
+        '<h3 class="niveauTitle">' + esc(niveauNom) +
+        ' <span class="compte">(' + classes.length + ")</span></h3>" +
+        '<table class="table"><thead><tr><th>Classe</th><th>Option</th><th>Élèves</th>' +
+        "<th>Présents aujourd'hui</th><th>Cours prévus</th></tr></thead>" +
+        "<tbody>" + rows + "</tbody></table></section>";
+    }
+
+    let html = NIVEAUX.map((n) => bloc(n.id, n.nom, false)).join("");
+    html += bloc(UNIVERSITE.id, UNIVERSITE.nom, true);
+    $("#classesGrouped").innerHTML = html || '<p class="empty">Aucune classe pour cette sélection.</p>';
   }
 
   function renderCours() {
-    const jour = jourSemaine(state.date);
     const cours = coursAffiches();
     const body = $("#coursBody");
     if (!cours.length) {
@@ -389,16 +444,15 @@
       return;
     }
     body.innerHTML = cours.map((c) => {
-      const effectif = elevesDeClasse(c.classe).length;
-      const pres = ((PRESENTS[jour] || {})[c.id] || []).length;
-      return "<tr><td>" + esc(c.nom) + "</td><td>" + esc(classeById(c.classe).nom) + "</td>" +
+      const eleves = elevesDeClasse(c.classe);
+      const pres = eleves.filter((e) => statutEleve(e, c) === "present").length;
+      return "<tr><td>" + esc(c.nom) + "</td><td>" + esc(classeLabel(classeById(c.classe))) + "</td>" +
         '<td class="num">' + c.debut + "–" + c.fin + "</td><td>" + esc(c.salle) + "</td>" +
-        '<td class="num">' + pres + "/" + effectif + "</td></tr>";
+        '<td class="num">' + pres + "/" + eleves.length + "</td></tr>";
     }).join("");
   }
 
   function renderEleves() {
-    const jour = jourSemaine(state.date);
     const cours = coursAffiches();
     let eleves = ELEVES.filter((e) => state.classe === "all" || e.classe === state.classe);
     if (state.cours !== "all") {
@@ -412,9 +466,9 @@
     }
     body.innerHTML = eleves.map((e) => {
       const mesCours = cours.filter((c) => c.classe === e.classe);
-      const pastilles = mesCours.map((c) => pastille(c.nom, statut(e.code, c.id, jour))).join("");
-      const scans = mesCours.filter((c) => statut(e.code, c.id, jour) === "present").length;
-      return "<tr><td>" + esc(e.nom) + "</td><td>" + esc(classeById(e.classe).nom) + "</td>" +
+      const pastilles = mesCours.map((c) => pastille(c.nom, statutEleve(e, c))).join("");
+      const scans = mesCours.filter((c) => statutEleve(e, c) === "present").length;
+      return "<tr><td>" + esc(e.nom) + "</td><td>" + esc(classeLabel(classeById(e.classe))) + "</td>" +
         '<td class="code">' + esc(e.code) + '</td><td class="num">' + scans + "</td>" +
         "<td>" + (pastilles || '<span class="empty">Aucun cours ce jour</span>') + "</td></tr>";
     }).join("");
@@ -456,14 +510,15 @@
 
   function renderCartes() {
     const eleves = ELEVES.filter((e) => state.classe === "all" || e.classe === state.classe);
-    $("#printTitle").textContent = state.classe === "all"
-      ? "Cartes — toutes les classes"
-      : "Cartes — " + classeById(state.classe).nom;
+    const cl = state.classe === "all" ? null : classeById(state.classe);
+    $("#printTitle").textContent = cl
+      ? "Cartes — " + classeLabel(cl)
+      : "Cartes — toutes les classes";
     $("#printBtn").textContent = "Imprimer la planche (" + eleves.length +
       " carte" + (eleves.length > 1 ? "s" : "") + ")";
     $("#cards").innerHTML = eleves.map((e) =>
       '<article class="card"><div class="cardHead"><span>VerifyCheck</span><span>' +
-      esc(classeById(e.classe).nom) + "</span></div>" +
+      esc(classeLabel(classeById(e.classe))) + "</span></div>" +
       '<div class="cardBody">' + qrSvg(e.code) + "<div>" +
       '<div class="cardNom">' + esc(e.nom) + "</div>" +
       '<div class="cardCode">' + esc(e.code) + "</div></div></div></article>").join("");
@@ -481,18 +536,33 @@
   // ---- filtres -------------------------------------------------------
   const fDate = $("#fDate"), fClasse = $("#fClasse"), fCours = $("#fCours");
 
+  // Le filtre Classe regroupe les classes par niveau (optgroups) ; l'Université
+  // forme son propre groupe.
+  function buildClasseOptions() {
+    let html = '<option value="all">Toutes</option>';
+    const groupes = NIVEAUX.concat([UNIVERSITE]);
+    groupes.forEach((n) => {
+      const classes = CLASSES.filter((c) => c.niveau === n.id);
+      if (!classes.length) return;
+      html += '<optgroup label="' + esc(n.nom) + '">';
+      classes.forEach((c) => {
+        html += '<option value="' + c.id + '">' + esc(classeLabel(c)) + "</option>";
+      });
+      html += "</optgroup>";
+    });
+    fClasse.innerHTML = html;
+  }
+
   // Les options « Cours » dépendent de la date (jour de la semaine) et de la classe.
   function syncCoursOptions() {
     const jour = jourSemaine(state.date);
     const dispo = coursDuJour(jour).filter((c) => state.classe === "all" || c.classe === state.classe);
     if (!dispo.some((c) => c.id === state.cours)) state.cours = "all";
     fCours.innerHTML = '<option value="all">Tous</option>' + dispo.map((c) =>
-      '<option value="' + c.id + '">' + esc(c.nom) + " " + c.debut + "</option>").join("");
+      '<option value="' + c.id + '">' + esc(c.nom) + " " + c.debut + " · " +
+      esc(classeLabel(classeById(c.classe))) + "</option>").join("");
     fCours.value = state.cours;
   }
-
-  fClasse.innerHTML = '<option value="all">Toutes</option>' + CLASSES.map((c) =>
-    '<option value="' + c.id + '">' + esc(c.nom) + "</option>").join("");
 
   fDate.addEventListener("change", () => {
     if (!fDate.value) { fDate.value = state.date; return; }
@@ -535,6 +605,7 @@
   $("#errBtn").addEventListener("click", () => { error = !error; if (error) loading = false; renderStates(); });
 
   // ---- initialisation ----------------------------------------------
+  buildClasseOptions();
   fDate.value = state.date;
   syncCoursOptions();
   setView("general");
