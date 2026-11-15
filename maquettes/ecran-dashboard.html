@@ -9,7 +9,8 @@
      Direction retenue : « registre scolaire contemporain » (docs/design-brief.md).
      Surfaces papier claires, filets, un seul accent. Aucun effet décoratif.
      Le dashboard réel (données via GET /api/dashboard) est dans
-     src/components/dashboard/ — ce fichier ne s'y connecte pas. */
+     src/components/dashboard/ — ce fichier ne s'y connecte pas.
+     Les filtres Date / Classe / Cours sont fonctionnels (recalcul des vues). */
   :root{
     --paper:#faf7f0; --surface:#fffdf8; --ink:#1c2733; --ink-soft:#5b6b7c;
     --accent:#14604a; --accent-ink:#0c3d2f; --warn:#9a5b00; --danger:#a32e2e;
@@ -51,6 +52,7 @@
   .filters label{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft)}
   .filters input,.filters select{height:36px;min-width:150px;border:1px solid var(--line);border-radius:4px;
     background:#fff;color:var(--ink);padding:0 8px;font:inherit}
+  .filters select:focus,.filters input:focus{outline:2px solid var(--accent);outline-offset:1px}
 
   .nav{display:flex;flex-wrap:wrap;gap:2px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--surface)}
   .nav button{border:0;background:none;padding:12px 14px;font:inherit;font-size:14px;color:var(--ink-soft);
@@ -105,6 +107,13 @@
   .qr{width:110px;height:110px;flex:0 0 auto;border:1px solid var(--line);border-radius:4px;background:#fff}
   .printTitle{font-size:16px;margin:8px 0 12px}
 
+  @media print{
+    body{background:#fff;display:block;padding:0}
+    .controls,.nav,.filters,.header,.actionsRow,.view[data-view="cartes"] > .actionsRow{display:none !important}
+    .screen{border:0;box-shadow:none;width:100%}
+    .view:not([data-view="cartes"]){display:none !important}
+  }
+
   @media (max-width:700px){
     .controls{position:static;width:100%}
     .screen{width:100%}
@@ -130,8 +139,9 @@
     <button type="button" id="loadBtn" aria-pressed="false">Chargement…</button>
     <button type="button" id="errBtn" aria-pressed="false">Erreur serveur</button>
     <div class="sep"></div>
-    <p class="note">Écran large (direction). Le PWA de scan (Rôle 2) est un écran
-      distinct, sur téléphone.</p>
+    <p class="note">Filtres <strong>Date / Classe / Cours</strong> fonctionnels :
+      ils recalculent toutes les vues. Période d'exemple : 9–13 nov. 2026
+      (le mercredi 11 n'a aucun cours → état vide).</p>
   </aside>
 
   <!-- Écran -->
@@ -139,12 +149,12 @@
     <header class="header">
       <div>
         <div class="brand">VerifyCheck</div>
-        <p class="subtitle">vendredi 13 novembre 2026 · Africa/Conakry</p>
+        <p class="subtitle" id="subtitle">—</p>
       </div>
       <div class="filters">
-        <label>Date<input type="date" value="2026-11-13" max="2026-11-13"></label>
-        <label>Classe<select><option>Toutes</option><option>6ème A</option><option>5ème B</option></select></label>
-        <label>Cours<select><option>Tous</option><option>Mathématiques 08:00</option><option>Français 10:15</option><option>Sciences 08:00</option><option>Anglais 14:00</option></select></label>
+        <label>Date<input type="date" id="fDate" value="2026-11-13" min="2026-11-09" max="2026-11-13"></label>
+        <label>Classe<select id="fClasse"></select></label>
+        <label>Cours<select id="fCours"></select></label>
       </div>
     </header>
 
@@ -164,21 +174,16 @@
       <!-- ---------------------------------------------- VUE GÉNÉRALE -->
       <section class="view" data-view="general">
         <section class="resume">
-          <div><span class="kpi">4</span><span class="kpiLabel">cours prévus</span></div>
-          <div><span class="kpi">8</span><span class="kpiLabel">élèves concernés</span></div>
-          <div><span class="kpi">6</span><span class="kpiLabel">présents (≥ 1 scan)</span></div>
-          <div><span class="kpi">7</span><span class="kpiLabel">scans serveur</span></div>
+          <div><span class="kpi" id="kpiCours">0</span><span class="kpiLabel">cours prévus</span></div>
+          <div><span class="kpi" id="kpiEleves">0</span><span class="kpiLabel">élèves concernés</span></div>
+          <div><span class="kpi" id="kpiPresents">0</span><span class="kpiLabel">présents (≥ 1 scan)</span></div>
+          <div><span class="kpi" id="kpiScans">0</span><span class="kpiLabel">scans serveur</span></div>
         </section>
         <table class="table">
           <thead>
             <tr><th>Classe</th><th>Cours</th><th>Salle</th><th>Heure</th><th>Présents</th><th>Absents (cours terminé)</th></tr>
           </thead>
-          <tbody>
-            <tr><td>6ème A</td><td>Mathématiques</td><td>Salle 12</td><td class="num">08:00–10:00</td><td class="num">3/4</td><td class="num">1</td></tr>
-            <tr><td>6ème A</td><td>Français</td><td>Salle 12</td><td class="num">10:15–12:15</td><td class="num">2/4</td><td class="num">0</td></tr>
-            <tr><td>5ème B</td><td>Sciences</td><td>Laboratoire</td><td class="num">08:00–10:00</td><td class="num">2/4</td><td class="num">2</td></tr>
-            <tr><td>5ème B</td><td>Anglais</td><td>Salle 7</td><td class="num">14:00–16:00</td><td class="num">0/4</td><td class="num">0</td></tr>
-          </tbody>
+          <tbody id="generalBody"></tbody>
         </table>
         <p class="actionsRow"><a class="button" href="#" onclick="return false">Exporter les absences (CSV)</a></p>
       </section>
@@ -187,10 +192,7 @@
       <section class="view" data-view="classes" hidden>
         <table class="table">
           <thead><tr><th>Classe</th><th>Élèves</th><th>Présents aujourd'hui</th><th>Cours prévus</th></tr></thead>
-          <tbody>
-            <tr><td>6ème A</td><td class="num">4</td><td class="num">4</td><td class="num">2</td></tr>
-            <tr><td>5ème B</td><td class="num">4</td><td class="num">2</td><td class="num">2</td></tr>
-          </tbody>
+          <tbody id="classesBody"></tbody>
         </table>
       </section>
 
@@ -198,12 +200,7 @@
       <section class="view" data-view="cours" hidden>
         <table class="table">
           <thead><tr><th>Cours</th><th>Classe</th><th>Heure</th><th>Salle</th><th>Présents</th></tr></thead>
-          <tbody>
-            <tr><td>Mathématiques</td><td>6ème A</td><td class="num">08:00–10:00</td><td>Salle 12</td><td class="num">3/4</td></tr>
-            <tr><td>Français</td><td>6ème A</td><td class="num">10:15–12:15</td><td>Salle 12</td><td class="num">2/4</td></tr>
-            <tr><td>Sciences</td><td>5ème B</td><td class="num">08:00–10:00</td><td>Laboratoire</td><td class="num">2/4</td></tr>
-            <tr><td>Anglais</td><td>5ème B</td><td class="num">14:00–16:00</td><td>Salle 7</td><td class="num">0/4</td></tr>
-          </tbody>
+          <tbody id="coursBody"></tbody>
         </table>
       </section>
 
@@ -217,8 +214,8 @@
 
       <!-- -------------------------------------------------- CARTES -->
       <section class="view" data-view="cartes" hidden>
-        <p class="actionsRow"><button type="button" class="button">Imprimer la planche (8 cartes)</button></p>
-        <h2 class="printTitle">Cartes — toutes les classes</h2>
+        <p class="actionsRow"><button type="button" class="button" id="printBtn">Imprimer la planche</button></p>
+        <h2 class="printTitle" id="printTitle">Cartes</h2>
         <div class="cards" id="cards"></div>
       </section>
 
@@ -226,42 +223,205 @@
   </div>
 
 <script>
-  // Données d'exemple — aucune donnée réelle.
+  // ------------------------------------------------------------------
+  // Données d'exemple (aucune donnée réelle) — miroir de la forme de
+  // GET /api/dashboard. Le dashboard réel est dans src/components/dashboard/.
+  // ------------------------------------------------------------------
+
+  // 0 = dimanche … 6 = samedi (cf. supabase/schema.sql).
+  const CLASSES = [
+    { id: "6a", nom: "6ème A" },
+    { id: "5b", nom: "5ème B" }
+  ];
+
+  const ELEVES = [
+    { code: "VC-6A-0001", nom: "Fatoumata Diallo", classe: "6a" },
+    { code: "VC-6A-0002", nom: "Mamadou Camara",   classe: "6a" },
+    { code: "VC-6A-0003", nom: "Aïssatou Barry",   classe: "6a" },
+    { code: "VC-6A-0004", nom: "Ibrahima Sow",     classe: "6a" },
+    { code: "VC-5B-0001", nom: "Kadiatou Keïta",   classe: "5b" },
+    { code: "VC-5B-0002", nom: "Ousmane Condé",    classe: "5b" },
+    { code: "VC-5B-0003", nom: "Mariam Touré",     classe: "5b" },
+    { code: "VC-5B-0004", nom: "Alpha Bah",        classe: "5b" }
+  ];
+
+  const COURS = [
+    { id: "m", nom: "Mathématiques", classe: "6a", salle: "Salle 12",    debut: "08:00", fin: "10:00", jours: [1, 5] },
+    { id: "f", nom: "Français",      classe: "6a", salle: "Salle 12",    debut: "10:15", fin: "12:15", jours: [2, 4, 5] },
+    { id: "s", nom: "Sciences",      classe: "5b", salle: "Laboratoire", debut: "08:00", fin: "10:00", jours: [1, 4, 5] },
+    { id: "a", nom: "Anglais",       classe: "5b", salle: "Salle 7",     debut: "14:00", fin: "16:00", jours: [2, 5] }
+  ];
+
+  // Présences serveur (scans) par jour de semaine : jour -> cours -> codes présents.
+  const PRESENTS = {
+    1: { m: ["VC-6A-0001", "VC-6A-0002", "VC-6A-0004"], s: ["VC-5B-0001", "VC-5B-0002"] },
+    2: { f: ["VC-6A-0001", "VC-6A-0003"], a: [] },
+    4: { f: ["VC-6A-0001", "VC-6A-0003"], s: ["VC-5B-0001", "VC-5B-0002"] },
+    5: { m: ["VC-6A-0001", "VC-6A-0002", "VC-6A-0003"], f: ["VC-6A-0001", "VC-6A-0002"], s: ["VC-5B-0001", "VC-5B-0002"], a: ["VC-5B-0001", "VC-5B-0003"] }
+  };
+
+  // Cours déjà terminés ce jour-là : les non-présents y sont ABSENTS,
+  // sinon NON POINTÉS (cours encore en cours).
+  const TERMINES = { 1: ["m", "s"], 2: ["f"], 4: ["f", "s"], 5: ["m", "f"] };
+
   const STATUTS = {
     present:      { label: "PRÉSENT",    cls: "present" },
     "non-pointe": { label: "NON POINTÉ", cls: "nonPointe" },
     absent:       { label: "ABSENT",     cls: "absent" }
   };
 
-  const ELEVES = [
-    { nom:"Fatoumata Diallo", classe:"6ème A", code:"VC-6A-0001", scans:2, statuts:[["Mathématiques","present"],["Français","present"]] },
-    { nom:"Mamadou Camara",   classe:"6ème A", code:"VC-6A-0002", scans:1, statuts:[["Mathématiques","present"],["Français","non-pointe"]] },
-    { nom:"Aïssatou Barry",   classe:"6ème A", code:"VC-6A-0003", scans:1, statuts:[["Mathématiques","absent"],["Français","present"]] },
-    { nom:"Ibrahima Sow",     classe:"6ème A", code:"VC-6A-0004", scans:1, statuts:[["Mathématiques","present"],["Français","non-pointe"]] },
-    { nom:"Kadiatou Keïta",   classe:"5ème B", code:"VC-5B-0001", scans:1, statuts:[["Sciences","present"],["Anglais","non-pointe"]] },
-    { nom:"Ousmane Condé",    classe:"5ème B", code:"VC-5B-0002", scans:1, statuts:[["Sciences","present"],["Anglais","non-pointe"]] },
-    { nom:"Mariam Touré",     classe:"5ème B", code:"VC-5B-0003", scans:0, statuts:[["Sciences","absent"],["Anglais","non-pointe"]] },
-    { nom:"Alpha Bah",        classe:"5ème B", code:"VC-5B-0004", scans:0, statuts:[["Sciences","absent"],["Anglais","non-pointe"]] }
-  ];
-
+  // ------------------------------------------------------------------
+  // Aides
+  // ------------------------------------------------------------------
   const $  = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) =>
-    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  // Tableau élèves : une pastille « cours : STATUT » par cours de la classe.
-  $("#elevesBody").innerHTML = ELEVES.map((e) => {
-    const pastilles = e.statuts.map(([cours, st]) => {
-      const s = STATUTS[st];
-      return '<span class="pastille ' + s.cls + '">' + esc(cours) + " : " + s.label + "</span>";
+  const classeById = (id) => CLASSES.find((c) => c.id === id);
+  const elevesDeClasse = (id) => ELEVES.filter((e) => e.classe === id);
+
+  function jourSemaine(dateStr) {
+    const p = dateStr.split("-").map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+  }
+
+  const JOURS_NOMS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  const MOIS_NOMS = ["janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+  // Format français déterministe (indépendant du support ICU du navigateur).
+  function labelDate(dateStr) {
+    const p = dateStr.split("-").map(Number);
+    const jour = new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+    return JOURS_NOMS[jour] + " " + p[2] + " " + MOIS_NOMS[p[1] - 1] + " " + p[0];
+  }
+
+  const coursDuJour = (jour) => COURS.filter((c) => c.jours.indexOf(jour) !== -1);
+
+  function statut(code, coursId, jour) {
+    const presents = (PRESENTS[jour] || {})[coursId] || [];
+    if (presents.indexOf(code) !== -1) return "present";
+    if ((TERMINES[jour] || []).indexOf(coursId) !== -1) return "absent";
+    return "non-pointe";
+  }
+
+  // État des filtres (période d'exemple : semaine du 9 au 13 nov. 2026).
+  const state = { date: "2026-11-13", classe: "all", cours: "all" };
+
+  function coursAffiches() {
+    const jour = jourSemaine(state.date);
+    return coursDuJour(jour).filter((c) =>
+      (state.classe === "all" || c.classe === state.classe) &&
+      (state.cours === "all" || c.id === state.cours));
+  }
+
+  // ------------------------------------------------------------------
+  // Rendu
+  // ------------------------------------------------------------------
+  function pastille(nom, st) {
+    const s = STATUTS[st];
+    return '<span class="pastille ' + s.cls + '">' + esc(nom) + " : " + s.label + "</span>";
+  }
+
+  function renderHeader() {
+    $("#subtitle").textContent = labelDate(state.date) + " · Africa/Conakry";
+  }
+
+  function renderGeneral() {
+    const jour = jourSemaine(state.date);
+    const cours = coursAffiches();
+    const codes = {};
+    const presentsSet = {};
+    let scans = 0;
+
+    cours.forEach((c) => {
+      elevesDeClasse(c.classe).forEach((e) => { codes[e.code] = true; });
+      const pres = (PRESENTS[jour] || {})[c.id] || [];
+      pres.forEach((code) => { presentsSet[code] = true; scans++; });
+    });
+
+    $("#kpiCours").textContent = cours.length;
+    $("#kpiEleves").textContent = Object.keys(codes).length;
+    $("#kpiPresents").textContent = Object.keys(presentsSet).length;
+    $("#kpiScans").textContent = scans;
+
+    const body = $("#generalBody");
+    if (!cours.length) {
+      body.innerHTML = '<tr><td class="empty" colspan="6">Aucun cours prévu pour cette sélection.</td></tr>';
+      return;
+    }
+    body.innerHTML = cours.map((c) => {
+      const effectif = elevesDeClasse(c.classe).length;
+      const pres = ((PRESENTS[jour] || {})[c.id] || []).length;
+      const termine = (TERMINES[jour] || []).indexOf(c.id) !== -1;
+      const absents = termine ? effectif - pres : 0;
+      return "<tr><td>" + esc(classeById(c.classe).nom) + "</td><td>" + esc(c.nom) + "</td>" +
+        "<td>" + esc(c.salle) + '</td><td class="num">' + c.debut + "–" + c.fin + "</td>" +
+        '<td class="num">' + pres + "/" + effectif + "</td>" +
+        '<td class="num">' + absents + "</td></tr>";
     }).join("");
-    return "<tr><td>" + esc(e.nom) + "</td><td>" + esc(e.classe) + "</td>" +
-      '<td class="code">' + esc(e.code) + "</td>" +
-      '<td class="num">' + e.scans + "</td><td>" + pastilles + "</td></tr>";
-  }).join("");
+  }
+
+  function renderClasses() {
+    const jour = jourSemaine(state.date);
+    const rows = CLASSES
+      .filter((c) => state.classe === "all" || c.id === state.classe)
+      .map((c) => {
+        const eleves = elevesDeClasse(c.id);
+        const coursClasse = coursDuJour(jour).filter((x) => x.classe === c.id);
+        const presents = eleves.filter((e) =>
+          coursClasse.some((x) => statut(e.code, x.id, jour) === "present")).length;
+        return "<tr><td>" + esc(c.nom) + '</td><td class="num">' + eleves.length +
+          '</td><td class="num">' + presents + '</td><td class="num">' + coursClasse.length + "</td></tr>";
+      });
+    $("#classesBody").innerHTML = rows.length
+      ? rows.join("")
+      : '<tr><td class="empty" colspan="4">Aucune classe.</td></tr>';
+  }
+
+  function renderCours() {
+    const jour = jourSemaine(state.date);
+    const cours = coursAffiches();
+    const body = $("#coursBody");
+    if (!cours.length) {
+      body.innerHTML = '<tr><td class="empty" colspan="5">Aucun cours prévu pour cette sélection.</td></tr>';
+      return;
+    }
+    body.innerHTML = cours.map((c) => {
+      const effectif = elevesDeClasse(c.classe).length;
+      const pres = ((PRESENTS[jour] || {})[c.id] || []).length;
+      return "<tr><td>" + esc(c.nom) + "</td><td>" + esc(classeById(c.classe).nom) + "</td>" +
+        '<td class="num">' + c.debut + "–" + c.fin + "</td><td>" + esc(c.salle) + "</td>" +
+        '<td class="num">' + pres + "/" + effectif + "</td></tr>";
+    }).join("");
+  }
+
+  function renderEleves() {
+    const jour = jourSemaine(state.date);
+    const cours = coursAffiches();
+    let eleves = ELEVES.filter((e) => state.classe === "all" || e.classe === state.classe);
+    if (state.cours !== "all") {
+      const c = COURS.find((x) => x.id === state.cours);
+      if (c) eleves = eleves.filter((e) => e.classe === c.classe);
+    }
+    const body = $("#elevesBody");
+    if (!eleves.length) {
+      body.innerHTML = '<tr><td class="empty" colspan="5">Aucun élève pour cette sélection.</td></tr>';
+      return;
+    }
+    body.innerHTML = eleves.map((e) => {
+      const mesCours = cours.filter((c) => c.classe === e.classe);
+      const pastilles = mesCours.map((c) => pastille(c.nom, statut(e.code, c.id, jour))).join("");
+      const scans = mesCours.filter((c) => statut(e.code, c.id, jour) === "present").length;
+      return "<tr><td>" + esc(e.nom) + "</td><td>" + esc(classeById(e.classe).nom) + "</td>" +
+        '<td class="code">' + esc(e.code) + '</td><td class="num">' + scans + "</td>" +
+        "<td>" + (pastilles || '<span class="empty">Aucun cours ce jour</span>') + "</td></tr>";
+    }).join("");
+  }
 
   // Pseudo-QR déterministe (illustratif : ce n'est PAS un QR scannable).
-  function qrSvg(seed){
+  function qrSvg(seed) {
     const N = 21, cell = 6;
     let h = 2166136261;
     for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -269,10 +429,10 @@
 
     const inBox = (r, c, r0, c0) => r >= r0 && r < r0 + 7 && c >= c0 && c < c0 + 7;
     const finder = (r, c) => {
-      const zones = [[0,0],[0,N-7],[N-7,0]];
-      for (const [r0, c0] of zones) {
-        if (inBox(r, c, r0, c0)) {
-          const lr = r - r0, lc = c - c0;
+      const zones = [[0, 0], [0, N - 7], [N - 7, 0]];
+      for (const z of zones) {
+        if (inBox(r, c, z[0], z[1])) {
+          const lr = r - z[0], lc = c - z[1];
           const edge = lr === 0 || lr === 6 || lc === 0 || lc === 6;
           const core = lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4;
           return (edge || core) ? 1 : 0;
@@ -294,15 +454,64 @@
       rects + "</g></svg>";
   }
 
-  $("#cards").innerHTML = ELEVES.map((e) =>
-    '<article class="card"><div class="cardHead"><span>VerifyCheck</span><span>' + esc(e.classe) + "</span></div>" +
-    '<div class="cardBody">' + qrSvg(e.code) + "<div>" +
-    '<div class="cardNom">' + esc(e.nom) + "</div>" +
-    '<div class="cardCode">' + esc(e.code) + "</div></div></div></article>"
-  ).join("");
+  function renderCartes() {
+    const eleves = ELEVES.filter((e) => state.classe === "all" || e.classe === state.classe);
+    $("#printTitle").textContent = state.classe === "all"
+      ? "Cartes — toutes les classes"
+      : "Cartes — " + classeById(state.classe).nom;
+    $("#printBtn").textContent = "Imprimer la planche (" + eleves.length +
+      " carte" + (eleves.length > 1 ? "s" : "") + ")";
+    $("#cards").innerHTML = eleves.map((e) =>
+      '<article class="card"><div class="cardHead"><span>VerifyCheck</span><span>' +
+      esc(classeById(e.classe).nom) + "</span></div>" +
+      '<div class="cardBody">' + qrSvg(e.code) + "<div>" +
+      '<div class="cardNom">' + esc(e.nom) + "</div>" +
+      '<div class="cardCode">' + esc(e.code) + "</div></div></div></article>").join("");
+  }
 
-  // ---- navigation entre vues + états ----
-  function setView(view){
+  function renderAll() {
+    renderHeader();
+    renderGeneral();
+    renderClasses();
+    renderCours();
+    renderEleves();
+    renderCartes();
+  }
+
+  // ---- filtres -------------------------------------------------------
+  const fDate = $("#fDate"), fClasse = $("#fClasse"), fCours = $("#fCours");
+
+  // Les options « Cours » dépendent de la date (jour de la semaine) et de la classe.
+  function syncCoursOptions() {
+    const jour = jourSemaine(state.date);
+    const dispo = coursDuJour(jour).filter((c) => state.classe === "all" || c.classe === state.classe);
+    if (!dispo.some((c) => c.id === state.cours)) state.cours = "all";
+    fCours.innerHTML = '<option value="all">Tous</option>' + dispo.map((c) =>
+      '<option value="' + c.id + '">' + esc(c.nom) + " " + c.debut + "</option>").join("");
+    fCours.value = state.cours;
+  }
+
+  fClasse.innerHTML = '<option value="all">Toutes</option>' + CLASSES.map((c) =>
+    '<option value="' + c.id + '">' + esc(c.nom) + "</option>").join("");
+
+  fDate.addEventListener("change", () => {
+    if (!fDate.value) { fDate.value = state.date; return; }
+    state.date = fDate.value;
+    syncCoursOptions();
+    renderAll();
+  });
+  fClasse.addEventListener("change", () => {
+    state.classe = fClasse.value;
+    syncCoursOptions();
+    renderAll();
+  });
+  fCours.addEventListener("change", () => {
+    state.cours = fCours.value;
+    renderAll();
+  });
+
+  // ---- navigation entre vues + états --------------------------------
+  function setView(view) {
     $$(".view").forEach((s) => { s.hidden = s.dataset.view !== view; });
     $$(".nav button").forEach((b) => {
       const on = b.dataset.view === view;
@@ -315,7 +524,7 @@
   $$("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 
   let loading = false, error = false;
-  function renderStates(){
+  function renderStates() {
     $("#load").hidden = !loading;
     $("#err").hidden = !error;
     $("#main").hidden = loading || error;
@@ -325,8 +534,12 @@
   $("#loadBtn").addEventListener("click", () => { loading = !loading; if (loading) error = false; renderStates(); });
   $("#errBtn").addEventListener("click", () => { error = !error; if (error) loading = false; renderStates(); });
 
+  // ---- initialisation ----------------------------------------------
+  fDate.value = state.date;
+  syncCoursOptions();
   setView("general");
   renderStates();
+  renderAll();
 </script>
 </body>
 </html>
