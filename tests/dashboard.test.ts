@@ -63,6 +63,16 @@ test("isIsoDate rejette les formats invalides", () => {
   assert.ok(!isIsoDate(""));
 });
 
+test("isIsoDate rejette les dates calendaires impossibles", () => {
+  // Le format seul passait le regex mais produisait une Date invalide (500 côté API).
+  assert.ok(!isIsoDate("2026-13-45"));
+  assert.ok(!isIsoDate("2026-02-31"));
+  assert.ok(!isIsoDate("0000-00-00"));
+  assert.ok(isIsoDate("2026-02-28"));
+  assert.ok(isIsoDate("2028-02-29")); // bissextile
+  assert.ok(!isIsoDate("2026-02-29")); // non bissextile
+});
+
 test("nextDayIso et weekdayOfIso sur des dates UTC", () => {
   assert.equal(nextDayIso("2026-11-13"), "2026-11-14");
   assert.equal(nextDayIso("2026-02-28"), "2026-03-01"); // année non bissextile

@@ -33,6 +33,7 @@
 
     // contexte
     screenContext: $("screenContext"),
+    contextForm: $("contextForm"),
     ctxNow: $("ctxNow"),
     ctxClasse: $("ctxClasse"),
     ctxCours: $("ctxCours"),

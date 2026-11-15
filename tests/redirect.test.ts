@@ -24,6 +24,13 @@ test("safeNext : URL protocol-relative rejetée", () => {
   assert.equal(safeNext("//evil.example/phish"), "/dashboard");
 });
 
+test("safeNext : backslash rejeté (normalisé en / par le navigateur)", () => {
+  // `/\evil.example` résout vers https://evil.example/ : open redirect.
+  assert.equal(safeNext("/\\evil.example"), "/dashboard");
+  assert.equal(safeNext("/\\\\evil.example"), "/dashboard");
+  assert.equal(safeNext("/dashboard\\..//evil.example"), "/dashboard");
+});
+
 test("safeNext : schéma relatif dangereux rejeté", () => {
   assert.equal(safeNext("javascript:alert(1)"), "/dashboard");
   assert.equal(safeNext("data:text/html,<script>alert(1)</script>"), "/dashboard");
