@@ -42,7 +42,20 @@ code, cours actif, anti-doublon.
 - `GET /api/scan/context` — **nouveau** : classes, cours du jour avec heures et
   statut actif (source de l'écran de contexte). Auth admin requise.
 
-Aucun changement de schéma SQL, de RLS ou de données élèves.
+### Évolution de schéma (v2, 2026-11)
+
+Ajout de trois colonnes à `classes` (système guinéen) : `niveau` (maternelle /
+primaire / college / lycee / universite), `option` (section, série ou
+parcours/année) et `departement` (département universitaire, référentiel
+générique sans nom d'établissement). Colonnes nullables, contraintes de
+vocabulaire, index `classes_niveau_idx`. Aucun impact sur `students`,
+`courses`, `attendance`, la RLS ni les données élèves.
+
+- Migration incrémentale (base existante) : `supabase/migrations/2026-11-15_classes_niveaux_option_departement.sql`
+- Schéma complet (nouvelle base) : `supabase/schema.sql` (v2)
+
+Les contrats API et le comportement runtime restent inchangés (les requêtes
+`select id, nom from classes` continuent de fonctionner).
 
 ## Hors ligne (PWA)
 

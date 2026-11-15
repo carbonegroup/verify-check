@@ -1,11 +1,49 @@
--- VerifyCheck — MVP schema (v1 corrigé, Sprint 0)
+-- VerifyCheck — MVP schema (v2, 2026-11)
 -- À exécuter manuellement dans l'éditeur SQL Supabase après validation humaine.
 -- Principe : minimisation des données élèves (pas de photo, pas d'email),
 -- RLS stricte réservée aux admins, fuseau scolaire Africa/Conakry.
+--
+-- v2 : niveaux (cycles) + option + département universitaire sur `classes`
+--      (système guinéen). Voir supabase/migrations/2026-11-15_*.sql pour la
+--      migration incrémentale d'une base déjà créée en v1.
 
 create table classes (
   id uuid primary key default gen_random_uuid(),
-  nom text not null unique
+  nom text not null unique,
+  -- Système guinéen : Maternelle / Primaire / Collège / Lycée (regroupés),
+  -- Université à part. Chaque classe porte une option ; le département ne
+  -- concerne que l'université (référentiel générique, sans nom d'établissement).
+  niveau text,                       -- cycle : maternelle | primaire | college | lycee | universite
+  option text,                       -- section (primaire/collège), série (lycée) ou parcours/année (université)
+  departement text,                  -- département universitaire (niveau = universite)
+  constraint classes_niveau_check
+    check (niveau is null or niveau in ('maternelle', 'primaire', 'college', 'lycee', 'universite')),
+  constraint classes_departement_check
+    check (departement is null or departement in (
+      -- Sciences et techniques
+      'Mathématiques', 'Physique', 'Chimie', 'Biologie', 'Géologie', 'Informatique',
+      -- Sciences de la santé
+      'Médecine', 'Pharmacie', 'Odontologie', 'Sciences infirmières', 'Sage-femme', 'Santé publique',
+      -- Ingénierie / polytechnique
+      'Génie civil', 'Génie électrique', 'Génie mécanique', 'Génie informatique', 'Télécommunications',
+      -- Sciences sociales et humaines
+      'Sociologie', 'Psychologie', 'Histoire', 'Géographie',
+      'Sciences de l''information et de la communication',
+      -- Lettres et langues
+      'Lettres modernes', 'Anglais', 'Langues nationales',
+      -- Droit et sciences politiques
+      'Droit privé', 'Droit public', 'Relations internationales',
+      -- Économie et gestion
+      'Économie', 'Gestion', 'Comptabilité-Finance',
+      -- Agronomie et sciences vétérinaires
+      'Agronomie', 'Foresterie', 'Sciences vétérinaires',
+      -- Sciences de l'éducation
+      'Sciences de l''éducation', 'Formation des enseignants',
+      -- Mines et environnement
+      'Génie minier', 'Sciences de l''environnement'
+    )),
+  constraint classes_departement_niveau_check
+    check (departement is null or niveau = 'universite')
 );
 
 create table students (
@@ -41,6 +79,7 @@ create unique index attendance_one_per_student_course_conakry_day_idx
 
 create index attendance_course_idx on attendance (course_id, scanned_at);
 create index students_classe_idx on students (classe_id);  -- vues dashboard par classe
+create index classes_niveau_idx on classes (niveau);        -- regroupement dashboard par niveau
 
 -- RLS activé sur toutes les tables
 alter table classes enable row level security;
