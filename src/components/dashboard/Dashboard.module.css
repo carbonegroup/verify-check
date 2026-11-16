@@ -257,6 +257,36 @@
   background: #fdf3f3;
 }
 
+.sansFrais {
+  color: var(--ink-soft, #5b6b7c);
+  background: #f2efe8;
+}
+
+/* Filtres locaux (dans une vue : statut, période). */
+.inlineFilter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft, #5b6b7c);
+}
+
+.inlineFilter input,
+.inlineFilter select {
+  height: 40px;
+  min-width: 150px;
+  border: 1px solid var(--line, #dcd5c8);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink, #1c2733);
+  padding: 0 8px;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 /* ---------------------------------------------------- Cartes QR imprimables */
 
 .cards {
