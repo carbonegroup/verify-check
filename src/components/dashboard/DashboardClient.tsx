@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildAbsences, isCourseFinished } from "@/lib/absences";
 import styles from "./Dashboard.module.css";
 
@@ -218,6 +218,14 @@ export default function DashboardClient() {
   const [comptabiliteError, setComptabiliteError] = useState<string | null>(null);
   const [comptabiliteLoading, setComptabiliteLoading] = useState(false);
 
+  // Connectivité faible : on mémorise en mémoire les réponses financières déjà
+  // obtenues pour ne pas les retélécharger à chaque va-et-vient entre vues.
+  // Un « Réessayer » invalide l'entrée concernée et force un rafraîchissement.
+  const scolariteCache = useRef(new Map<string, ScolariteData>());
+  const comptabiliteCache = useRef(new Map<string, ComptabiliteData>());
+  const [scolariteReload, setScolariteReload] = useState(0);
+  const [comptabiliteReload, setComptabiliteReload] = useState(0);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -251,9 +259,17 @@ export default function DashboardClient() {
     load();
   }, [load]);
 
-  // Service scolarité : chargé à la demande (vue Scolarité).
+  // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
   useEffect(() => {
     if (vue !== "scolarite") return;
+    const key = `${classe}|${statutScolarite}`;
+    const cached = scolariteCache.current.get(key);
+    if (cached) {
+      setScolarite(cached);
+      setScolariteError(null);
+      setScolariteLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setScolariteLoading(true);
@@ -271,7 +287,9 @@ export default function DashboardClient() {
           setScolariteError("Erreur serveur — réessaie.");
           setScolarite(null);
         } else {
-          setScolarite((await res.json()) as ScolariteData);
+          const body = (await res.json()) as ScolariteData;
+          scolariteCache.current.set(key, body);
+          setScolarite(body);
         }
       } catch {
         setScolariteError("Réseau indisponible.");
@@ -282,11 +300,19 @@ export default function DashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, [vue, classe, statutScolarite]);
+  }, [vue, classe, statutScolarite, scolariteReload]);
 
-  // Service comptabilité : chargé à la demande (vue Comptabilité).
+  // Service comptabilité : chargé à la demande (vue Comptabilité), avec cache mémoire.
   useEffect(() => {
     if (vue !== "comptabilite") return;
+    const key = `${periodeFrom}|${periodeTo}`;
+    const cached = comptabiliteCache.current.get(key);
+    if (cached) {
+      setComptabilite(cached);
+      setComptabiliteError(null);
+      setComptabiliteLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setComptabiliteLoading(true);
@@ -304,7 +330,9 @@ export default function DashboardClient() {
           setComptabiliteError("Erreur serveur — réessaie.");
           setComptabilite(null);
         } else {
-          setComptabilite((await res.json()) as ComptabiliteData);
+          const body = (await res.json()) as ComptabiliteData;
+          comptabiliteCache.current.set(key, body);
+          setComptabilite(body);
         }
       } catch {
         setComptabiliteError("Réseau indisponible.");
@@ -315,7 +343,18 @@ export default function DashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, [vue, periodeFrom, periodeTo]);
+  }, [vue, periodeFrom, periodeTo, comptabiliteReload]);
+
+  // « Réessayer » : invalide le cache de la vue concernée et relance la requête.
+  const retryScolarite = useCallback(() => {
+    scolariteCache.current.delete(`${classe}|${statutScolarite}`);
+    setScolariteReload((n) => n + 1);
+  }, [classe, statutScolarite]);
+
+  const retryComptabilite = useCallback(() => {
+    comptabiliteCache.current.delete(`${periodeFrom}|${periodeTo}`);
+    setComptabiliteReload((n) => n + 1);
+  }, [periodeFrom, periodeTo]);
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({ date });
@@ -410,7 +449,14 @@ export default function DashboardClient() {
         ))}
       </nav>
 
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+          <button type="button" className={styles.retry} onClick={() => load()}>
+            Réessayer
+          </button>
+        </p>
+      )}
       {loading && <p className={styles.loading}>Chargement des données réelles…</p>}
 
       {data && !loading && (
@@ -665,7 +711,14 @@ export default function DashboardClient() {
                 <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
               </div>
 
-              {scolariteError && <p className={styles.error} role="alert">{scolariteError}</p>}
+              {scolariteError && (
+                <p className={styles.error} role="alert">
+                  {scolariteError}
+                  <button type="button" className={styles.retry} onClick={retryScolarite}>
+                    Réessayer
+                  </button>
+                </p>
+              )}
               {scolariteLoading && <p className={styles.loading}>Chargement de la scolarité…</p>}
 
               {scolarite && !scolariteLoading && (
@@ -736,7 +789,14 @@ export default function DashboardClient() {
                 <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
               </div>
 
-              {comptabiliteError && <p className={styles.error} role="alert">{comptabiliteError}</p>}
+              {comptabiliteError && (
+                <p className={styles.error} role="alert">
+                  {comptabiliteError}
+                  <button type="button" className={styles.retry} onClick={retryComptabilite}>
+                    Réessayer
+                  </button>
+                </p>
+              )}
               {comptabiliteLoading && <p className={styles.loading}>Chargement de la comptabilité…</p>}
 
               {comptabilite && !comptabiliteLoading && (

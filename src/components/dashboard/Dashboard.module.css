@@ -192,6 +192,24 @@
   font-size: 14px;
 }
 
+/* Bouton « Réessayer » intégré au message d'erreur (connectivité faible :
+   relancer la requête sans recharger toute la page). */
+.retry {
+  margin-left: 10px;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: rgba(163, 46, 46, 0.08);
+}
+
 .actionsRow {
   display: flex;
   flex-wrap: wrap;

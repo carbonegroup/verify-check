@@ -159,7 +159,8 @@
     <p style="padding:24px;color:#e8eef4">Le scanner a besoin de JavaScript (caméra et décodage QR).</p>
   </noscript>
 
-  <script src="vendor/html5-qrcode.min.js"></script>
+  <!-- html5-qrcode n'est PAS chargé ici : lib/qr.js utilise d'abord le décodage
+       natif (BarcodeDetector) et ne télécharge la librairie qu'en repli. -->
   <script src="lib/feedback.js"></script>
   <script src="lib/api.js"></script>
   <script src="lib/qr.js"></script>

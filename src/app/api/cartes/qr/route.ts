@@ -36,7 +36,10 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "private, max-age=3600",
+        // Le QR d'un code est déterministe : on le cache côté navigateur pour
+        // éviter de re-générer/télécharger une planche entière à chaque
+        // impression (connectivité faible). `private` : lié à la session admin.
+        "Cache-Control": "private, max-age=86400",
       },
     });
     if (auth.session) setSessionCookies(response, auth.session);

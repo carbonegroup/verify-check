@@ -101,4 +101,26 @@ Les contrats API et le comportement runtime restent inchangés (les requêtes
 - Un pointage sans serveur = **EN ATTENTE** (jamais « confirmé »).
 - Synchronisation : au retour du réseau + à l'ouverture ; réponse `doublon`
   → confirmé en doublon ; `ok` → confirmé ; autre erreur → reste en file.
-- Service worker existant conservé (cache des assets statiques).
+- Service worker : coquille minimale mise en cache **individuellement**
+  (`allSettled`) pour que l'installation réussisse même si un fichier échoue en
+  réseau instable ; navigations réseau-d'abord, assets en
+  *stale-while-revalidate*.
+
+## Performance et connectivité faible (2026-11)
+
+Optimisations pour un usage léger à Conakry (réseau 2G/3G intermittent) :
+
+- **Scan sans librairie** : le scanner utilise d'abord le décodage natif
+  `BarcodeDetector` (Chrome/Android) — **aucun script à télécharger**. La
+  librairie `html5-qrcode` (≈ 360 Ko) n'est chargée **qu'en repli** (navigateur
+  sans `BarcodeDetector`), à la demande et mise en cache ensuite.
+- **Cache HTTP long** des assets statiques du scanner (`max-age=604800,
+  stale-while-revalidate`) ; `index.html` et `service-worker.js` restent
+  toujours revalidés pour livrer les mises à jour.
+- **Dashboard** : les vues financières (Scolarité, Comptabilité) gardent leur
+  réponse en mémoire (pas de re-téléchargement au changement d'onglet) et
+  offrent un bouton **Réessayer** en cas d'échec réseau, sans recharger la page.
+- **QR des cartes** : réponse PNG cachée côté navigateur (`private, max-age=86400`)
+  — le QR d'un code est déterministe, utile pour réimprimer une planche.
+- Aucun fichier audio/image lourd : feedback sonore généré (WebAudio), polices
+  système, icônes PNG < 7 Ko.
