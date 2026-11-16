@@ -1,9 +1,12 @@
 # Frais de scolarité — note de conception (proposition, 2026-11)
 
-> Statut : **PROPOSITION — à valider par le mainteneur (Patrick)**.
-> Aucun changement de schéma ni de code n'est inclus dans cette branche.
-> Ce document décrit l'intention, les données minimales et les écrans, afin de
-> valider l'approche **avant** toute implémentation.
+> Statut : **IMPLÉMENTÉ (code + migration fournis)** — migration **non appliquée**
+> en base (validation humaine requise avant exécution SQL).
+> Logique métier : `src/lib/scolarite.ts` (tests : `tests/scolarite.test.ts`).
+> Migration : `supabase/migrations/2026-11-16_frais_scolarite.sql`.
+> API : `/api/scolarite`, `/api/scolarite/export`, `/api/scolarite/reglement`.
+> Vue dashboard : **Scolarité**.
+> Ce document décrit l'intention, les données minimales et les écrans.
 
 ## Objectif
 

@@ -28,6 +28,10 @@
    Le sélecteur **Cours** reste navigable grâce à `cours_disponibles` (tous les
    cours du jour de la classe, indépendamment du cours sélectionné).
 6. Cartes : génération/impression des cartes QR depuis les élèves réels.
+7. Vue **Scolarité** : frais par élève (attendu / réglé / solde / statut), filtre
+   par classe et statut, export CSV + impression.
+8. Vue **Comptabilité** : grand livre (recettes des frais + dépenses), solde et
+   dépenses par catégorie, filtre par période, export CSV + impression.
 
 ### Élève (carte physique)
 Identifiant scolaire, nom, classe, QR unique, identité visuelle école.
@@ -47,6 +51,20 @@ code, cours actif, anti-doublon.
 - `GET /api/scan/context` — **nouveau** : classes, cours du jour avec heures et
   statut actif (source de l'écran de contexte). Auth admin requise.
 
+### Services financiers (2026-11)
+
+- `GET /api/scolarite?classe&statut` — frais par élève (attendu / réglé / solde /
+  statut), résumé par classe et totaux. Statut ∈ regle | partiel | impaye | sans-frais.
+- `GET /api/scolarite/export?classe&statut` — CSV des frais (une ligne par élève).
+- `POST /api/scolarite/reglement {student_id, fee_id, montant_gnf, recu_le, note?}`
+  — enregistre un règlement ; un doublon (même élève + frais + montant + date)
+  est inséré puis signalé (`doublon: true`).
+- `GET /api/comptabilite?from&to` — grand livre (recettes des frais + dépenses),
+  solde et dépenses par catégorie.
+- `GET /api/comptabilite/export?from&to` — CSV du grand livre.
+- `POST /api/comptabilite/depense {libelle, categorie, montant_gnf, date_depense, note?}`
+  — enregistre une dépense.
+
 ### Évolution de schéma (v2, 2026-11)
 
 Ajout de trois colonnes à `classes` (système guinéen) : `niveau` (maternelle /
@@ -58,6 +76,20 @@ vocabulaire, index `classes_niveau_idx`. Aucun impact sur `students`,
 
 - Migration incrémentale (base existante) : `supabase/migrations/2026-11-15_classes_niveaux_option_departement.sql`
 - Schéma complet (nouvelle base) : `supabase/schema.sql` (v2)
+
+### Évolution de schéma (v2.1 / v2.2, 2026-11) — services financiers
+
+- **v2.1 — frais de scolarité** : tables `fees` (frais attendu par classe) et
+  `payments` (règlement reçu par élève). Montants GNF (entiers > 0) + dates
+  uniquement ; aucune donnée de paiement sensible. Solde et statut **dérivés**
+  (`src/lib/scolarite.ts`), jamais stockés.
+  Migration : `supabase/migrations/2026-11-16_frais_scolarite.sql`.
+- **v2.2 — comptabilité** : table `expenses` (dépenses : libellé, catégorie,
+  montant GNF, date). Recettes = `payments`. Solde **dérivé**
+  (`src/lib/comptabilite.ts`).
+  Migration : `supabase/migrations/2026-11-16_depenses.sql`.
+- RLS activé, policies admin-only et privilèges `authenticated` identiques au
+  reste du schéma ; aucun droit `anon`.
 
 Les contrats API et le comportement runtime restent inchangés (les requêtes
 `select id, nom from classes` continuent de fonctionner).

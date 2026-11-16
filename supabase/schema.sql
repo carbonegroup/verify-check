@@ -6,6 +6,11 @@
 -- v2 : niveaux (cycles) + option + département universitaire sur `classes`
 --      (système guinéen). Voir supabase/migrations/2026-11-15_*.sql pour la
 --      migration incrémentale d'une base déjà créée en v1.
+-- v2.1 (2026-11-16) : frais de scolarité — tables `fees` / `payments`
+--      (montants GNF + dates uniquement, RLS admin-only).
+--      Voir supabase/migrations/2026-11-16_frais_scolarite.sql.
+-- v2.2 (2026-11-16) : comptabilité — table `expenses` (dépenses).
+--      Voir supabase/migrations/2026-11-16_depenses.sql.
 
 create table classes (
   id uuid primary key default gen_random_uuid(),
@@ -71,6 +76,43 @@ create table attendance (
   scanned_at timestamptz not null default now()   -- horodatage serveur (timestamptz), pas client
 );
 
+-- Frais de scolarité : minimisation des données (montants GNF + dates seulement,
+-- aucune donnée de paiement sensible). Solde et statut DÉRIVÉS (src/lib/scolarite.ts).
+create table fees (
+  id uuid primary key default gen_random_uuid(),
+  classe_id uuid not null references classes(id) on delete cascade,
+  libelle text not null,                       -- ex. « Scolarité T1 »
+  annee_scolaire text not null,                -- ex. « 2026-2027 »
+  montant_gnf integer not null check (montant_gnf > 0),
+  echeance date,                               -- date limite indicative (optionnelle)
+  created_at timestamptz not null default now()
+);
+
+create table payments (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references students(id) on delete cascade,
+  fee_id uuid not null references fees(id) on delete cascade,
+  montant_gnf integer not null check (montant_gnf > 0),
+  recu_le date not null default current_date,  -- date du règlement (pas d'heure)
+  note text,                                   -- référence libre (reçu papier…)
+  created_at timestamptz not null default now()
+);
+
+-- Comptabilité : dépenses saisies par la direction. Recettes = `payments`.
+-- Solde DÉRIVÉ (src/lib/comptabilite.ts), jamais stocké.
+create table expenses (
+  id uuid primary key default gen_random_uuid(),
+  libelle text not null,
+  categorie text not null
+    check (categorie in (
+      'salaires', 'fournitures', 'entretien', 'transport', 'energie', 'loyer', 'autre'
+    )),
+  montant_gnf integer not null check (montant_gnf > 0),
+  date_depense date not null default current_date,
+  note text,
+  created_at timestamptz not null default now()
+);
+
 -- Anti-doublon : index UNIQUE d'expression sur élève + cours + journée locale Africa/Conakry.
 -- scanned_at (timestamptz) est converti en heure locale Conakry puis on extrait la date scolaire.
 -- Pas de contrainte UNIQUE sur expression : on utilise un index unique d'expression.
@@ -80,12 +122,20 @@ create unique index attendance_one_per_student_course_conakry_day_idx
 create index attendance_course_idx on attendance (course_id, scanned_at);
 create index students_classe_idx on students (classe_id);  -- vues dashboard par classe
 create index classes_niveau_idx on classes (niveau);        -- regroupement dashboard par niveau
+create index fees_classe_idx on fees (classe_id);
+create index payments_student_idx on payments (student_id);
+create index payments_fee_idx on payments (fee_id);
+create index expenses_date_idx on expenses (date_depense);
+create index expenses_categorie_idx on expenses (categorie);
 
 -- RLS activé sur toutes les tables
 alter table classes enable row level security;
 alter table students enable row level security;
 alter table courses enable row level security;
 alter table attendance enable row level security;
+alter table fees enable row level security;
+alter table payments enable row level security;
+alter table expenses enable row level security;
 
 -- Privilèges SQL : seuls les rôles authentifiés peuvent toucher les tables (nécessaire pour que RLS
 -- puisse s'appliquer via une session admin). Aucun droit n'est accordé au rôle anon (scanner inclus).
@@ -93,10 +143,16 @@ grant select, insert, update, delete on classes to authenticated;
 grant select, insert, update, delete on students to authenticated;
 grant select, insert, update, delete on courses to authenticated;
 grant select, insert, update, delete on attendance to authenticated;
+grant select, insert, update, delete on fees to authenticated;
+grant select, insert, update, delete on payments to authenticated;
+grant select, insert, update, delete on expenses to authenticated;
 revoke all on classes from anon;
 revoke all on students from anon;
 revoke all on courses from anon;
 revoke all on attendance from anon;
+revoke all on fees from anon;
+revoke all on payments from anon;
+revoke all on expenses from anon;
 
 -- Policies réservées aux admins authentifiés : app_metadata.role = 'admin' (jamais user_metadata).
 -- Remplacement des anciennes policies permissives "using (true) with check (true)".
@@ -116,6 +172,21 @@ create policy "admin full access courses" on courses
   with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
 create policy "admin full access attendance" on attendance
+  for all to authenticated
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+create policy "admin full access fees" on fees
+  for all to authenticated
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+create policy "admin full access payments" on payments
+  for all to authenticated
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+create policy "admin full access expenses" on expenses
   for all to authenticated
   using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
   with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');

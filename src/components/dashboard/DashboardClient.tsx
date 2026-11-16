@@ -41,7 +41,7 @@ type DashboardData = {
   eleves: Eleve[];
 };
 
-type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes";
+type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes" | "scolarite" | "comptabilite";
 
 const VUES: { id: Vue; label: string }[] = [
   { id: "general", label: "Vue générale" },
@@ -50,7 +50,70 @@ const VUES: { id: Vue; label: string }[] = [
   { id: "cours", label: "Cours" },
   { id: "eleves", label: "Élèves" },
   { id: "cartes", label: "Cartes QR" },
+  { id: "scolarite", label: "Scolarité" },
+  { id: "comptabilite", label: "Comptabilité" },
 ];
+
+type StatutFrais = "regle" | "partiel" | "impaye" | "sans-frais";
+type ScolariteLigne = {
+  eleve_id: string;
+  eleve: string;
+  classe_id: string;
+  classe: string;
+  attendu_gnf: number;
+  regle_gnf: number;
+  solde_gnf: number;
+  statut: StatutFrais;
+};
+type ScolariteData = {
+  lignes: ScolariteLigne[];
+  par_classe: Array<{
+    classe_id: string;
+    classe: string;
+    eleves: number;
+    attendu_gnf: number;
+    regle_gnf: number;
+    solde_gnf: number;
+    taux: number;
+  }>;
+  totaux: { eleves: number; attendu_gnf: number; regle_gnf: number; solde_gnf: number; taux: number };
+};
+
+type ComptabiliteEcriture = {
+  id: string;
+  date: string;
+  type: "recette" | "depense";
+  libelle: string;
+  categorie: string | null;
+  montant_gnf: number;
+};
+type ComptabiliteData = {
+  ecritures: ComptabiliteEcriture[];
+  par_categorie: Array<{ categorie: string; montant_gnf: number }>;
+  totaux: { recettes_gnf: number; depenses_gnf: number; solde_gnf: number; nb_ecritures: number };
+};
+
+const STATUT_FRAIS_LABEL: Record<StatutFrais, string> = {
+  regle: "RÉGLÉ",
+  partiel: "PARTIEL",
+  impaye: "IMPAYÉ",
+  "sans-frais": "AUCUN FRAIS",
+};
+
+const CATEGORIE_LABEL: Record<string, string> = {
+  salaires: "Salaires",
+  fournitures: "Fournitures",
+  entretien: "Entretien",
+  transport: "Transport",
+  energie: "Énergie",
+  loyer: "Loyer",
+  autre: "Autre",
+};
+
+/** Montant en GNF, séparateur de milliers (affichage). */
+function gnf(montant: number): string {
+  return `${Math.round(montant).toLocaleString("fr-FR")} GNF`;
+}
 
 const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
@@ -109,6 +172,19 @@ function statutClass(statut: Statut, s: Record<string, string>): string {
   return `${styles.pastille} ${s[key] ?? ""}`;
 }
 
+/** Réutilise les couleurs de pastille existantes pour les statuts de frais. */
+const SCOLARITE_CLASS: Record<StatutFrais, string> = {
+  regle: "present",
+  partiel: "nonPointe",
+  impaye: "absent",
+  "sans-frais": "sansFrais",
+};
+
+function statutFraisClass(statut: StatutFrais): string {
+  const key = SCOLARITE_CLASS[statut];
+  return `${styles.pastille} ${(styles as Record<string, string>)[key] ?? ""}`;
+}
+
 /** Horodatage d'un scan, à l'heure locale Conakry (jj/mm hh:mm). */
 function formatPresenceAt(scannedAt: string): string {
   const d = new Date(scannedAt);
@@ -131,6 +207,16 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [classeNom, setClasseNom] = useState<string>("");
+
+  const [statutScolarite, setStatutScolarite] = useState<"" | StatutFrais>("");
+  const [scolarite, setScolarite] = useState<ScolariteData | null>(null);
+  const [scolariteError, setScolariteError] = useState<string | null>(null);
+  const [scolariteLoading, setScolariteLoading] = useState(false);
+  const [periodeFrom, setPeriodeFrom] = useState<string>("");
+  const [periodeTo, setPeriodeTo] = useState<string>("");
+  const [comptabilite, setComptabilite] = useState<ComptabiliteData | null>(null);
+  const [comptabiliteError, setComptabiliteError] = useState<string | null>(null);
+  const [comptabiliteLoading, setComptabiliteLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -165,12 +251,94 @@ export default function DashboardClient() {
     load();
   }, [load]);
 
+  // Service scolarité : chargé à la demande (vue Scolarité).
+  useEffect(() => {
+    if (vue !== "scolarite") return;
+    let cancelled = false;
+    (async () => {
+      setScolariteLoading(true);
+      setScolariteError(null);
+      const params = new URLSearchParams();
+      if (classe) params.set("classe", classe);
+      if (statutScolarite) params.set("statut", statutScolarite);
+      try {
+        const res = await fetch(`/api/scolarite?${params.toString()}`, { credentials: "same-origin" });
+        if (res.status === 401) {
+          window.location.href = "/login?next=%2Fdashboard";
+          return;
+        }
+        if (!res.ok) {
+          setScolariteError("Erreur serveur — réessaie.");
+          setScolarite(null);
+        } else {
+          setScolarite((await res.json()) as ScolariteData);
+        }
+      } catch {
+        setScolariteError("Réseau indisponible.");
+      } finally {
+        if (!cancelled) setScolariteLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vue, classe, statutScolarite]);
+
+  // Service comptabilité : chargé à la demande (vue Comptabilité).
+  useEffect(() => {
+    if (vue !== "comptabilite") return;
+    let cancelled = false;
+    (async () => {
+      setComptabiliteLoading(true);
+      setComptabiliteError(null);
+      const params = new URLSearchParams();
+      if (periodeFrom) params.set("from", periodeFrom);
+      if (periodeTo) params.set("to", periodeTo);
+      try {
+        const res = await fetch(`/api/comptabilite?${params.toString()}`, { credentials: "same-origin" });
+        if (res.status === 401) {
+          window.location.href = "/login?next=%2Fdashboard";
+          return;
+        }
+        if (!res.ok) {
+          setComptabiliteError("Erreur serveur — réessaie.");
+          setComptabilite(null);
+        } else {
+          setComptabilite((await res.json()) as ComptabiliteData);
+        }
+      } catch {
+        setComptabiliteError("Réseau indisponible.");
+      } finally {
+        if (!cancelled) setComptabiliteLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [vue, periodeFrom, periodeTo]);
+
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({ date });
     if (classe) params.set("classe", classe);
     if (cours) params.set("cours", cours);
     return `/api/dashboard/export?${params.toString()}`;
   }, [date, classe, cours]);
+
+  const scolariteExportUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (classe) params.set("classe", classe);
+    if (statutScolarite) params.set("statut", statutScolarite);
+    const q = params.toString();
+    return `/api/scolarite/export${q ? `?${q}` : ""}`;
+  }, [classe, statutScolarite]);
+
+  const comptabiliteExportUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (periodeFrom) params.set("from", periodeFrom);
+    if (periodeTo) params.set("to", periodeTo);
+    const q = params.toString();
+    return `/api/comptabilite/export${q ? `?${q}` : ""}`;
+  }, [periodeFrom, periodeTo]);
 
   const classeLabel = (id: string) => data?.classes.find((c) => c.id === id)?.nom ?? "—";
   const eleveParClasse = useMemo(
@@ -474,6 +642,157 @@ export default function DashboardClient() {
           {/* -------------------------------------------------- CARTES */}
           {vue === "cartes" && (
             <CartesQR eleves={eleveParClasse} classeLabel={classeLabel} classeNom={classeNom} />
+          )}
+
+          {/* ---------------------------------------------- SCOLARITÉ */}
+          {vue === "scolarite" && (
+            <>
+              <div className={styles.actionsRow}>
+                <label className={styles.inlineFilter}>
+                  Statut
+                  <select
+                    value={statutScolarite}
+                    onChange={(e) => setStatutScolarite(e.target.value as "" | StatutFrais)}
+                  >
+                    <option value="">Tous</option>
+                    <option value="impaye">Impayés</option>
+                    <option value="partiel">Partiels</option>
+                    <option value="regle">Réglés</option>
+                    <option value="sans-frais">Sans frais</option>
+                  </select>
+                </label>
+                <a className={styles.button} href={scolariteExportUrl}>Exporter en CSV</a>
+                <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
+              </div>
+
+              {scolariteError && <p className={styles.error} role="alert">{scolariteError}</p>}
+              {scolariteLoading && <p className={styles.loading}>Chargement de la scolarité…</p>}
+
+              {scolarite && !scolariteLoading && (
+                <>
+                  <section className={styles.resume}>
+                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.attendu_gnf)}</span><span className={styles.kpiLabel}>attendu</span></div>
+                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.regle_gnf)}</span><span className={styles.kpiLabel}>réglé</span></div>
+                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde dû</span></div>
+                    <div><span className={styles.kpi}>{Math.round(scolarite.totaux.taux * 100)} %</span><span className={styles.kpiLabel}>recouvrement</span></div>
+                  </section>
+
+                  <h2 className={styles.printTitle}>
+                    Frais de scolarité{classeNom ? ` — ${classeNom}` : ""}
+                  </h2>
+
+                  <table className={styles.table}>
+                    <thead>
+                      <tr><th>Élève</th><th>Classe</th><th>Attendu</th><th>Réglé</th><th>Solde</th><th>Statut</th></tr>
+                    </thead>
+                    <tbody>
+                      {scolarite.lignes.map((l) => (
+                        <tr key={l.eleve_id}>
+                          <td>{l.eleve}</td>
+                          <td>{l.classe}</td>
+                          <td className={styles.num}>{gnf(l.attendu_gnf)}</td>
+                          <td className={styles.num}>{gnf(l.regle_gnf)}</td>
+                          <td className={styles.num}>{gnf(l.solde_gnf)}</td>
+                          <td>
+                            <span className={statutFraisClass(l.statut)}>
+                              {STATUT_FRAIS_LABEL[l.statut]}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {scolarite.lignes.length === 0 && (
+                        <tr><td colSpan={6} className={styles.empty}>Aucun élève pour ces filtres.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ------------------------------------------- COMPTABILITÉ */}
+          {vue === "comptabilite" && (
+            <>
+              <div className={styles.actionsRow}>
+                <label className={styles.inlineFilter}>
+                  Du
+                  <input
+                    type="date"
+                    value={periodeFrom}
+                    max={periodeTo || undefined}
+                    onChange={(e) => setPeriodeFrom(e.target.value)}
+                  />
+                </label>
+                <label className={styles.inlineFilter}>
+                  Au
+                  <input
+                    type="date"
+                    value={periodeTo}
+                    min={periodeFrom || undefined}
+                    onChange={(e) => setPeriodeTo(e.target.value)}
+                  />
+                </label>
+                <a className={styles.button} href={comptabiliteExportUrl}>Exporter en CSV</a>
+                <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
+              </div>
+
+              {comptabiliteError && <p className={styles.error} role="alert">{comptabiliteError}</p>}
+              {comptabiliteLoading && <p className={styles.loading}>Chargement de la comptabilité…</p>}
+
+              {comptabilite && !comptabiliteLoading && (
+                <>
+                  <section className={styles.resume}>
+                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.recettes_gnf)}</span><span className={styles.kpiLabel}>recettes</span></div>
+                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.depenses_gnf)}</span><span className={styles.kpiLabel}>dépenses</span></div>
+                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde</span></div>
+                    <div><span className={styles.kpi}>{comptabilite.totaux.nb_ecritures}</span><span className={styles.kpiLabel}>écritures</span></div>
+                  </section>
+
+                  <h2 className={styles.printTitle}>
+                    Grand livre{periodeFrom || periodeTo ? ` — ${periodeFrom || "début"} → ${periodeTo || "aujourd’hui"}` : ""}
+                  </h2>
+
+                  <table className={styles.table}>
+                    <thead>
+                      <tr><th>Date</th><th>Type</th><th>Libellé</th><th>Catégorie</th><th>Montant</th></tr>
+                    </thead>
+                    <tbody>
+                      {comptabilite.ecritures.map((e) => (
+                        <tr key={e.id}>
+                          <td className={styles.num}>{e.date}</td>
+                          <td>{e.type === "recette" ? "Recette" : "Dépense"}</td>
+                          <td>{e.libelle}</td>
+                          <td>{e.categorie ? (CATEGORIE_LABEL[e.categorie] ?? e.categorie) : "—"}</td>
+                          <td className={styles.num}>{gnf(e.montant_gnf)}</td>
+                        </tr>
+                      ))}
+                      {comptabilite.ecritures.length === 0 && (
+                        <tr><td colSpan={5} className={styles.empty}>Aucune écriture pour cette période.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  {comptabilite.par_categorie.length > 0 && (
+                    <>
+                      <h2 className={styles.printTitle}>Dépenses par catégorie</h2>
+                      <table className={styles.table}>
+                        <thead>
+                          <tr><th>Catégorie</th><th>Montant</th></tr>
+                        </thead>
+                        <tbody>
+                          {comptabilite.par_categorie.map((c) => (
+                            <tr key={c.categorie}>
+                              <td>{CATEGORIE_LABEL[c.categorie] ?? c.categorie}</td>
+                              <td className={styles.num}>{gnf(c.montant_gnf)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </>
+              )}
+            </>
           )}
         </main>
       )}
