@@ -34,6 +34,8 @@ export function buildAbsencesCsv(
     date: string;
     weekday: number;
     classe?: string;
+    /** Restreint l'export à un cours (id) ; absent = tous les cours du jour. */
+    cours?: string;
     /** Instant scolaire actuel (Conakry) — un cours non terminé n'est pas absent. */
     now?: { jour: string; heure: string };
   }
@@ -45,7 +47,10 @@ export function buildAbsencesCsv(
   );
   const classIds = new Set(visibleStudents.map((s) => s.classe_id));
   const planned = raw.courses.filter(
-    (c) => c.jour_semaine === options.weekday && classIds.has(c.classe_id)
+    (c) =>
+      c.jour_semaine === options.weekday &&
+      classIds.has(c.classe_id) &&
+      (!options.cours || c.id === options.cours)
   );
   // Honnêteté métier : un élève sans scan n'est PAS absent tant que le cours
   // n'est pas terminé (journée passée = tous terminés ; journée du jour =

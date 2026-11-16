@@ -132,6 +132,26 @@ test("buildDashboard : filtre classe", () => {
   );
 });
 
+test("buildDashboard : cours_disponibles garde tous les cours du jour malgré le filtre cours", () => {
+  const r = buildDashboard(base(), { date: vendredi, cours: "co-math" });
+  assert.deepEqual(
+    r.cours_prevus.map((c) => c.id),
+    ["co-math"]
+  );
+  assert.deepEqual(
+    r.cours_disponibles.map((c) => c.id),
+    ["co-math", "co-phys"]
+  );
+});
+
+test("buildDashboard : cours_disponibles respecte le filtre classe", () => {
+  const r = buildDashboard(base(), { date: vendredi, classe: "cl-2" });
+  assert.deepEqual(
+    r.cours_disponibles.map((c) => c.id),
+    ["co-phys"]
+  );
+});
+
 test("buildDashboard : filtre cours et élève", () => {
   const r = buildDashboard(base(), { date: vendredi, cours: "co-math", eleve: "st-2" });
   assert.equal(r.effectif, 1);

@@ -13,7 +13,7 @@ import { schoolInstant } from "@/lib/time";
 
 /**
  * GET /api/dashboard/export — Sprint 3 : export CSV des absences d'une journée.
- * Params : date (défaut aujourd'hui Conakry), classe?.
+ * Params : date (défaut aujourd'hui Conakry), classe?, cours?.
  * Une ligne par élève sans scan pour chaque cours prévu ce jour (fuseau scolaire).
  */
 
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "date_invalide" }, { status: 400 });
   }
   const classeFilter = params.get("classe") ?? undefined;
+  const coursFilter = params.get("cours") ?? undefined;
   const { startAt, endAt } = dayWindow(date);
 
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       students: (studentsRes.data ?? []) as never,
       attendance: (attendanceRes.data ?? []) as never,
     },
-    { date, weekday: weekdayOfIso(date), classe: classeFilter, now: schoolInstant() }
+    { date, weekday: weekdayOfIso(date), classe: classeFilter, cours: coursFilter, now: schoolInstant() }
   );
 
   const response = new NextResponse(csv, {

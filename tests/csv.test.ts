@@ -65,6 +65,16 @@ test("buildAbsencesCsv : filtre classe", () => {
   assert.ok(!csv.includes("Fatou Camara"));
 });
 
+test("buildAbsencesCsv : filtre cours", () => {
+  const csv = buildAbsencesCsv(
+    { classes, courses, students, attendance: [] },
+    { date, weekday, cours: "co-phys" }
+  );
+  assert.ok(csv.includes("Ibrahima Diallo"), "cours sélectionné → absence listée");
+  assert.ok(!csv.includes("Alpha Barry"), "autre cours → exclu");
+  assert.ok(!csv.includes("Mathématiques"), "autre cours → exclu");
+});
+
 test("buildAbsencesCsv : aucun cours prévu → en-tête seul", () => {
   const csv = buildAbsencesCsv(
     { classes, courses, students, attendance: [] },
