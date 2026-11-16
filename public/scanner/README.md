@@ -21,6 +21,18 @@ Plusieurs cours peuvent être actifs en même temps. Le serveur **refuse le
 pointage ambigu** (`cours_ambigu`) : l'agent choisit le cours (écran de
 contexte) et peut préciser la salle du portique.
 
+## Performance / connectivité faible
+
+- **Décodage QR sans téléchargement** : `lib/qr.js` utilise en priorité
+  l'API native `BarcodeDetector` (Chrome/Android). La librairie
+  `vendor/html5-qrcode.min.js` (≈ 360 Ko) n'est chargée **qu'en repli**, à la
+  demande — elle n'est donc plus sur le chemin critique de démarrage.
+- **Service worker** : coquille mise en cache individuellement (`allSettled`),
+  l'installation réussit même si un fichier échoue ; assets en
+  *stale-while-revalidate*.
+- **Cache navigateur** : assets statiques `/scanner/*` en `max-age=604800,
+  stale-while-revalidate` ; `index.html` et `service-worker.js` revalidés.
+
 ## Développement
 
 ```bash
