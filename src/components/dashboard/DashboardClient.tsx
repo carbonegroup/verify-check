@@ -34,6 +34,7 @@ type DashboardData = {
   jour_semaine: number;
   classes: Classe[];
   cours_prevus: Cours[];
+  cours_disponibles: Cours[];
   effectif: number;
   presents: number;
   scans: number;
@@ -108,6 +109,19 @@ function statutClass(statut: Statut, s: Record<string, string>): string {
   return `${styles.pastille} ${s[key] ?? ""}`;
 }
 
+/** Horodatage d'un scan, à l'heure locale Conakry (jj/mm hh:mm). */
+function formatPresenceAt(scannedAt: string): string {
+  const d = new Date(scannedAt);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
 export default function DashboardClient() {
   const [vue, setVue] = useState<Vue>("general");
   const [date, setDate] = useState(todayConakry());
@@ -154,8 +168,9 @@ export default function DashboardClient() {
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({ date });
     if (classe) params.set("classe", classe);
+    if (cours) params.set("cours", cours);
     return `/api/dashboard/export?${params.toString()}`;
-  }, [date, classe]);
+  }, [date, classe, cours]);
 
   const classeLabel = (id: string) => data?.classes.find((c) => c.id === id)?.nom ?? "—";
   const eleveParClasse = useMemo(
@@ -202,7 +217,7 @@ export default function DashboardClient() {
             Cours
             <select value={cours} onChange={(e) => setCours(e.target.value)}>
               <option value="">Tous</option>
-              {(data?.cours_prevus ?? [])
+              {(data?.cours_disponibles ?? [])
                 .filter((c) => !classe || c.classe_id === classe)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
@@ -412,29 +427,43 @@ export default function DashboardClient() {
           {vue === "eleves" && (
             <table className={styles.table}>
               <thead>
-                <tr><th>Élève</th><th>Classe</th><th>Code carte</th><th>Scans</th><th>Détail des cours</th></tr>
+                <tr><th>Élève</th><th>Classe</th><th>Code carte</th><th>Scans</th><th>Historique</th></tr>
               </thead>
               <tbody>
-                {eleveParClasse.map((e) => (
-                  <tr key={e.id}>
-                    <td>{e.nom}</td>
-                    <td>{classeLabel(e.classe_id)}</td>
-                    <td className={styles.code}>{e.code_qr}</td>
-                    <td className={styles.num}>{e.scans}</td>
-                    <td>
-                      {data.cours_prevus
-                        .filter((c) => c.classe_id === e.classe_id)
-                        .map((c) => {
-                          const statut = statutEleve(e, c, date);
-                          return (
-                            <span key={c.id} className={statutClass(statut, styles as Record<string, string>)}>
-                              {c.nom} : {STATUT_LABEL[statut]}
+                {eleveParClasse.map((e) => {
+                  const history = data.cours_prevus
+                    .filter((c) => c.classe_id === e.classe_id)
+                    .map((c) => ({
+                      cours: c,
+                      statut: statutEleve(e, c, date),
+                      presence: e.presences.find((p) => p.course_id === c.id),
+                    }));
+                  return (
+                    <tr key={e.id}>
+                      <td>{e.nom}</td>
+                      <td>{classeLabel(e.classe_id)}</td>
+                      <td className={styles.code}>{e.code_qr}</td>
+                      <td className={styles.num}>{e.scans}</td>
+                      <td>
+                        {history.length === 0 ? (
+                          <span className={styles.empty}>Aucun cours prévu.</span>
+                        ) : (
+                          history.map(({ cours: c, statut, presence }) => (
+                            <span
+                              key={`${e.id}-${c.id}`}
+                              className={statutClass(statut, styles as Record<string, string>)}
+                            >
+                              {c.nom}
+                              {presence
+                                ? ` · Présent · ${formatPresenceAt(presence.scanned_at)}`
+                                : ` · ${STATUT_LABEL[statut]}`}
                             </span>
-                          );
-                        })}
-                    </td>
-                  </tr>
-                ))}
+                          ))
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {eleveParClasse.length === 0 && (
                   <tr><td colSpan={5} className={styles.empty}>Aucun élève pour ce filtre.</td></tr>
                 )}

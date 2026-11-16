@@ -22,8 +22,12 @@
    terminé), **absent** (cours terminé sans scan). Jamais « absent » pour un
    cours futur ou en cours.
 4. Vue **Absences** : liste imprimable (élève × cours terminé sans scan) avec
-   **export CSV** et **impression** (`window.print`, mise en page dédiée).
-5. Cartes : génération/impression des cartes QR depuis les élèves réels.
+   **export CSV** (filtres date / classe / cours) et **impression**
+   (`window.print`, mise en page dédiée).
+5. Vue **Élèves** : historique réel des scans (horodatage local Conakry).
+   Le sélecteur **Cours** reste navigable grâce à `cours_disponibles` (tous les
+   cours du jour de la classe, indépendamment du cours sélectionné).
+6. Cartes : génération/impression des cartes QR depuis les élèves réels.
 
 ### Élève (carte physique)
 Identifiant scolaire, nom, classe, QR unique, identité visuelle école.
@@ -34,8 +38,8 @@ code, cours actif, anti-doublon.
 
 - `POST /api/auth/login` / `POST /api/auth/logout` — session admin (cookies).
 - `GET /api/dashboard?date&classe&cours&eleve` — données réelles du jour.
-- `GET /api/dashboard/export?date&classe` — CSV absences (cours terminés ou
-  journée passée uniquement).
+- `GET /api/dashboard/export?date&classe&cours` — CSV absences (cours terminés
+  ou journée passée uniquement).
 - `POST /api/scan {code_qr, salle?}` — **correction** : plus de choix
   arbitraire. Si plusieurs cours actifs sans désambiguïsation → `cours_ambigu`
   (l'agent choisit la salle/le cours dans son contexte). Accepte désormais
