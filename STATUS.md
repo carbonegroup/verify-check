@@ -1,71 +1,82 @@
-# STATUS — État des tâches
+# STATUS — État réel du projet
 
-> **Règle d'usage :**
-> 1. Chaque agent/collaborateur, **à la fin de sa session**, met à jour **sa section** (via la PR de sa tâche — jamais de push direct sur `main`) et laisse un handoff clair : ce qui est fait, ce qui ne l'est pas, ce qui bloque.
-> 2. Le Rôle 1 (Patrick) met à jour les sections des autres dès qu'une de ses tâches débloque la leur.
-> 3. Ce fichier est un **instantané**, pas une source de vérité technique : en cas de doute, se fier au code sur `main` et à `ROADMAP.md`/`TEAM.md`.
+**Dernière inspection documentaire :** 2026-11-18  
+**Dépôt :** `sudomarc/verify-check`  
+**Branche de référence inspectée :** `main`  
+**Dernier commit observé :** `bcf56bc87b5a7a2b38fe00cbb9cfc1ea349fc25b` — optimisation de l'interface pour la connectivité faible (#37, 2026-11-16).
 
-**Dernière mise à jour :** 2026-11-14 — Rôle 2 : application mobile native React Native/Expo (`mobile/`) sur branche `feat/app-mobile` (PR #26) — auth Supabase natif, scanner QR natif, file hors ligne, réutilisation des API backend via `Authorization: Bearer` (5 routes étendues, compat cookies préservée). Le mobile est aligné sur le cycle de maintenance 1 (seul `qr_invalide` est un rejet définitif à la synchronisation).
+> Ce fichier est un instantané. Le code et l'état réel des services restent prioritaires. Une fonctionnalité présente dans le dépôt n'est pas nécessairement validée sur un appareil ou dans la base distante.
 
-## Maintenance technique — cycle 1 (2026-11-14)
+## État général
 
-- **Corrigé (scanner PWA)** : le service worker listait `./lib/mock-data.js` (fichier supprimé) → `cache.addAll` échouait et le shell n'était **jamais** mis en cache (mode hors ligne cassé). Liste corrigée + version de cache incrémentée (`v4`).
-- **Corrigé (sécurité/état)** : le service worker servait les réponses `/api/**` depuis le cache (stale-while-revalidate) — un contexte ou une session obsolète pouvait être réutilisé après déconnexion. Les appels `/api/**` ne sont plus mis en cache ; navigations en réseau-d'abord.
-- **Corrigé (fiabilité métier)** : `POST /api/scan` renvoyait `qr_invalide` (rejet définitif côté scanner) même en cas de panne base. Désormais une erreur autre que « 0 ligne » renvoie `erreur_base` (500) → le pointage reste en file au lieu d'être perdu.
-- **Corrigé (fiabilité métier)** : la file hors ligne ne rejette plus définitivement `cours_pas_actif` / `pas_de_cours` / `salle_invalide` à la synchronisation (ces cas surviennent normalement quand la synchro arrive après la fin du cours) : le pointage reste **EN ATTENTE**, jamais supprimé silencieusement. Seul `qr_invalide` reste un rejet définitif.
-- **Corrigé (sécurité)** : open redirect via le paramètre `next` de `/login` (`//evil.com`) → helper `safeNext` (chemin interne uniquement) + tests.
-- **Corrigé (PWA)** : l'URL propre `/scanner` (sans slash) cassait les chemins relatifs (`styles.css`, `lib/*`, service worker) ; redirection vers `/scanner/index.html`.
-- **Corrigé (encodage)** : `public/scanner/styles.css` contenait des octets UTF-8 invalides (`Écrans`, `réelle` en latin-1) → fichier ré-encodé UTF-8.
-- **Nettoyé** : suppression du code mort (`src/lib/mock-data.ts`, `src/lib/supabase.ts`, `pg_connect_tmp.mjs`, CSS `.ini`/`.codes`), protection `/scan` morte retirée du middleware, `.gitignore` complété (`supabase/.temp/`), page d'accueil placeholder remplacée.
-- **Vérifié** : `npm run typecheck` OK, `npm test` **37 tests** verts, `npm run build` OK, redirections scanner et 401 API re-testés en runtime.
+Le socle web, le scanner PWA, le dashboard connecté aux API, les cartes QR, les services Scolarité/Comptabilité et le client mobile Expo sont présents dans `main`. Le projet n'est **pas encore validé de bout en bout sur un appareil réel avec une session administrateur réelle**.
 
----
+### Changements récents observés dans `main`
 
-## Rôle 1 — Backend/DB (Patrick) 🔨 EN COURS
-- **Fait et vérifié (Sprint 0 + Sprint 1)** : schéma corrigé appliqué dans le projet Supabase `hdfefhltqyxiqnuruhlp` (verify-check) via CLI — tables `classes`, `students`, `courses`, `attendance` créées, RLS activé sur les 4 tables, policies admin (`app_metadata.role='admin'`, jamais `user_metadata`), privilèges SQL : `authenticated` arwd, `anon` rien. Index unique d'expression `attendance_one_per_student_course_conakry_day_idx` (anti-doublon par jour local `Africa/Conakry`) **testé en base** : doublon même jour rejeté (23505), lendemain accepté, rôle `anon` = permission denied, `authenticated` sans JWT admin = 0 lignes. Données de test créées puis nettoyées (base vierge).
-- **Fait (code Sprint 1–3, build vert)** : `src/lib/auth.ts` + `src/middleware.ts` (protection `/dashboard` et `/scan`, JWT vérifié auprès de Supabase), page `/login`, `POST /api/auth/login` (rejet rôle non-admin), `POST /api/auth/logout`, `POST /api/scan` (QR → cours actif Conakry → attendance, erreurs métier : `qr_invalide` / `pas_de_cours` / `salle_invalide` / `doublon`), `GET /api/dashboard` (planning du jour, résumé, présence par classe/cours/élève), `GET /api/dashboard/export` (CSV absences). Vérifié : typecheck OK, `next build` OK, runtime — 401 sans session sur `/api/scan` et `/api/dashboard(/export)`, 307 `/dashboard`→`/login`, 401 sur login bidon.
-- **Fait (audit Rôle 1 — PR `fix/backend-audit-sessions-tests`)** : cycle access/refresh token complété (renouvellement automatique via le refresh cookie 8 h dans le middleware et les endpoints protégés, rotation access+refresh ré-écrite en cookies) ; `logout` révoque désormais la session côté Supabase (`signOut` via `setSession`) en plus de supprimer les cookies ; logique métier extraite en fonctions pures (`src/lib/dashboard.ts`, `src/lib/csv.ts`, `src/lib/scan.ts`) et testée — **26 tests `node:test` verts** (`npm test`), dont anti-doublon compté, scans hors planning ignorés, filtres classe/cours/élève, CSV absences (échappement, BOM, filtre), rôles (`app_metadata` seulement), créneaux Conakry ; `npm test` ajouté au workflow CI (`.github/workflows/ci.yml`) ; typecheck + build verts localement.
-- **Bloqué sur décision humaine :** création du **compte admin Supabase Auth** (`admin@ucao.edu` / `ucaoadmin$`, `app_metadata.role='admin'`) — à créer par Patrick dans le projet Supabase ; le parcours bout-en-bout ne peut être vérifié qu'avec ce compte. Variables production Vercel : confirmées par Patrick.
-- **Reste Rôle 1** : vérification bout-en-bout scan→présence avec le compte admin (runtime 401/refus re-vérifiable seulement avec une session réelle) ; branchement réel de l'UI dashboard = Rôle 3 ; vérification locale du serveur de dev bloquée dans cet environnement (session Windows agent) — la CI GitHub revalide typecheck + tests + build sur la PR.
+- **#32 — Absences et export :** vue Absences, export CSV et impression.
+- **#35 — Historique élève :** historique réel des scans, filtre cours propagé à l'export.
+- **#36 — Scolarité et Comptabilité :** logique métier, API, vues dashboard, tests et migrations SQL ajoutés.
+- **#37 — Connectivité faible :** BarcodeDetector natif prioritaire, chargement différé de `html5-qrcode`, cache du scanner et des QR, conservation en mémoire des vues financières et bouton Réessayer.
 
-## Rôle 2 — Frontend scanner 🔨 EN COURS
-- **Fait (PR #20 fusionnée)** : PWA scanner réel (caméra navigateur, états serveur honnêtes, erreurs métier affichées), dashboard branché aux données réelles, cartes QR imprimables.
-- **Fait (branche `feat/app-mobile`, PR en cours)** : application mobile native React Native + Expo (`mobile/`) — client des mêmes endpoints API, `Authorization: Bearer` accepté par le backend (helper `requestAccessToken`, 5 routes, compat cookies web préservée). Auth Supabase natif, contexte de pointage (classes + cours actifs Conakry), scanner QR natif + saisie manuelle, file hors ligne persistante (EN ATTENTE / CONFIRMÉ / REJETÉ — jamais de « confirmé » sans réponse serveur), historique local, compteurs réels. Vérifié : typecheck strict OK, 17 tests `node --test mobile/tests/` verts (mapping états, file, config), `expo-doctor` 20/20, typecheck + tests racine verts.
-- **Non vérifié / bloqué** : build Android signé (pas de SDK ni compte EAS sur la machine — instructions Expo Go dans `mobile/README.md`), caméra sur appareil physique, parcours complet login→scan→dashboard (compte admin Supabase toujours à créer — décision de Patrick).
-- **Reste Rôle 2** : retour sonore de confirmation, test réel appareil, éventuel flux multi-rôles (navigation `react-navigation` volontairement non ajoutée : un seul flux admin à 3 onglets).
+Le dashboard contient actuellement les vues « Vue générale », « Absences », « Classes », « Cours », « Élèves », « Cartes QR », « Scolarité » et « Comptabilité ».
 
-## Rôle 3 — Frontend dashboard ⏳ EN ATTENTE (partiel)
-- **Débloqué côté backend (Sprint 1 + 3)** : tables + RLS + auth admin (login/middleware) appliquées ; API `GET /api/dashboard` (filtres date/classe/cours/élève, fuseau Conakry) et `GET /api/dashboard/export` (CSV absences) implémentées. L'UI (données réelles, filtres, export) reste à brancher par le Rôle 3.
-- **Peut faire dès maintenant :** maquette de l'écran dashboard (Sprint 0, ROADMAP), éventuellement avec les mock-data.
-- **Débloqué :** —
+## Rôle 1 — Backend, données, sécurité et intégration
 
-## Rôle 4 — Carte ID + QR + intégration ⏳ EN ATTENTE (partiel)
-- **Débloqué côté backend (Sprint 1)** : tables `students`/`classes` exécutées dans Supabase — la génération de cartes peut commencer.
-- **Peut faire dès maintenant :** maquette de la carte élève (Sprint 0, ROADMAP).
-- **Débloqué :** —
+### Fait dans le code / intégré
 
----
+- Schéma principal, tables de présence et politiques RLS admin.
+- Auth admin web, protection des routes, renouvellement et révocation de session.
+- API de scan et règles métier : cours/salle, horodatage serveur, anti-doublon et erreurs explicites.
+- API dashboard, historique, filtres et export CSV.
+- Auth Bearer pour le client mobile sur les routes API concernées, en conservant les cookies web.
+- Services Scolarité et Comptabilité : logique métier, API, interfaces raccordées et tests présents dans le dépôt.
 
-## Variables d'environnement (pour tous les rôles)
+### Restant / bloquant
 
-Les variables **publiques** du projet Supabase (URL + clé `anon`) sont commitées en vraies valeurs dans **`.env.example`** : copiez-le en `.env.local` pour développer (`cp .env.example .env.local`) ou reprenez les valeurs directement. La clé `anon` est publique par conception (RLS côté base) — côté serveur/node, copier le fichier en `.env.local` suffit pour Next.js.
-Aucun token privé GitHub, Supabase ou Vercel ne doit figurer dans `.env.example`, dans la documentation ou dans Git. Les accès d'administration doivent être fournis uniquement par l'environnement local ou les mécanismes d'authentification propres à chaque outil.
+- [ ] **Bloquant humain :** créer le compte administrateur Supabase Auth et définir son rôle dans `app_metadata`. Aucun identifiant ou mot de passe ne doit être conservé dans ce fichier.
+- [ ] Vérifier les parcours authentifiés et les refus d'accès avec ce compte réel.
+- [ ] **Migrations financières non appliquées selon les notes de conception :** obtenir la validation humaine des modèles, puis appliquer les migrations frais de scolarité et dépenses ; vérifier ensuite les tables et policies RLS dans la base distante.
+- [ ] Vérifier l'état réel de la migration des niveaux/options/départements des classes dans Supabase ; la présence du fichier SQL ne prouve pas son application.
+- [ ] Faire le test réel scan → insertion `attendance` → lecture dans le dashboard.
 
-## Refonte produit (en cours — branche `feat/refonte-produit`)
+## Rôle 2 — Frontend, scanner, mobile, expérience et QA
 
-- **FAIT (code)** : corrections métier backend — `POST /api/scan` refuse désormais un contexte ambigu (`cours_ambigu`, plus jamais de choix arbitraire du 1er cours) et accepte `cours` explicite ; export CSV honnête (un cours non terminé n'est pas « absent ») ; nouvel endpoint `GET /api/scan/context` (contexte de pointage réel).
-- **FAIT (code)** : PWA scanner reconnectée aux API réelles (login same-origin, contexte, `POST /api/scan`), file hors ligne **IndexedDB** persistante avec états EN ATTENTE / confirmé / doublon confirmé / rejeté ; écrans connexion + contexte de pointage ; démo (`mock-data.js`, forçage hors-ligne) retirée de la production ; saisie manuelle conservée.
-- **FAIT (code)** : dashboard reconnecté aux données réelles (`GET /api/dashboard`) — vues Générale / Classes / Cours / Élèves / Cartes QR, filtres date+classe+cours, distinction PRÉSENT / NON POINTÉ / ABSENT à l'heure Conakry, export CSV, génération & impression des cartes QR depuis les élèves réels.
-- **FAIT** : design brief `docs/design-brief.md` (3 directions comparées, « Registre scolaire contemporain » retenu) + architecture produit `docs/produit-architecture.md`.
-- **À VÉRIFIER** : parcours réel login→scan→dashboard bloqué sur la création du **compte admin Supabase** (décision humaine) ; tests caméra/PWA sur téléphone réel ; QA navigateur complet.
+### Fait dans le code / intégré
 
+- PWA scanner connectée au backend, caméra navigateur, file IndexedDB hors ligne et états de synchronisation.
+- Feedback sonore WebAudio et vibration implémentés dans `public/scanner/lib/feedback.js`, préférences activées par défaut.
+- Dashboard réel : vues générales, absences, classes, cours, élèves/historique, cartes QR, Scolarité et Comptabilité.
+- Génération/impression des cartes QR, filtres, export CSV et impression.
+- Application mobile Expo : Auth Supabase, scanner natif, saisie manuelle, file hors ligne persistante et historique local.
+- Optimisations de performance et de résilience réseau décrites dans le commit #37.
 
----
+### Restant / non vérifié sur matériel réel
 
-## Événements de déblocage (historique court)
-- *2026-11-13* — **Rôle 1 (audit)** : PR `fix/backend-audit-sessions-tests` — renouvellement automatique access/refresh token (middleware + endpoints), logout révoquant la session côté Supabase, 26 tests unitaires `node:test` (scan/dashboard/CSV/auth/time), `npm test` ajouté à la CI, ROADMAP : « Auth admin » cochée. Bloqué sur la création du compte admin (décision humaine).
-- *2026-11-13* — **Rôle 1** : schéma corrigé appliqué et vérifié dans le projet Supabase `hdfefhltqyxiqnuruhlp` (anti-doublon par jour Conakry testé, RLS/policies admin vérifiées, `anon` bloqué). Backend Sprint 1–3 implémenté (auth admin, protection des routes, `/api/scan`, `/api/dashboard`, export CSV) — typecheck + build verts, endpoints d'auth vérifiés en runtime. Bloqué sur la création du compte admin (décision humaine).
-- *2026-11-12* — Fichier créé. Aucun déblocage : Rôle 1 démarre le schéma du Sprint 0.
-- *2026-11-12* — Fichier de schéma v1 commité (PR #4) + protection de `main` active (PR obligatoire, check CI, admins inclus).
-- *2026-11-12* — **Autonomie des agents** : règle « 1 review » retirée de la protection de `main`. Chaque agent (Rôles 2/3/4) ouvre ses PR et les merge lui-même après CI verte (workflow dans `CONTRIBUTING.md`). Exception : schéma de données / sécurité / données élèves = validation Patrick obligatoire.
-- *2026-11-12* — **PR #7 (transverse)** : workflow CI aligné sur Node 22 + vérification TypeScript et build ; procédure agents clarifiée ; suivi/handoff documenté. Aucune case ROADMAP cochée, car cette PR ne termine aucune tâche produit listée. CI vérifiée verte avant merge.
+- [ ] Parcours navigateur authentifié complet, après création du compte admin.
+- [ ] Test PWA sur téléphone réel : caméra, installation, cache hors ligne, synchronisation et reprise réseau.
+- [ ] Test réel du son et de la vibration ; leur implémentation est présente, mais leur comportement matériel n'est pas confirmé.
+- [ ] Test Expo Go sur téléphone : connexion, caméra, scan, file hors ligne et synchronisation.
+- [ ] QA responsive/accessibilité et revue des erreurs sur toutes les vues, y compris les vues financières après activation des migrations.
+- [ ] Jeu de données fictives et scénario de démonstration reproductible.
+- [ ] Build Android signé : non réalisé/confirmé dans les éléments inspectés ; à faire uniquement si une distribution autonome est requise. Expo Go permet un test appareil sans attendre ce build.
+
+## Vérifications et limites des preuves
+
+- Le commit #37 indique que la syntaxe JavaScript, le typecheck, les tests et le build ont été vérifiés lors de son travail.
+- Le statut combiné récupéré pour le SHA de `main` expose un contrôle Vercel en succès. Aucun workflow GitHub Actions n'a été retourné par la récupération des runs pour ce SHA ; je ne considère donc pas l'exécution GitHub Actions de ce commit comme indépendamment confirmée ici.
+- Les notes du client mobile documentent un typecheck strict, 17 tests mobiles et `expo-doctor` 20/20 lors de l'implémentation. Cela ne remplace pas un test sur appareil physique.
+- Les notes `docs/frais-scolarite.md` et `docs/comptabilite.md` déclarent les migrations financières non appliquées. Leur application distante n'est pas vérifiée.
+- Aucune validation bout-en-bout avec un compte admin réel ni caméra physique n'est confirmée dans cette inspection.
+
+## Documentation à réaligner
+
+`ROADMAP.md` conserve encore plusieurs cases non cochées alors que des fonctionnalités correspondantes sont intégrées dans `main` (#32, #35, #36, #37). Il n'a pas été modifié dans cette mise à jour, limitée à `TEAM.md` et `STATUS.md`. Une PR documentaire distincte devra le réconcilier avec le code et les preuves, sans cocher une tâche sur la seule base d'une ancienne description.
+
+## Règle de mise à jour
+
+À chaque PR fusionnée ou session de travail significative, le rôle concerné met à jour sa section avec :
+- le changement réellement intégré ;
+- le commit/PR de référence ;
+- les tests et vérifications réellement exécutés ;
+- les points non testés et les blocages ;
+- la prochaine action et son responsable.
