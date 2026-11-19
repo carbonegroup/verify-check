@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { NextResponse } from "next/server";
-import { Env } from "@/env";
+import { Env } from "../env.ts";
 
 /**
  * Helpers d'authentification côté serveur (Sprint 1 — Auth admin).

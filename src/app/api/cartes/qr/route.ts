@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   REFRESH_COOKIE,
-  SESSION_COOKIE,
   requestAccessToken,
-  createServerSupabase,
   requireAdmin,
   setSessionCookies,
 } from "@/lib/auth";

@@ -62,11 +62,6 @@ export function statutFrais(attendu: number, regle: number): StatutFrais {
   return "impaye";
 }
 
-/** Montant en GNF, séparateur de milliers insécable (affichage). */
-export function formatGnf(montant: number): string {
-  return `${Math.round(montant).toLocaleString("fr-FR")} GNF`;
-}
-
 export type ScolariteLigne = {
   eleve_id: string;
   eleve: string;

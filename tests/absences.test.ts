@@ -124,25 +124,25 @@ test("buildAbsences : trié par classe, puis horaire, puis élève", () => {
 
 test("statutEleve : present si scan existant", () => {
   const eleve = { presences: [{ course_id: "co-math" }] };
-  const cours = { heure_fin: "09:00" };
+  const cours = { id: "co-math", heure_fin: "09:00" };
   assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 480 }), "present");
 });
 
 test("statutEleve : absent si cours terminé sans scan", () => {
   const eleve = { presences: [] };
-  const cours = { heure_fin: "09:00" };
+  const cours = { id: "co-math", heure_fin: "09:00" };
   assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 540 }), "absent");
 });
 
 test("statutEleve : non-pointe si cours non terminé sans scan", () => {
   const eleve = { presences: [] };
-  const cours = { heure_fin: "09:00" };
+  const cours = { id: "co-math", heure_fin: "09:00" };
   assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 480 }), "non-pointe");
 });
 
 test("statutEleve : present l'emporte sur terme", () => {
   const eleve = { presences: [{ course_id: "co-math" }] };
-  const cours = { heure_fin: "09:00" };
+  const cours = { id: "co-math", heure_fin: "09:00" };
   // Même après l'heure de fin, si scanné → present
   assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 1000 }), "present");
 });

@@ -1,5 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+
+// Set dummy env vars BEFORE importing auth (which imports env)
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test";
+
 import { isAdminRole } from "../src/lib/auth.ts";
 
 test("isAdminRole lit le rôle uniquement dans app_metadata", () => {

@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  createServerSupabase,
   setSessionCookies,
   supabaseAnonKey,
   supabaseUrl,

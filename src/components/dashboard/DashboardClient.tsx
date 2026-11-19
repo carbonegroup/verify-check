@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import styles from "./Dashboard.module.css";
@@ -196,7 +197,10 @@ export default function DashboardClient() {
   const [scolariteReload, setScolariteReload] = useState(0);
   const [comptabiliteReload, setComptabiliteReload] = useState(0);
 
+  const router = useRouter();
+
   const load = useCallback(async () => {
+    const cancelledRef = { current: false };
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({ date });
@@ -205,29 +209,60 @@ export default function DashboardClient() {
     try {
       const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
       if (res.status === 401) {
-        window.location.href = "/login?next=%2Fdashboard";
+        router.push("/login?next=%2Fdashboard");
         return;
       }
       if (!res.ok) {
-        setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
-        setData(null);
+        if (!cancelledRef.current) setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
+        if (!cancelledRef.current) setData(null);
       } else {
         const body = (await res.json()) as DashboardData;
-        setData(body);
-        setClasseNom(
+        if (!cancelledRef.current) setData(body);
+        if (!cancelledRef.current) setClasseNom(
           classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
         );
       }
     } catch {
-      setError("Réseau indisponible.");
+      if (!cancelledRef.current) setError("Réseau indisponible.");
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
-  }, [date, classe, cours]);
+  }, [date, classe, cours, router]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    const cancelledRef = { current: false };
+    (async () => {
+      setLoading(true);
+      setError(null);
+      const params = new URLSearchParams({ date });
+      if (classe) params.set("classe", classe);
+      if (cours) params.set("cours", cours);
+      try {
+        const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
+        if (res.status === 401) {
+          router.push("/login?next=%2Fdashboard");
+          return;
+        }
+        if (!res.ok) {
+          if (!cancelledRef.current) setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
+          if (!cancelledRef.current) setData(null);
+        } else {
+          const body = (await res.json()) as DashboardData;
+          if (!cancelledRef.current) setData(body);
+          if (!cancelledRef.current) setClasseNom(
+            classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
+          );
+        }
+      } catch {
+        if (!cancelledRef.current) setError("Réseau indisponible.");
+      } finally {
+        if (!cancelledRef.current) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [date, classe, cours, router]);
 
   // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
   useEffect(() => {
@@ -250,7 +285,7 @@ export default function DashboardClient() {
       try {
         const res = await fetch(`/api/scolarite?${params.toString()}`, { credentials: "same-origin" });
         if (res.status === 401) {
-          window.location.href = "/login?next=%2Fdashboard";
+          router.push("/login?next=%2Fdashboard");
           return;
         }
         if (!res.ok) {
@@ -270,7 +305,7 @@ export default function DashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, [vue, classe, statutScolarite, scolariteReload]);
+  }, [vue, classe, statutScolarite, scolariteReload, router]);
 
   // Service comptabilité : chargé à la demande (vue Comptabilité), avec cache mémoire.
   useEffect(() => {
@@ -293,7 +328,7 @@ export default function DashboardClient() {
       try {
         const res = await fetch(`/api/comptabilite?${params.toString()}`, { credentials: "same-origin" });
         if (res.status === 401) {
-          window.location.href = "/login?next=%2Fdashboard";
+          router.push("/login?next=%2Fdashboard");
           return;
         }
         if (!res.ok) {
@@ -313,7 +348,7 @@ export default function DashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, [vue, periodeFrom, periodeTo, comptabiliteReload]);
+  }, [vue, periodeFrom, periodeTo, comptabiliteReload, router]);
 
   // « Réessayer » : invalide le cache de la vue concernée et relance la requête.
   const retryScolarite = useCallback(() => {

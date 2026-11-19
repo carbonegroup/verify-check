@@ -22,7 +22,7 @@ export type StatutPresence = "present" | "non-pointe" | "absent";
  */
 export function statutEleve(
   eleve: { presences: Array<{ course_id: string }> },
-  cours: { heure_fin?: string | null },
+  cours: { id: string; heure_fin?: string | null },
   date: string,
   now: NowMinutes
 ): StatutPresence {

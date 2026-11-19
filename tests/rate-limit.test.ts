@@ -15,13 +15,12 @@ const mockRequest = (ip: string) => ({
 
 test("rateLimit autorise jusqu'au max", () => {
   const key = "test:rate:limit:1";
-  // Réinitialiser en utilisant une nouvelle clé unique
+  // Utiliser la même clé pour tester la limite
   for (let i = 0; i < 5; i++) {
-    const result = rateLimit(`${key}:${i}`, { max: 5, windowMs: 60_000 });
+    const result = rateLimit(key, { max: 5, windowMs: 60_000 });
     assert.ok(result.allowed);
     assert.equal(result.remaining, 5 - i - 1);
   }
-  // 6ème requête sur la même clé devrait être bloquée (mais on utilise des clés uniques)
 });
 
 test("rateLimit bloque après max atteint", () => {
