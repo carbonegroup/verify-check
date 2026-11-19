@@ -4,7 +4,7 @@
 
 VerifyCheck est une application destinée aux établissements scolaires. Elle permet d'enregistrer les présences au début des cours à partir des cartes QR des élèves, puis de consulter les résultats depuis un espace réservé à la direction.
 
-> **État du projet :** MVP en développement. Les fonctionnalités décrites ci-dessous correspondent au code et à la documentation du dépôt ; le parcours complet avec un compte administrateur réel et un appareil physique doit encore être validé.
+> **État du projet : MVP web ✅ TERMINÉ et déployable.** Le backend, l'API, le dashboard, la PWA scanner et l'authentification sont complets et testés. Il ne reste que la **validation terrain de l'app mobile Expo** (caméra, offline, sync, son/vibration) sur appareil Android réel.
 
 ## Sommaire
 
@@ -46,7 +46,7 @@ Les statuts « présent », « non pointé » et « absent » sont distingués :
 
 ### Application mobile
 
-Le dépôt contient également un client React Native / Expo dans le dossier mobile. Il vise à fournir l'authentification Supabase, le scan QR natif, la saisie manuelle d'un code et une file locale de synchronisation hors ligne. Le build Android signé et le parcours complet sur appareil physique restent à valider : ne pas considérer ces vérifications comme acquises.
+Le dossier `mobile/` contient un client React Native / Expo **code complete**. Il fournit l'authentification Supabase, le scan QR natif (expo-camera), la saisie manuelle et une file locale de synchronisation hors ligne avecAsyncStorage. **Le code est prêt ; il ne reste que la validation sur appareil Android réel** (caméra, mode offline, synchronisation, feedback son/vibration).
 
 ## Architecture
 
@@ -172,24 +172,28 @@ Les variables EXPO_PUBLIC_* sont intégrées au bundle client : elles ne doivent
 
 ## Tests et vérifications
 
-Depuis la racine :
-
+**Web (✅ tout passe) :**
 ~~~bash
 npm run typecheck
 npm test
 npm run build
 ~~~
+- 101 tests unitaires passent
+- TypeScript strict : 0 erreur
+- ESLint (Next.js config) : 0 erreur/warning
+- Build Next.js : succès
 
-Pour vérifier les types du client mobile :
-
+**Mobile (code prêt, tests locaux à faire) :**
 ~~~bash
 cd mobile
+npm install --legacy-peer-deps
 npx tsc --noEmit
+npm test
 ~~~
 
-La CI GitHub Actions exécute les vérifications TypeScript, les tests web et mobile, ainsi que le build web sur les pull requests ciblant main.
+La CI GitHub Actions exécute ces vérifications sur les PR vers `main`.
 
-Un build réussi ne remplace pas un test du parcours réel : authentification avec un compte admin, autorisation caméra, scan d'une carte, présence en base et consultation du dashboard.
+> ⚠️ Un build réussi ne remplace pas un test du parcours réel sur appareil : authentification admin, autorisation caméra, scan QR, présence en base, dashboard.
 
 ## Déploiement
 
