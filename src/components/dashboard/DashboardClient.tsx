@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildAbsences, isCourseFinished } from "@/lib/absences";
+import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
+import { formatGnf } from "@/lib/scolarite";
 import styles from "./Dashboard.module.css";
 
 /**
@@ -110,11 +111,6 @@ const CATEGORIE_LABEL: Record<string, string> = {
   autre: "Autre",
 };
 
-/** Montant en GNF, séparateur de milliers (affichage). */
-function gnf(montant: number): string {
-  return `${Math.round(montant).toLocaleString("fr-FR")} GNF`;
-}
-
 const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
   minute: "2-digit",
@@ -149,25 +145,12 @@ function nowMinutesConakry(): number {
   return get("hour") * 60 + get("minute");
 }
 
-/** Statut métier d'un élève pour un cours, à l'heure Conakry actuelle. */
-type Statut = "present" | "non-pointe" | "absent";
-function statutEleve(eleve: Eleve, cours: Cours, date: string): Statut {
-  const present = eleve.presences.some((p) => p.course_id === cours.id);
-  if (present) return "present";
-  const termine = isCourseFinished(date, cours.heure_fin, {
-    jour: todayConakry(),
-    minutes: nowMinutesConakry(),
-  });
-  return termine ? "absent" : "non-pointe";
+/** Helper pour construire l'instant scolaire courant pour les fonctions de lib/absences. */
+function nowConakry(): { jour: string; minutes: number } {
+  return { jour: todayConakry(), minutes: nowMinutesConakry() };
 }
 
-const STATUT_LABEL: Record<Statut, string> = {
-  present: "PRÉSENT",
-  "non-pointe": "NON POINTÉ",
-  absent: "ABSENT",
-};
-
-function statutClass(statut: Statut, s: Record<string, string>): string {
+function statutClass(statut: StatutPresence, s: Record<string, string>): string {
   const key = statut === "non-pointe" ? "nonPointe" : statut;
   return `${styles.pastille} ${s[key] ?? ""}`;
 }
@@ -183,19 +166,6 @@ const SCOLARITE_CLASS: Record<StatutFrais, string> = {
 function statutFraisClass(statut: StatutFrais): string {
   const key = SCOLARITE_CLASS[statut];
   return `${styles.pastille} ${(styles as Record<string, string>)[key] ?? ""}`;
-}
-
-/** Horodatage d'un scan, à l'heure locale Conakry (jj/mm hh:mm). */
-function formatPresenceAt(scannedAt: string): string {
-  const d = new Date(scannedAt);
-  if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    timeZone: TIME_ZONE,
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
 }
 
 export default function DashboardClient() {
@@ -493,7 +463,7 @@ export default function DashboardClient() {
                 <tbody>
                   {data.cours_prevus.map((c) => {
                     const eleves = eleveParClasse.filter((e) => e.classe_id === c.classe_id);
-                    const statuts = eleves.map((e) => statutEleve(e, c, date));
+                    const statuts = eleves.map((e) => statutEleve(e, c, date, nowConakry()));
                     return (
                       <tr key={c.id}>
                         <td>{classeLabel(c.classe_id)}</td>
@@ -649,7 +619,7 @@ export default function DashboardClient() {
                     .filter((c) => c.classe_id === e.classe_id)
                     .map((c) => ({
                       cours: c,
-                      statut: statutEleve(e, c, date),
+                      statut: statutEleve(e, c, date, nowConakry()),
                       presence: e.presences.find((p) => p.course_id === c.id),
                     }));
                   return (
@@ -724,9 +694,9 @@ export default function DashboardClient() {
               {scolarite && !scolariteLoading && (
                 <>
                   <section className={styles.resume}>
-                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.attendu_gnf)}</span><span className={styles.kpiLabel}>attendu</span></div>
-                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.regle_gnf)}</span><span className={styles.kpiLabel}>réglé</span></div>
-                    <div><span className={styles.kpi}>{gnf(scolarite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde dû</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.attendu_gnf)}</span><span className={styles.kpiLabel}>attendu</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.regle_gnf)}</span><span className={styles.kpiLabel}>réglé</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde dû</span></div>
                     <div><span className={styles.kpi}>{Math.round(scolarite.totaux.taux * 100)} %</span><span className={styles.kpiLabel}>recouvrement</span></div>
                   </section>
 
@@ -743,9 +713,9 @@ export default function DashboardClient() {
                         <tr key={l.eleve_id}>
                           <td>{l.eleve}</td>
                           <td>{l.classe}</td>
-                          <td className={styles.num}>{gnf(l.attendu_gnf)}</td>
-                          <td className={styles.num}>{gnf(l.regle_gnf)}</td>
-                          <td className={styles.num}>{gnf(l.solde_gnf)}</td>
+                          <td className={styles.num}>{formatGnf(l.attendu_gnf)}</td>
+                          <td className={styles.num}>{formatGnf(l.regle_gnf)}</td>
+                          <td className={styles.num}>{formatGnf(l.solde_gnf)}</td>
                           <td>
                             <span className={statutFraisClass(l.statut)}>
                               {STATUT_FRAIS_LABEL[l.statut]}
@@ -802,9 +772,9 @@ export default function DashboardClient() {
               {comptabilite && !comptabiliteLoading && (
                 <>
                   <section className={styles.resume}>
-                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.recettes_gnf)}</span><span className={styles.kpiLabel}>recettes</span></div>
-                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.depenses_gnf)}</span><span className={styles.kpiLabel}>dépenses</span></div>
-                    <div><span className={styles.kpi}>{gnf(comptabilite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.recettes_gnf)}</span><span className={styles.kpiLabel}>recettes</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.depenses_gnf)}</span><span className={styles.kpiLabel}>dépenses</span></div>
+                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde</span></div>
                     <div><span className={styles.kpi}>{comptabilite.totaux.nb_ecritures}</span><span className={styles.kpiLabel}>écritures</span></div>
                   </section>
 
@@ -823,7 +793,7 @@ export default function DashboardClient() {
                           <td>{e.type === "recette" ? "Recette" : "Dépense"}</td>
                           <td>{e.libelle}</td>
                           <td>{e.categorie ? (CATEGORIE_LABEL[e.categorie] ?? e.categorie) : "—"}</td>
-                          <td className={styles.num}>{gnf(e.montant_gnf)}</td>
+                          <td className={styles.num}>{formatGnf(e.montant_gnf)}</td>
                         </tr>
                       ))}
                       {comptabilite.ecritures.length === 0 && (
@@ -843,7 +813,7 @@ export default function DashboardClient() {
                           {comptabilite.par_categorie.map((c) => (
                             <tr key={c.categorie}>
                               <td>{CATEGORIE_LABEL[c.categorie] ?? c.categorie}</td>
-                              <td className={styles.num}>{gnf(c.montant_gnf)}</td>
+                              <td className={styles.num}>{formatGnf(c.montant_gnf)}</td>
                             </tr>
                           ))}
                         </tbody>

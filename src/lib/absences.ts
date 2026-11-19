@@ -11,6 +11,46 @@ import { minutesOf } from "./time.ts";
 /** Instant scolaire courant, exprimé en minutes depuis minuit (Conakry). */
 export type NowMinutes = { jour: string; minutes: number };
 
+/** Statut métier d'un élève pour un cours, à l'heure Conakry actuelle. */
+export type StatutPresence = "present" | "non-pointe" | "absent";
+
+/**
+ * Détermine le statut de présence d'un élève pour un cours donné.
+ * - present : au moins un scan enregistré pour ce cours ;
+ * - absent : cours terminé (heure de fin passée) sans scan ;
+ * - non-pointe : cours non terminé, pas encore d'absence déclarée.
+ */
+export function statutEleve(
+  eleve: { presences: Array<{ course_id: string }> },
+  cours: { heure_fin?: string | null },
+  date: string,
+  now: NowMinutes
+): StatutPresence {
+  const present = eleve.presences.some((p) => p.course_id === cours.id);
+  if (present) return "present";
+  const termine = isCourseFinished(date, cours.heure_fin, now);
+  return termine ? "absent" : "non-pointe";
+}
+
+export const STATUT_LABEL: Record<StatutPresence, string> = {
+  present: "PRÉSENT",
+  "non-pointe": "NON POINTÉ",
+  absent: "ABSENT",
+};
+
+/** Formate un horodatage ISO en date/heure locale Conakry (jj/mm hh:mm). */
+export function formatPresenceAt(scannedAt: string): string {
+  const d = new Date(scannedAt);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Africa/Conakry",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
 /**
  * Vrai si le cours est terminé relativement à l'instant scolaire courant.
  * - sans `now` (journée passée) : considéré terminé ;

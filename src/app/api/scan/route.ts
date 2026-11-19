@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth";
 import { isCourseActive, schoolInstant } from "@/lib/time";
 import { selectCourse } from "@/lib/scan";
+import { applyRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/scan — Sprint 2 : flux scan → cours actif → écriture attendance.
@@ -22,6 +23,7 @@ import { selectCourse } from "@/lib/scan";
  * - salle_invalide : cours actif mais salle différente de celle du portique (409) ;
  * - doublon : présence déjà enregistrée aujourd'hui pour ce cours (409).
  * Le scanner utilise la session admin du poste tablette (aucun rôle anon).
+ * Rate limited : 60 requêtes/minute par IP (protection basique).
  */
 
 type CourseRow = {
@@ -38,6 +40,15 @@ export async function POST(request: NextRequest) {
   const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  // Rate limiting : 60 req/min par IP (scans légitimes)
+  const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:scan" });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
   }
 
   let body: { code_qr?: string; salle?: string; cours?: string };

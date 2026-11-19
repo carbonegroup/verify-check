@@ -89,12 +89,12 @@ Créer le fichier de configuration local à partir du modèle :
 
 **Windows PowerShell**
 ~~~powershell
-Copy-Item .env.local.example .env.local
+Copy-Item .env.example .env.local
 ~~~
 
 **Linux / macOS**
 ~~~bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ~~~
 
 Renseigner les variables suivantes dans .env.local :

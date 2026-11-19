@@ -47,8 +47,14 @@ npx expo install   # aligne les versions avec le SDK Expo installé
 
 Copier le modèle et remplir les valeurs :
 
+**Linux / macOS**
 ```bash
-cp .env.example .env   # Windows PowerShell: Copy-Item .env.example .env
+cp .env.example .env
+```
+
+**Windows PowerShell**
+```powershell
+Copy-Item .env.example .env
 ```
 
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` : URL et clé **anon** publique du projet Supabase (jamais la clé `service_role` — les `EXPO_PUBLIC_*` sont publiques par nature, incluses dans le bundle client).

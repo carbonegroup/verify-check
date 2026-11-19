@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAbsences, isCourseFinished } from "../src/lib/absences.ts";
+import { buildAbsences, isCourseFinished, statutEleve, formatPresenceAt, STATUT_LABEL } from "../src/lib/absences.ts";
 
 // Vendredi 2026-11-13.
 const date = "2026-11-13";
@@ -120,4 +120,45 @@ test("buildAbsences : trié par classe, puis horaire, puis élève", () => {
       "10e A|10:00|Zoé Bangoura",
     ]
   );
+});
+
+test("statutEleve : present si scan existant", () => {
+  const eleve = { presences: [{ course_id: "co-math" }] };
+  const cours = { heure_fin: "09:00" };
+  assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 480 }), "present");
+});
+
+test("statutEleve : absent si cours terminé sans scan", () => {
+  const eleve = { presences: [] };
+  const cours = { heure_fin: "09:00" };
+  assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 540 }), "absent");
+});
+
+test("statutEleve : non-pointe si cours non terminé sans scan", () => {
+  const eleve = { presences: [] };
+  const cours = { heure_fin: "09:00" };
+  assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 480 }), "non-pointe");
+});
+
+test("statutEleve : present l'emporte sur terme", () => {
+  const eleve = { presences: [{ course_id: "co-math" }] };
+  const cours = { heure_fin: "09:00" };
+  // Même après l'heure de fin, si scanné → present
+  assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: 1000 }), "present");
+});
+
+test("formatPresenceAt formate ISO en jj/mm hh:mm (Conakry)", () => {
+  const result = formatPresenceAt("2026-11-13T08:05:00Z");
+  assert.ok(result.includes("13/11") || result.includes("11/13")); // format français
+  assert.ok(result.includes("08:05") || result.includes("08:05")); // heure
+});
+
+test("formatPresenceAt retourne — si date invalide", () => {
+  assert.equal(formatPresenceAt("invalide"), "—");
+});
+
+test("STATUT_LABEL contient les 3 statuts", () => {
+  assert.equal(STATUT_LABEL.present, "PRÉSENT");
+  assert.equal(STATUT_LABEL["non-pointe"], "NON POINTÉ");
+  assert.equal(STATUT_LABEL.absent, "ABSENT");
 });

@@ -19,28 +19,35 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install web dependencies
         run: npm ci
 
       - name: Install mobile dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: mobile
 
-      - name: Type check
+      - name: Type check web
         run: npm run typecheck
 
       - name: Type check mobile
         run: npx tsc --noEmit
         working-directory: mobile
 
-      - name: Tests unitaires
+      - name: Lint web
+        run: npm run lint
+
+      - name: Lint mobile
+        run: npm run lint
+        working-directory: mobile
+
+      - name: Tests unitaires web
         run: npm test
 
       - name: Tests unitaires mobile
-        run: node --experimental-strip-types --test tests/*.test.ts
+        run: npm test -- --passWithNoTests
         working-directory: mobile
 
-      - name: Build
+      - name: Build web
         run: npm run build
         env:
           # Valeurs factices : le build ne doit pas nécessiter Supabase réel

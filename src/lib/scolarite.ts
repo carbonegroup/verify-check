@@ -12,6 +12,11 @@
 
 import { csvEscape } from "./csv.ts";
 
+/** Montant en GNF, séparateur de milliers insécable (affichage). */
+export function formatGnf(montant: number): string {
+  return `${Math.round(montant).toLocaleString("fr-FR")} GNF`;
+}
+
 export type ScolariteClasseRow = { id: string; nom: string };
 export type ScolariteEleveRow = { id: string; nom: string; classe_id: string };
 

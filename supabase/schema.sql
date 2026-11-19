@@ -115,9 +115,10 @@ create table expenses (
 
 -- Anti-doublon : index UNIQUE d'expression sur élève + cours + journée locale Africa/Conakry.
 -- scanned_at (timestamptz) est converti en heure locale Conakry puis on extrait la date scolaire.
--- Pas de contrainte UNIQUE sur expression : on utilise un index unique d'expression.
+-- L'expression utilise `timezone('Africa/Conakry', scanned_at)::date` pour être explicite
+-- sur le fuseau, indépendamment du fuseau du serveur.
 create unique index attendance_one_per_student_course_conakry_day_idx
-  on attendance (student_id, course_id, date(scanned_at AT TIME ZONE 'Africa/Conakry'));
+  on attendance (student_id, course_id, (timezone('Africa/Conakry', scanned_at)::date));
 
 create index attendance_course_idx on attendance (course_id, scanned_at);
 create index students_classe_idx on students (classe_id);  -- vues dashboard par classe

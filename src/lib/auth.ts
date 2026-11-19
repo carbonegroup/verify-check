@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { NextResponse } from "next/server";
+import { Env } from "@/env";
 
 /**
  * Helpers d'authentification côté serveur (Sprint 1 — Auth admin).
@@ -14,17 +15,11 @@ import type { NextResponse } from "next/server";
 export const SESSION_COOKIE = "vc_access";
 export const REFRESH_COOKIE = "vc_refresh";
 
-export function supabaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL manquante");
-  return url;
-}
+/** URL Supabase validée au démarrage (voir src/env.ts). */
+export const supabaseUrl = () => Env.SUPABASE_URL();
 
-export function supabaseAnonKey(): string {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY manquante");
-  return key;
-}
+/** Clé anonyme Supabase validée au démarrage (voir src/env.ts). */
+export const supabaseAnonKey = () => Env.SUPABASE_ANON_KEY();
 
 /** Client Supabase côté serveur, optionnellement porteur du JWT d'un utilisateur. */
 export function createServerSupabase(accessToken?: string): SupabaseClient {
@@ -49,12 +44,18 @@ export function isAdminRole(user: {
   return user.app_metadata?.role === "admin";
 }
 
+/** Détermine si l'environnement est production (Vercel, etc.) */
+function isProduction(): boolean {
+  // VERCEL=1 est défini automatiquement par Vercel à la build ET au runtime
+  return process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+}
+
 /** Pose (ou renouvelle) les cookies de session admin sur une réponse. */
 export function setSessionCookies(
   response: NextResponse,
   session: { access_token: string; refresh_token: string }
 ) {
-  const secure = process.env.NODE_ENV === "production";
+  const secure = isProduction();
   response.cookies.set(SESSION_COOKIE, session.access_token, {
     httpOnly: true,
     secure,
