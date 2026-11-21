@@ -51,31 +51,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Configure EAS Build
-        if: ${{ inputs.version != '' }}
-        env:
-          APP_VERSION: ${{ inputs.version }}
-        run: |
-          node <<'NODE'
-          const fs = require("node:fs");
-
-          const version = process.env.APP_VERSION?.trim();
-          if (!version || !/^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/.test(version)) {
-            throw new Error("Version invalide. Utilise uniquement lettres, chiffres, points, + et -.");
-          }
-
-          const configPath = "app.json";
-          const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-          if (!config.expo || typeof config.expo !== "object") {
-            throw new Error("La configuration Expo est absente de app.json.");
-          }
-
-          config.expo.version = version;
-          fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-          console.log(`Version Expo configurée : ${version}`);
-          NODE
-        working-directory: mobile
-
       - name: Build APK
         id: build
         run: |
@@ -108,6 +83,7 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           BUILD_PROFILE: ${{ inputs['build-profile'] }}
+          APP_VERSION: ${{ inputs.version }}
 
       - name: Wait for build to complete
         id: wait
