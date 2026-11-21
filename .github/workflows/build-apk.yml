@@ -39,6 +39,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -51,39 +52,88 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Configure EAS Build
+        if: ${{ inputs.version != '' }}
+        env:
+          APP_VERSION: ${{ inputs.version }}
         run: |
-          # Update version if provided
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            npx expo-application-version --version ${{ github.event.inputs.version }}
-          fi
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const version = process.env.APP_VERSION?.trim();
+          if (!version || !/^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/.test(version)) {
+            throw new Error("Version invalide. Utilise uniquement lettres, chiffres, points, + et -.");
+          }
+
+          const configPath = "app.json";
+          const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+          if (!config.expo || typeof config.expo !== "object") {
+            throw new Error("La configuration Expo est absente de app.json.");
+          }
+
+          config.expo.version = version;
+          fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+          console.log(`Version Expo configurée : ${version}`);
+          NODE
         working-directory: mobile
 
       - name: Build APK
         id: build
         run: |
-          eas build --platform android --profile ${{ github.event.inputs.build-profile }} --non-interactive --no-wait --output build-output.txt
+          eas build --platform android --profile "$BUILD_PROFILE" --non-interactive --no-wait
+
+          # Retrieve the build created for this exact commit and profile.
+          for attempt in 1 2 3 4 5 6; do
+            eas build:list \
+              --platform android \
+              --build-profile "$BUILD_PROFILE" \
+              --git-commit-hash "$GITHUB_SHA" \
+              --limit 1 \
+              --json > builds.json
+
+            BUILD_ID=$(jq -r '.[0].id // empty' builds.json)
+            if [ -n "$BUILD_ID" ]; then
+              echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+              echo "EAS build ID: $BUILD_ID"
+              exit 0
+            fi
+
+            echo "Build not visible yet (attempt $attempt/6)."
+            sleep 5
+          done
+
+          echo "Unable to find the EAS build for commit $GITHUB_SHA."
+          cat builds.json
+          exit 1
         working-directory: mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_PROFILE: ${{ inputs['build-profile'] }}
 
       - name: Wait for build to complete
+        id: wait
         run: |
-          eas build:list --platform android --limit 1 --json > build.json
-          BUILD_ID=$(jq -r '.[0].id' build.json)
-          echo "Build ID: $BUILD_ID"
+          if [ -z "$BUILD_ID" ]; then
+            echo "Missing EAS build ID."
+            exit 1
+          fi
 
-          # Wait for build to complete
           while true; do
-            eas build:view $BUILD_ID --json > build-status.json
-            STATUS=$(jq -r '.status' build-status.json)
+            eas build:view "$BUILD_ID" --json > build-status.json
+            STATUS=$(jq -r '.status // empty' build-status.json)
             echo "Build status: $STATUS"
 
             if [ "$STATUS" = "finished" ]; then
-              ARTIFACT_URL=$(jq -r '.artifacts.buildUrl' build-status.json)
-              echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+              ARTIFACT_URL=$(jq -r '.artifacts.buildUrl // empty' build-status.json)
+              if [ -z "$ARTIFACT_URL" ]; then
+                echo "Build finished but no APK artifact URL was returned."
+                cat build-status.json
+                exit 1
+              fi
+              echo "artifact_url=$ARTIFACT_URL" >> "$GITHUB_OUTPUT"
               break
             elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
               echo "Build failed with status: $STATUS"
+              cat build-status.json
               exit 1
             fi
 
@@ -92,12 +142,20 @@ jobs:
         working-directory: mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ steps.build.outputs.build_id }}
 
       - name: Download APK
         run: |
-          curl -L -o app.apk "${{ steps.build.outputs.artifact_url }}"
-          ls -la app.apk
+          if [ -z "$ARTIFACT_URL" ]; then
+            echo "Missing APK artifact URL."
+            exit 1
+          fi
+          curl --fail --location --retry 3 --retry-all-errors --output app.apk "$ARTIFACT_URL"
+          test -s app.apk
+          file app.apk
         working-directory: mobile
+        env:
+          ARTIFACT_URL: ${{ steps.wait.outputs.artifact_url }}
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
