@@ -1,0 +1,1 @@
+qa-audit-report — QA audit of VerifyCheck mobile Android app, comprehensive functional testing via ADB, unit test verification, permission analysis, and full report generation in qa-reports/ — completed 2026-11-21
