@@ -23,7 +23,7 @@ Branche de correction : `fix/ci-et-build-apk`.
 ### Vérification
 
 - Les runs initiaux sont documentés dans GitHub Actions : APK `44938334546` et CI PR #41 `44938270898`.
-- Sur cette PR, typecheck web/mobile, lint web/mobile et tests unitaires web/mobile ont réussi. Le build web a ensuite révélé le format invalide du placeholder Supabase ; la correction du placeholder doit être confirmée par la CI relancée.
+- La CI PR #42, run `44939376752`, est terminée avec succès : typecheck web/mobile, lint web/mobile, tests unitaires web/mobile et build web réussis.
 - Le workflow EAS étant déclenché manuellement, une nouvelle exécution de génération et publication APK reste à effectuer après intégration.
 
 Aucune tâche fonctionnelle de la ROADMAP n'est déclarée terminée par cette maintenance.
