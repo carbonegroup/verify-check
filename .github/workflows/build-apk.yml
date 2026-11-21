@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: verifycheck-android-apk-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -60,6 +60,17 @@ jobs:
       - name: Update lockfile for declared Expo modules
         working-directory: mobile
         run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+
+      - name: Commit synchronized mobile lockfile
+        if: github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- mobile/package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add mobile/package-lock.json
+            git commit -m "chore(mobile): sync Expo SDK lockfile"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Install mobile dependencies
         working-directory: mobile
