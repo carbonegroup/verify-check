@@ -52,4 +52,4 @@ jobs:
         env:
           # Valeurs factices : le build ne doit pas nécessiter Supabase réel
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ci_placeholder_key
