@@ -8,6 +8,12 @@ on:
     paths:
       - "mobile/**"
       - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
     inputs:
       version:
@@ -143,7 +149,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-build-${{ github.run_number }}
-          name: VerifyCheck Android APK #${{ github.run_number }}
+          name: "VerifyCheck Android APK #${{ github.run_number }}"
           body: |
             Automatically built Android APK for VerifyCheck.
 
