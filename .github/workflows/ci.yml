@@ -26,6 +26,25 @@ jobs:
         run: npm ci --legacy-peer-deps
         working-directory: mobile
 
+      - name: Validate Expo configuration
+        run: |
+          npx expo config --json > /tmp/expo-config.json
+          APP_VERSION=0.1-dev npx expo config --json > /tmp/expo-version-config.json
+          node <<'NODE'
+          const fs = require("node:fs");
+          const base = JSON.parse(fs.readFileSync("/tmp/expo-config.json", "utf8"));
+          const versioned = JSON.parse(fs.readFileSync("/tmp/expo-version-config.json", "utf8"));
+
+          if (base.version !== "1.0.0") {
+            throw new Error(`Version Expo par défaut inattendue : ${base.version}`);
+          }
+          if (versioned.version !== "0.1-dev") {
+            throw new Error(`APP_VERSION non appliquée : ${versioned.version}`);
+          }
+          console.log("Configuration Expo statique et surcharge APP_VERSION validées.");
+          NODE
+        working-directory: mobile
+
       - name: Type check web
         run: npm run typecheck
 
