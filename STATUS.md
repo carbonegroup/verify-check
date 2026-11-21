@@ -2,34 +2,37 @@
 
 ## Maintenance transversale — CI et distribution Android
 
-Branche de correction : `fix/ci-et-build-apk`.
+Branche de correction précédente : `fix/ci-et-build-apk`.
+Branche de correction actuelle : `fix/eas-production-build-type`.
 
-### Problèmes observés
+### Problème EAS observé sur le run réel
 
-- Le workflow APK appelait le package npm inexistant `expo-application-version`, ce qui provoquait une erreur 404.
-- Le workflow APK utilisait `--output` pour un build distant, alors que cette option est réservée aux builds locaux, et ne reliait pas correctement l'URL de l'artefact à l'étape de téléchargement.
-- Le lint mobile signalait le fichier de configuration Jest CommonJS dans un paquet ESM et deux imports inutilisés dans `ScannerScreen.tsx`.
-- Les tests mobiles utilisent `node:test`, mais le script lançait Jest. Jest tentait de transformer des dépendances React Native contenant de la syntaxe Flow et échouait avant d'exécuter les tests.
-- Le build web CI utilisait un faux placeholder Supabase rejeté par le validateur.
-- La surcharge de version ne doit pas modifier `app.json`, car EAS refuse un working tree modifié en mode non interactif.
-- Une recherche EAS par commit et profil peut sélectionner un ancien build lors de plusieurs déclenchements sur le même commit.
+- Le run APK `44940385438` a bien sélectionné le profil `preview`.
+- EAS CLI `27.11.0` a néanmoins validé l'ensemble de `mobile/eas.json` et a rejeté `build.production.android.buildType = "aab"`.
+- La valeur `aab` n'est pas une valeur valide du schéma EAS. Les valeurs acceptées sont `apk` et `app-bundle`.
+- L'avertissement « Our services aren't available right now » concernait une opération de sauvegarde non bloquante ; le build s'est arrêté explicitement sur la validation de `eas.json`.
+- Le patch des watchers `ENOSPC` s'est terminé avec succès et n'est pas la cause de cet échec.
 
-### Corrections apportées dans la branche
+### Corrections déjà intégrées dans main
 
-- Remplacer le package npm inexistant par une configuration Expo dynamique `mobile/app.config.js` qui surcharge `expo.version` depuis `APP_VERSION`, sans modifier les fichiers suivis.
-- Importer explicitement `process` depuis `node:process` pour respecter le lint.
-- Récupérer directement l'objet du build exact créé par la commande `eas build --no-wait --json` et transmettre son ID à l'étape d'attente ; ne plus rechercher le build via une liste potentiellement ambiguë.
-- Supprimer l'option locale `--output` du build distant ; attendre le statut final et transmettre explicitement l'URL de l'artefact au téléchargement.
-- Utiliser le runner natif Node.js pour les tests mobiles, cohérent avec les fichiers `node:test` et Node 22.
-- Supprimer les imports inutilisés du scanner.
-- Remplacer le faux placeholder Supabase du build CI par une valeur synthétique acceptée par le validateur ; aucune vraie clé n'est injectée.
-- Ajouter une étape CI qui valide la configuration Expo par défaut et la surcharge `APP_VERSION`.
+- CI web/mobile : typechecks, lint, tests unitaires et build web.
+- Configuration Expo dynamique `mobile/app.config.js` avec surcharge de version `APP_VERSION`, sans modification du working tree.
+- Workflow APK : récupération de l'ID exact renvoyé par `eas build --no-wait --json`, attente du résultat, téléchargement et publication de l'artefact.
+- Tests mobiles exécutés avec le runner natif Node.js, cohérent avec les fichiers `node:test`.
+- Suppression des imports inutilisés et correction du placeholder Supabase de CI.
+
+### Corrections dans la branche actuelle
+
+- Remplacer `build.production.android.buildType: "aab"` par `"app-bundle"`, valeur EAS valide qui conserve le format App Bundle pour la production / Google Play.
+- Retirer le profil `production` du sélecteur du workflow nommé « Build APK » : ce profil produit un App Bundle et ne doit pas être présenté comme un profil de génération APK.
+- Ajouter un garde-fou dans le workflow pour refuser tout profil autre que `development` ou `preview`.
+- Ajouter un contrôle CI qui valide les valeurs `android.buildType` de tous les profils EAS et vérifie que les profils utilisés pour publier l'APK résolvent bien vers APK.
 
 ### Vérification
 
-- Les runs initiaux sont documentés dans GitHub Actions : APK `44938334546` et CI PR #41 `44938270898`.
-- La CI du commit contenant les corrections de configuration Expo, lint et corrélation EAS est passée : run `44939999268` terminé avec succès.
-- Étapes vérifiées : configuration Expo par défaut et surcharge `APP_VERSION`, typechecks web/mobile, lint web/mobile, tests unitaires web/mobile et build web.
-- Le workflow EAS est déclenché manuellement ; la génération et la publication d'un APK doivent encore être exécutées et vérifiées.
+- Run EAS en échec analysé : `44940385438`, profil observé : `preview`.
+- CI complète précédente sur `main` : run `44940148557` réussie.
+- La correction actuelle doit encore passer la CI de sa pull request.
+- La nouvelle exécution réelle du workflow EAS reste à effectuer après intégration ; la génération et la publication APK ne sont donc pas encore vérifiées.
 
 Aucune tâche fonctionnelle de la ROADMAP n'est déclarée terminée par cette maintenance.

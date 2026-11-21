@@ -26,6 +26,37 @@ jobs:
         run: npm ci --legacy-peer-deps
         working-directory: mobile
 
+      - name: Validate EAS Android build types
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const eas = JSON.parse(fs.readFileSync("eas.json", "utf8"));
+          const allowed = new Set(["apk", "app-bundle"]);
+
+          for (const [name, profile] of Object.entries(eas.build ?? {})) {
+            const buildType = profile.android?.buildType;
+            if (buildType !== undefined && !allowed.has(buildType)) {
+              throw new Error(`build.${name}.android.buildType must be "apk" or "app-bundle"; received ${JSON.stringify(buildType)}`);
+            }
+          }
+
+          for (const name of ["development", "preview"]) {
+            const profile = eas.build?.[name];
+            if (!profile) throw new Error(`Missing required APK profile: ${name}`);
+
+            const distribution = profile.android?.distribution ?? profile.distribution;
+            const effectiveType = profile.android?.buildType ??
+              (profile.developmentClient || distribution === "internal" ? "apk" : "app-bundle");
+
+            if (effectiveType !== "apk") {
+              throw new Error(`The APK publishing workflow profile "${name}" resolves to "${effectiveType}".`);
+            }
+          }
+
+          console.log("All EAS Android buildType values and APK publishing profiles are valid.");
+          NODE
+        working-directory: mobile
+
       - name: Validate Expo configuration
         run: |
           npx expo config --json > /tmp/expo-config.json
