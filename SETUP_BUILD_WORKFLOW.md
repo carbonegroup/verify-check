@@ -51,13 +51,15 @@ eas login
 
 Edit `scripts/download-and-install-apk.sh` and update:
 ```bash
-GITHUB_REPO="YOUR_USERNAME/YOUR_REPO"  # e.g., "marco/verify-check"
+GITHUB_REPO="sudomarc/verify-check"
 ```
 
 Your APK will be available at:
 ```
-https://YOUR_USERNAME.github.io/YOUR_REPO/verifycheck-latest.apk
+https://sudomarc.github.io/verify-check/verifycheck-latest.apk
 ```
+
+*(Already configured for your repo)*
 
 ### 2. Push Changes to GitHub
 ```bash

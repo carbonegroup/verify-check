@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Configuration - UPDATE THESE VALUES
-GITHUB_REPO="marco/verify-check"  # Change to your GitHub repo (owner/repo)
-GITHUB_PAGES_URL="https://${GITHUB_REPO}.github.io"  # Or custom domain if configured
+GITHUB_REPO="sudomarc/verify-check"  # Change to your GitHub repo (owner/repo)
+GITHUB_PAGES_URL="https://sudomarc.github.io/verify-check"  # Or custom domain if configured
 APK_FILENAME="verifycheck-latest.apk"
 DOWNLOAD_DIR="${HOME}/Downloads"
 APK_PATH="${DOWNLOAD_DIR}/${APK_FILENAME}"
