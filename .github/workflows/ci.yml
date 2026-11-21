@@ -44,7 +44,7 @@ jobs:
         run: npm test
 
       - name: Tests unitaires mobile
-        run: npm test -- --passWithNoTests
+        run: npm test
         working-directory: mobile
 
       - name: Build web
