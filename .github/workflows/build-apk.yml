@@ -49,6 +49,44 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+      - name: Link EAS project
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # EAS CLI cannot update a dynamic app.config.js automatically.
+          CONFIG_BACKUP="$(mktemp "$RUNNER_TEMP/app-config.XXXXXX.js")"
+          mv app.config.js "$CONFIG_BACKUP"
+          restore_config() {
+            if [ -f "$CONFIG_BACKUP" ]; then
+              mv "$CONFIG_BACKUP" app.config.js
+            fi
+          }
+          trap restore_config EXIT
+
+          eas init --account marcopolos-team --json --non-interactive --no-icon > "$RUNNER_TEMP/eas-project.json"
+          PROJECT_ID="$(jq -r '.projectId // empty' "$RUNNER_TEMP/eas-project.json")"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "EAS project initialization did not return a project ID."
+            cat "$RUNNER_TEMP/eas-project.json"
+            exit 1
+          fi
+
+          restore_config
+          trap - EXIT
+
+          npx expo config --json > "$RUNNER_TEMP/expo-config.json"
+          CONFIGURED_PROJECT_ID="$(jq -r '.extra.eas.projectId // empty' "$RUNNER_TEMP/expo-config.json")"
+          CONFIGURED_OWNER="$(jq -r '.owner // empty' "$RUNNER_TEMP/expo-config.json")"
+          if [ "$CONFIGURED_PROJECT_ID" != "$PROJECT_ID" ] || [ "$CONFIGURED_OWNER" != "marcopolos-team" ]; then
+            echo "Expo config does not preserve the linked EAS project."
+            jq '{owner, slug, extra: {eas: .extra.eas}}' "$RUNNER_TEMP/expo-config.json"
+            exit 1
+          fi
+
+          echo "Linked EAS project @${CONFIGURED_OWNER}/verifycheck-mobile ($PROJECT_ID)"
 
       - name: Validate selected APK profile
         env:
