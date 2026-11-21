@@ -43,6 +43,11 @@ Une tâche passe à `[x]` quand le code est dans `main` et vérifié. Une foncti
 - [x] App mobile Expo : Auth Supabase, scan natif, saisie manuelle, file offline AsyncStorage, historique
 - [x] Optimisations réseau : BarcodeDetector natif, lazy-load html5-qrcode, cache PWA, retry
 
+### Contrôles automatisés
+
+- La CI valide les types web/mobile, le lint web/mobile, les tests unitaires et le build web.
+- Le workflow `Build APK and Deploy to GitHub Pages` lance manuellement EAS Build et publie l'APK sur GitHub Pages.
+
 ### Tests terrain à faire (seul reste)
 
 - [ ] **Mobile Expo Go sur Android réel** : caméra, permission, scan QR, mode offline, sync, son/vibration
