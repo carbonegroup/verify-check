@@ -2,37 +2,36 @@
 
 ## Maintenance transversale — CI et distribution Android
 
-Branche de correction précédente : `fix/ci-et-build-apk`.
-Branche de correction actuelle : `fix/eas-production-build-type`.
+Branche de correction précédente : fix/eas-production-build-type.
+Branche de correction actuelle : fix/eas-project-link.
 
-### Problème EAS observé sur le run réel
+### Incidents EAS observés
 
-- Le run APK `44940385438` a bien sélectionné le profil `preview`.
-- EAS CLI `27.11.0` a néanmoins validé l'ensemble de `mobile/eas.json` et a rejeté `build.production.android.buildType = "aab"`.
-- La valeur `aab` n'est pas une valeur valide du schéma EAS. Les valeurs acceptées sont `apk` et `app-bundle`.
-- L'avertissement « Our services aren't available right now » concernait une opération de sauvegarde non bloquante ; le build s'est arrêté explicitement sur la validation de `eas.json`.
-- Le patch des watchers `ENOSPC` s'est terminé avec succès et n'est pas la cause de cet échec.
+- Le run 44940385438 sélectionnait le profil preview, mais EAS rejetait la valeur build.production.android.buildType = aab. Cette erreur a été corrigée dans main en utilisant app-bundle pour la production et en limitant le workflow APK aux profils development/preview.
+- Le nouveau run manuel Build APK and Deploy to GitHub Pages (#3) passe maintenant la validation de eas.json et échoue au lancement du build avec EAS project not configured.
+- La cause est l'absence de extra.eas.projectId dans la configuration Expo. Le fichier app.config.js étant dynamique, EAS CLI ne peut pas y injecter directement la liaison avec eas init.
+- Les avertissements cache GitHub, punycode et disponibilité temporaire des services ne sont pas la cause de l'arrêt. L'avertissement appVersionSource manquant était non bloquant et est traité explicitement.
 
 ### Corrections déjà intégrées dans main
 
 - CI web/mobile : typechecks, lint, tests unitaires et build web.
-- Configuration Expo dynamique `mobile/app.config.js` avec surcharge de version `APP_VERSION`, sans modification du working tree.
-- Workflow APK : récupération de l'ID exact renvoyé par `eas build --no-wait --json`, attente du résultat, téléchargement et publication de l'artefact.
-- Tests mobiles exécutés avec le runner natif Node.js, cohérent avec les fichiers `node:test`.
-- Suppression des imports inutilisés et correction du placeholder Supabase de CI.
+- Validation EAS de tous les buildType Android et des profils APK.
+- Workflow APK : profils development/preview uniquement, récupération de l'ID exact renvoyé par EAS, attente du résultat, téléchargement et publication de l'artefact.
+- Tests mobiles exécutés avec le runner natif Node.js, cohérent avec les fichiers node:test.
 
 ### Corrections dans la branche actuelle
 
-- Remplacer `build.production.android.buildType: "aab"` par `"app-bundle"`, valeur EAS valide qui conserve le format App Bundle pour la production / Google Play.
-- Retirer le profil `production` du sélecteur du workflow nommé « Build APK » : ce profil produit un App Bundle et ne doit pas être présenté comme un profil de génération APK.
-- Ajouter un garde-fou dans le workflow pour refuser tout profil autre que `development` ou `preview`.
-- Ajouter un contrôle CI qui valide les valeurs `android.buildType` de tous les profils EAS et vérifie que les profils utilisés pour publier l'APK résolvent bien vers APK.
+- Déclarer marcopolos-team comme propriétaire Expo du projet verifycheck-mobile.
+- Ajouter cli.appVersionSource = local dans eas.json pour expliciter le comportement déjà utilisé par défaut et supprimer l'avertissement de configuration.
+- Ajouter une étape idempotente qui lie le projet EAS existant @marcopolos-team/verifycheck-mobile ou le crée s'il n'existe pas.
+- Comme app.config.js est dynamique, déplacer temporairement ce fichier hors du dossier mobile pendant eas init afin que le CLI puisse enregistrer extra.eas.projectId dans app.json sur le runner, puis restaurer la configuration dynamique.
+- Vérifier la configuration Expo résolue après restauration avant de lancer eas build.
 
-### Vérification
+### Vérification et limites
 
-- Run EAS en échec analysé : `44940385438`, profil observé : `preview`.
-- CI complète précédente sur `main` : run `44940148557` réussie.
-- La correction actuelle doit encore passer la CI de sa pull request.
-- La nouvelle exécution réelle du workflow EAS reste à effectuer après intégration ; la génération et la publication APK ne sont donc pas encore vérifiées.
+- Cause du nouveau run identifiée à partir de son log fourni : l'échec survient sur EAS project not configured, après la validation des profils et avant la création d'un build EAS.
+- Le script de liaison utilise le compte marcopolos-team, déjà accessible au jeton EXPO_TOKEN observé dans le run.
+- La CI de la pull request doit encore valider les modifications du dépôt.
+- Aucun build APK n'est déclaré réussi : la nouvelle initialisation EAS et le téléchargement de l'APK devront être vérifiés lors de la prochaine exécution réelle du workflow.
 
 Aucune tâche fonctionnelle de la ROADMAP n'est déclarée terminée par cette maintenance.

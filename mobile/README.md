@@ -71,6 +71,10 @@ npx expo start
 Scanner le QR avec l'app **Expo Go** (Android/iOS) ou appuyer sur `a` (émulateur Android).
 `expo-camera` est inclus dans Expo Go : pas de build natif requis pour tester.
 
+## Build APK
+
+Le workflow manuel GitHub Actions « Build APK and Deploy to GitHub Pages » initialise ou relie le projet EAS `@marcopolos-team/verifycheck-mobile`, puis construit et publie l'APK. Le secret `EXPO_TOKEN` doit être configuré dans les secrets du dépôt.
+
 ## Vérifications effectuées
 
 - ✅ `npx tsc --noEmit` (TypeScript strict)

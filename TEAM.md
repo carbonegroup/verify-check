@@ -46,7 +46,7 @@ Une tâche passe à `[x]` quand le code est dans `main` et vérifié. Une foncti
 ### Contrôles automatisés
 
 - La CI valide les types web/mobile, le lint web/mobile, les tests unitaires et le build web.
-- Le workflow `Build APK and Deploy to GitHub Pages` lance manuellement EAS Build et publie l'APK sur GitHub Pages.
+- Le workflow `Build APK and Deploy to GitHub Pages` lie ou initialise le projet EAS `@marcopolos-team/verifycheck-mobile`, lance manuellement EAS Build et publie l'APK sur GitHub Pages.
 
 ### Tests terrain à faire (seul reste)
 
