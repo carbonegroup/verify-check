@@ -63,7 +63,11 @@ jobs:
             "platforms;android-34" \
             "build-tools;34.0.0"
 
-      - name: Install locked mobile dependencies
+      - name: Update lockfile for declared Expo modules
+        working-directory: mobile
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+
+      - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci --legacy-peer-deps
 
