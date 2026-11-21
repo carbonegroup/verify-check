@@ -54,31 +54,18 @@ jobs:
       - name: Build APK
         id: build
         run: |
-          eas build --platform android --profile "$BUILD_PROFILE" --non-interactive --no-wait
+          # EAS returns the exact build object created by this invocation.
+          eas build --platform android --profile "$BUILD_PROFILE" --non-interactive --no-wait --json > build-start.json
 
-          # Retrieve the build created for this exact commit and profile.
-          for attempt in 1 2 3 4 5 6; do
-            eas build:list \
-              --platform android \
-              --build-profile "$BUILD_PROFILE" \
-              --git-commit-hash "$GITHUB_SHA" \
-              --limit 1 \
-              --json > builds.json
+          BUILD_ID=$(jq -r '.[0].id // empty' build-start.json)
+          if [ -z "$BUILD_ID" ]; then
+            echo "EAS did not return a build ID."
+            cat build-start.json
+            exit 1
+          fi
 
-            BUILD_ID=$(jq -r '.[0].id // empty' builds.json)
-            if [ -n "$BUILD_ID" ]; then
-              echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-              echo "EAS build ID: $BUILD_ID"
-              exit 0
-            fi
-
-            echo "Build not visible yet (attempt $attempt/6)."
-            sleep 5
-          done
-
-          echo "Unable to find the EAS build for commit $GITHUB_SHA."
-          cat builds.json
-          exit 1
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "EAS build ID: $BUILD_ID"
         working-directory: mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
