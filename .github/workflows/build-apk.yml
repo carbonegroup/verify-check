@@ -1,238 +1,162 @@
-name: Build APK and Deploy to GitHub Pages
+name: Build Android APK
 
 on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
     inputs:
-      build-profile:
-        description: 'EAS Build profile'
-        required: true
-        default: 'preview'
-        type: choice
-        options:
-          - development
-          - preview
       version:
-        description: 'Version name (optional)'
+        description: "Optional app version override"
         required: false
         type: string
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: verifycheck-android-apk-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build APK with EAS
-    runs-on: ubuntu-latest
+    name: Build signed Android APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-        working-directory: mobile
-
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - name: Link EAS project
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Install locked mobile dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate native Android project
         working-directory: mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: "1"
+          APP_VERSION: ${{ inputs.version || '' }}
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --max-workers=2 :app:assembleRelease
+
+      - name: Verify and sign APK for device testing
+        working-directory: mobile
         run: |
           set -euo pipefail
 
-          # EAS CLI cannot update a dynamic app.config.js automatically.
-          CONFIG_BACKUP="$(mktemp "$RUNNER_TEMP/app-config.XXXXXX.js")"
-          mv app.config.js "$CONFIG_BACKUP"
-          restore_config() {
-            if [ -f "$CONFIG_BACKUP" ]; then
-              mv "$CONFIG_BACKUP" app.config.js
-            fi
-          }
-          trap restore_config EXIT
-
-          eas init --account marcopolos-team --json --non-interactive --no-icon > "$RUNNER_TEMP/eas-project.json"
-          PROJECT_ID="$(jq -r '.projectId // empty' "$RUNNER_TEMP/eas-project.json")"
-          if [ -z "$PROJECT_ID" ]; then
-            echo "EAS project initialization did not return a project ID."
-            cat "$RUNNER_TEMP/eas-project.json"
+          APK_PATH="$(find android/app/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::Gradle completed without producing a release APK."
+            find android/app/build/outputs -maxdepth 5 -type f -print || true
             exit 1
           fi
 
-          restore_config
-          trap - EXIT
-
-          npx expo config --json > "$RUNNER_TEMP/expo-config.json"
-          CONFIGURED_PROJECT_ID="$(jq -r '.extra.eas.projectId // empty' "$RUNNER_TEMP/expo-config.json")"
-          CONFIGURED_OWNER="$(jq -r '.owner // empty' "$RUNNER_TEMP/expo-config.json")"
-          if [ "$CONFIGURED_PROJECT_ID" != "$PROJECT_ID" ] || [ "$CONFIGURED_OWNER" != "marcopolos-team" ]; then
-            echo "Expo config does not preserve the linked EAS project."
-            jq '{owner, slug, extra: {eas: .extra.eas}}' "$RUNNER_TEMP/expo-config.json"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::Android apksigner was not found."
             exit 1
           fi
 
-          echo "Linked EAS project @${CONFIGURED_OWNER}/verifycheck-mobile ($PROJECT_ID)"
-
-      - name: Validate selected APK profile
-        env:
-          BUILD_PROFILE: ${{ inputs['build-profile'] }}
-        run: |
-          case "$BUILD_PROFILE" in
-            development|preview) ;;
-            *)
-              echo "Profile '$BUILD_PROFILE' is not an APK distribution profile. Use development or preview."
-              exit 1
-              ;;
-          esac
-
-      - name: Build APK
-        id: build
-        run: |
-          # EAS returns the exact build object created by this invocation.
-          eas build --platform android --profile "$BUILD_PROFILE" --non-interactive --no-wait --json > build-start.json
-
-          BUILD_ID=$(jq -r '.[0].id // empty' build-start.json)
-          if [ -z "$BUILD_ID" ]; then
-            echo "EAS did not return a build ID."
-            cat build-start.json
-            exit 1
+          if ! "$APKSIGNER" verify "$APK_PATH" >/dev/null 2>&1; then
+            echo "Release APK is not signed; signing it with a temporary test key."
+            KEYSTORE="$RUNNER_TEMP/verifycheck-test.keystore"
+            SIGNED_APK="$RUNNER_TEMP/verifycheck-signed.apk"
+            keytool -genkeypair -noprompt \
+              -keystore "$KEYSTORE" \
+              -storepass android \
+              -keypass android \
+              -alias verifycheck \
+              -dname "CN=VerifyCheck Test,O=VerifyCheck,C=GN" \
+              -keyalg RSA -keysize 2048 -validity 10000
+            "$APKSIGNER" sign \
+              --ks "$KEYSTORE" \
+              --ks-key-alias verifycheck \
+              --ks-pass pass:android \
+              --key-pass pass:android \
+              --out "$SIGNED_APK" "$APK_PATH"
+            APK_PATH="$SIGNED_APK"
           fi
 
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-          echo "EAS build ID: $BUILD_ID"
-        working-directory: mobile
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          BUILD_PROFILE: ${{ inputs['build-profile'] }}
-          APP_VERSION: ${{ inputs.version }}
+          "$APKSIGNER" verify --verbose "$APK_PATH"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$APK_PATH" "$GITHUB_WORKSPACE/dist/verifycheck.apk"
+          sha256sum "$GITHUB_WORKSPACE/dist/verifycheck.apk"
+          ls -lh "$GITHUB_WORKSPACE/dist/verifycheck.apk"
 
-      - name: Wait for build to complete
-        id: wait
-        run: |
-          if [ -z "$BUILD_ID" ]; then
-            echo "Missing EAS build ID."
-            exit 1
-          fi
-
-          while true; do
-            eas build:view "$BUILD_ID" --json > build-status.json
-            STATUS=$(jq -r '.status // empty' build-status.json)
-            echo "Build status: $STATUS"
-
-            if [ "$STATUS" = "finished" ]; then
-              ARTIFACT_URL=$(jq -r '.artifacts.buildUrl // empty' build-status.json)
-              if [ -z "$ARTIFACT_URL" ]; then
-                echo "Build finished but no APK artifact URL was returned."
-                cat build-status.json
-                exit 1
-              fi
-              echo "artifact_url=$ARTIFACT_URL" >> "$GITHUB_OUTPUT"
-              break
-            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
-              echo "Build failed with status: $STATUS"
-              cat build-status.json
-              exit 1
-            fi
-
-            sleep 30
-          done
-        working-directory: mobile
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          BUILD_ID: ${{ steps.build.outputs.build_id }}
-
-      - name: Download APK
-        run: |
-          if [ -z "$ARTIFACT_URL" ]; then
-            echo "Missing APK artifact URL."
-            exit 1
-          fi
-          curl --fail --location --retry 3 --retry-all-errors --output app.apk "$ARTIFACT_URL"
-          test -s app.apk
-          file app.apk
-        working-directory: mobile
-        env:
-          ARTIFACT_URL: ${{ steps.wait.outputs.artifact_url }}
-
-      - name: Upload APK as artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: mobile/app.apk
+          name: verifycheck-apk-${{ github.run_number }}
+          path: dist/verifycheck.apk
+          if-no-files-found: error
           retention-days: 30
 
-  deploy:
-    name: Deploy to GitHub Pages
+  release:
+    name: Publish APK on GitHub Releases
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write
     steps:
       - name: Download APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: apk
-          path: apk
+          name: verifycheck-apk-${{ github.run_number }}
+          path: dist
 
-      - name: Prepare for Pages
-        run: |
-          mkdir -p public
-          cp apk/app.apk public/verifycheck-${{ github.run_number }}.apk
-          cp apk/app.apk public/verifycheck-latest.apk
-
-          # Create a simple index.html for listing
-          cat > public/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>VerifyCheck APK Downloads</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-              body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
-              .apk-link { display: block; padding: 1rem; margin: 0.5rem 0; background: #f5f5f5; border-radius: 8px; text-decoration: none; color: #333; }
-              .apk-link:hover { background: #e0e0e0; }
-              .latest { background: #e3f2fd; border: 2px solid #2196f3; }
-              .version { color: #666; font-size: 0.9em; }
-            </style>
-          </head>
-          <body>
-            <h1>VerifyCheck APK Downloads</h1>
-            <p>Latest build: <strong>#${{ github.run_number }}</strong></p>
-            <a href="verifycheck-latest.apk" class="apk-link latest">
-              <strong>Latest APK</strong> (verifycheck-latest.apk)
-              <span class="version">Always points to the most recent build</span>
-            </a>
-            <a href="verifycheck-${{ github.run_number }}.apk" class="apk-link">
-              <strong>Build #${{ github.run_number }}</strong> (verifycheck-${{ github.run_number }}.apk)
-              <span class="version">Permanent link to this specific build</span>
-            </a>
-            <p style="margin-top: 2rem; color: #666; font-size: 0.9em;">
-              Install on Android: Download the APK, then open it to install.<br>
-              You may need to enable "Install unknown apps" for your browser.
-            </p>
-          </body>
-          </html>
-          EOF
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          path: public
+          tag_name: android-build-${{ github.run_number }}
+          name: "VerifyCheck Android APK #${{ github.run_number }}"
+          body: |
+            Automatically built Android APK for VerifyCheck.
+
+            Commit: ${{ github.sha }}
+            Build run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This APK is signed for testing. A persistent production signing key is required for Play Store publication and seamless upgrades across separately built releases.
+          files: dist/verifycheck.apk
+          draft: false
+          prerelease: false
+          make_latest: true
