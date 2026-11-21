@@ -22,8 +22,10 @@ jobs:
       - name: Install web dependencies
         run: npm ci
 
-      - name: Install mobile dependencies
-        run: npm ci --legacy-peer-deps
+      - name: Sync mobile lockfile and install dependencies
+        run: |
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+          npm ci --legacy-peer-deps
         working-directory: mobile
 
       - name: Validate EAS Android build types
