@@ -28,8 +28,8 @@ Branche de correction : `fix/ci-et-build-apk`.
 ### Vérification
 
 - Les runs initiaux sont documentés dans GitHub Actions : APK `44938334546` et CI PR #41 `44938270898`.
-- Le commit précédent a passé la CI complète, mais la revue et le lint ont révélé les derniers ajustements ci-dessus.
-- Le dernier contrôle CI a validé l'exécution de la configuration Expo, puis identifié un problème de lint résolu dans la branche ; le résultat de la CI couvrant également la corrélation exacte du build EAS reste à confirmer.
+- La CI du commit contenant les corrections de configuration Expo, lint et corrélation EAS est passée : run `44939999268` terminé avec succès.
+- Étapes vérifiées : configuration Expo par défaut et surcharge `APP_VERSION`, typechecks web/mobile, lint web/mobile, tests unitaires web/mobile et build web.
 - Le workflow EAS est déclenché manuellement ; la génération et la publication d'un APK doivent encore être exécutées et vérifiées.
 
 Aucune tâche fonctionnelle de la ROADMAP n'est déclarée terminée par cette maintenance.
