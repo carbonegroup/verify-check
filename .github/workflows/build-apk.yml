@@ -11,7 +11,6 @@ on:
         options:
           - development
           - preview
-          - production
       version:
         description: 'Version name (optional)'
         required: false
@@ -50,6 +49,18 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Validate selected APK profile
+        env:
+          BUILD_PROFILE: ${{ inputs['build-profile'] }}
+        run: |
+          case "$BUILD_PROFILE" in
+            development|preview) ;;
+            *)
+              echo "Profile '$BUILD_PROFILE' is not an APK distribution profile. Use development or preview."
+              exit 1
+              ;;
+          esac
 
       - name: Build APK
         id: build
