@@ -1,0 +1,81 @@
+name: Download & Install APK via ADB
+
+on:
+  workflow_dispatch:
+    inputs:
+      github-pages-url:
+        description: 'GitHub Pages URL (e.g., https://user.github.io/repo)'
+        required: true
+        type: string
+      apk-filename:
+        description: 'APK filename on GitHub Pages'
+        required: true
+        default: 'verifycheck-latest.apk'
+        type: string
+      device-serial:
+        description: 'ADB device serial (optional, uses first device if empty)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Download and Install APK
+    runs-on: self-hosted
+    # Note: This requires a self-hosted runner with ADB and a connected Android device
+    # For local use, run the script directly: ./scripts/download-and-install-apk.sh
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check ADB availability
+        run: |
+          if ! command -v adb &> /dev/null; then
+            echo "::error::adb not found. Install Android Platform Tools on the runner."
+            exit 1
+          fi
+          adb version
+
+      - name: Check connected devices
+        run: |
+          DEVICES=$(adb devices | grep -v "List of devices" | grep -v "^$" | grep "device$")
+          if [ -z "$DEVICES" ]; then
+            echo "::error::No Android device connected via ADB"
+            exit 1
+          fi
+          echo "Connected devices:"
+          echo "$DEVICES"
+
+      - name: Select device
+        id: device
+        run: |
+          if [ -n "${{ github.event.inputs.device-serial }}" ]; then
+            echo "serial=${{ github.event.inputs.device-serial }}" >> $GITHUB_OUTPUT
+          else
+            SERIAL=$(adb devices | grep "device$" | head -1 | awk '{print $1}')
+            echo "serial=$SERIAL" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download APK from GitHub Pages
+        run: |
+          URL="${{ github.event.inputs.github-pages-url }}/${{ github.event.inputs.apk-filename }}"
+          echo "Downloading from: $URL"
+          curl -L -f -o app.apk "$URL"
+          ls -la app.apk
+
+      - name: Uninstall existing app
+        run: |
+          adb -s ${{ steps.device.outputs.serial }} uninstall com.verifycheck.mobile 2>/dev/null || true
+
+      - name: Install APK
+        run: |
+          adb -s ${{ steps.device.outputs.serial }} install -r app.apk
+
+      - name: Launch app
+        run: |
+          adb -s ${{ steps.device.outputs.serial }} shell am start -n com.verifycheck.mobile/.MainActivity 2>/dev/null || \
+          adb -s ${{ steps.device.outputs.serial }} shell monkey -p com.verifycheck.mobile -c android.intent.category.LAUNCHER 1 2>/dev/null || \
+          echo "App installed. Launch manually from device."
