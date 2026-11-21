@@ -1,0 +1,168 @@
+name: Build APK and Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-profile:
+        description: 'EAS Build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+      version:
+        description: 'Version name (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build APK with EAS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+        working-directory: mobile
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Configure EAS Build
+        run: |
+          # Update version if provided
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            npx expo-application-version --version ${{ github.event.inputs.version }}
+          fi
+        working-directory: mobile
+
+      - name: Build APK
+        id: build
+        run: |
+          eas build --platform android --profile ${{ github.event.inputs.build-profile }} --non-interactive --no-wait --output build-output.txt
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Wait for build to complete
+        run: |
+          eas build:list --platform android --limit 1 --json > build.json
+          BUILD_ID=$(jq -r '.[0].id' build.json)
+          echo "Build ID: $BUILD_ID"
+
+          # Wait for build to complete
+          while true; do
+            eas build:view $BUILD_ID --json > build-status.json
+            STATUS=$(jq -r '.status' build-status.json)
+            echo "Build status: $STATUS"
+
+            if [ "$STATUS" = "finished" ]; then
+              ARTIFACT_URL=$(jq -r '.artifacts.buildUrl' build-status.json)
+              echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+              break
+            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+
+            sleep 30
+          done
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Download APK
+        run: |
+          curl -L -o app.apk "${{ steps.build.outputs.artifact_url }}"
+          ls -la app.apk
+        working-directory: mobile
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: mobile/app.apk
+          retention-days: 30
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: apk
+
+      - name: Prepare for Pages
+        run: |
+          mkdir -p public
+          cp apk/app.apk public/verifycheck-${{ github.run_number }}.apk
+          cp apk/app.apk public/verifycheck-latest.apk
+
+          # Create a simple index.html for listing
+          cat > public/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>VerifyCheck APK Downloads</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+              .apk-link { display: block; padding: 1rem; margin: 0.5rem 0; background: #f5f5f5; border-radius: 8px; text-decoration: none; color: #333; }
+              .apk-link:hover { background: #e0e0e0; }
+              .latest { background: #e3f2fd; border: 2px solid #2196f3; }
+              .version { color: #666; font-size: 0.9em; }
+            </style>
+          </head>
+          <body>
+            <h1>VerifyCheck APK Downloads</h1>
+            <p>Latest build: <strong>#${{ github.run_number }}</strong></p>
+            <a href="verifycheck-latest.apk" class="apk-link latest">
+              <strong>Latest APK</strong> (verifycheck-latest.apk)
+              <span class="version">Always points to the most recent build</span>
+            </a>
+            <a href="verifycheck-${{ github.run_number }}.apk" class="apk-link">
+              <strong>Build #${{ github.run_number }}</strong> (verifycheck-${{ github.run_number }}.apk)
+              <span class="version">Permanent link to this specific build</span>
+            </a>
+            <p style="margin-top: 2rem; color: #666; font-size: 0.9em;">
+              Install on Android: Download the APK, then open it to install.<br>
+              You may need to enable "Install unknown apps" for your browser.
+            </p>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          path: public
