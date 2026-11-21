@@ -68,6 +68,12 @@ Contrainte : budget 0 $ (free tiers uniquement). Voir `TEAM.md` pour la réparti
 
 ---
 
+## Maintenance technique (hors sprints)
+
+Les corrections transversales de CI, de configuration des tests et de distribution Android sont suivies dans `STATUS.md`. Elles ne modifient pas les jalons fonctionnels des sprints et ne cochent aucune tâche produit à elles seules.
+
+---
+
 ## Règles de travail
 
 - Branches `feat/*`, `fix/*` → PR vers `main` (main = stable).
