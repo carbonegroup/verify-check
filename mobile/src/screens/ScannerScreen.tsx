@@ -198,12 +198,6 @@ export function ScannerScreen({
           {etat ? LIBELLES[etat.kind]?.titre ?? etat.kind : "En attente d'un scan"}
         </Text>
         <Text style={s.meta}>{etat?.detail ?? "Approche la carte élève de la caméra."}</Text>
-        {/* Code QR détecté en dessous pour référence */}
-        {etat && etat.kind !== "hors_ligne" && etat.kind !== "erreur_serveur" && (
-          <Text style={[s.meta, { marginTop: 4, fontSize: 12 }]}>
-            Code : {etat.eleve ? etat.eleve : ""}
-          </Text>
-        )}
         {busy ? <ActivityIndicator color={theme.accent} style={{ marginTop: 8 }} /> : null}
       </View>
 
