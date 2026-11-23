@@ -82,7 +82,7 @@ jobs:
         run: |
           echo "EXPO_PUBLIC_SUPABASE_URL=https://hdfefhltqyxiqnuruhlp.supabase.co" > .env
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_6QbAwQ2hnt8qCeUPVCXJ5w_MSO0APSP" >> .env
-          echo "EXPO_PUBLIC_API_BASE_URL=https://hdfefhltqyxiqnuruhlp.supabase.co" >> .env
+          echo "EXPO_PUBLIC_API_BASE_URL=https://verify-check-one.vercel.app" >> .env
           cat .env
 
       - name: Generate native Android project
