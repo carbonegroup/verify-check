@@ -25,7 +25,7 @@ const ETAT_LIBELLE: Record<LocalItem["etat"], string> = {
 };
 const ETAT_COULEUR: Record<LocalItem["etat"], string> = {
   en_attente: theme.warn,
-  confirme: theme.accent,
+  confirme: theme.success,
   rejete: theme.danger,
 };
 
@@ -106,7 +106,8 @@ export function HistoriqueScreen({ classeId, onSessionExpiree }: { classeId: str
       <FlatList
         data={locaux}
         keyExtractor={(i) => i.id}
-        ListEmptyComponent={<Text style={s.meta}>Aucun pointage sur cet appareil.</Text>}
+        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Aucun pointage local</Text><Text style={s.meta}>Les scans effectués sur cet appareil apparaîtront ici.</Text></View>}
+        contentContainerStyle={s.listContent}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={charger} tintColor={theme.accent} />}
         renderItem={({ item }) => (
           <View style={s.ligne}>
@@ -124,35 +125,57 @@ export function HistoriqueScreen({ classeId, onSessionExpiree }: { classeId: str
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.paper, padding: theme.space.lg, gap: 10 },
-  entete: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  titre: { fontSize: theme.type.title, fontWeight: "700", color: theme.ink },
+  root: { flex: 1, backgroundColor: theme.paper, paddingHorizontal: theme.space.lg, paddingTop: theme.space.lg, gap: 13 },
+  entete: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  titre: { fontSize: 25, fontWeight: "800", letterSpacing: -0.6, color: theme.ink },
   sync: {
-    borderRadius: 999,
+    minHeight: 40,
+    borderRadius: theme.radiusSm,
     borderWidth: 1,
-    borderColor: theme.accent,
+    borderColor: theme.navy,
+    backgroundColor: theme.navySoft,
     paddingHorizontal: 12,
-    height: 32,
     justifyContent: "center",
   },
-  syncTexte: { color: theme.accent, fontWeight: "600", fontSize: theme.type.small },
-  meta: { color: theme.inkSoft, fontSize: theme.type.small },
-  erreur: { color: theme.danger, fontSize: theme.type.small },
-  cours: { gap: 4 },
-  coursLigne: { flexDirection: "row", justifyContent: "space-between" },
-  coursNom: { color: theme.ink, fontSize: theme.type.body },
-  coursCompte: { color: theme.inkSoft, fontSize: theme.type.small },
+  syncTexte: { color: theme.navy, fontWeight: "800", fontSize: 11 },
+  meta: { color: theme.inkSoft, fontSize: theme.type.small, lineHeight: 18 },
+  erreur: { color: theme.danger, fontSize: theme.type.small, padding: 10, backgroundColor: "#FFF1F1", borderRadius: 8 },
+  cours: {
+    gap: 0,
+    padding: theme.space.md,
+    borderWidth: 1,
+    borderColor: theme.line,
+    borderRadius: theme.radius,
+    backgroundColor: theme.white,
+  },
+  coursLigne: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF2F6",
+  },
+  coursNom: { flex: 1, color: theme.ink, fontSize: 13, fontWeight: "600" },
+  coursCompte: { color: theme.inkSoft, fontSize: 11, fontVariant: ["tabular-nums"] },
+  listContent: { flexGrow: 1, paddingBottom: 22 },
   ligne: {
+    minHeight: 66,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: theme.card,
+    gap: 12,
+    backgroundColor: theme.white,
     borderRadius: theme.radiusSm,
     borderWidth: 1,
     borderColor: theme.line,
-    padding: 10,
-    marginBottom: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    marginBottom: 8,
   },
-  code: { fontFamily: "monospace", color: theme.ink, fontSize: theme.type.body },
-  etat: { fontWeight: "700", fontSize: 12 },
+  code: { color: theme.ink, fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
+  etat: { fontWeight: "800", fontSize: 10, letterSpacing: 0.3 },
+  empty: { marginTop: 8, padding: theme.space.xl, alignItems: "center", gap: 5, borderWidth: 1, borderStyle: "dashed", borderColor: theme.line, borderRadius: theme.radius },
+  emptyTitle: { color: theme.ink, fontWeight: "800", fontSize: 13 },
 });

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -25,7 +26,7 @@ const LIBELLES: Record<string, { titre: string; detail: string; couleur: string 
   confirmee: {
     titre: "Présence confirmée",
     detail: "Le serveur a validé le pointage.",
-    couleur: theme.accent,
+    couleur: theme.success,
   },
   doublon: {
     titre: "Déjà scanné",
@@ -163,13 +164,21 @@ export function ScannerScreen({
   const effectif = dashboard?.effectif ?? 0;
 
   return (
-    <View style={s.root}>
-      <Text style={s.titre}>{selection.coursNom}</Text>
-      <Text style={s.meta}>
-        {selection.classeNom}
-        {selection.salle ? " · " + selection.salle : ""}
-        {cours ? ` · ${cours.heure_debut.slice(0, 5)}–${cours.heure_fin.slice(0, 5)}` : ""}
-      </Text>
+    <ScrollView
+      style={s.root}
+      contentContainerStyle={s.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={s.session}>
+        <Text style={s.eyebrow}>SÉANCE SÉLECTIONNÉE</Text>
+        <Text style={s.titre}>{selection.coursNom}</Text>
+
+        <Text style={s.sessionMeta}>
+          {selection.classeNom}
+          {selection.salle ? " · " + selection.salle : ""}
+          {cours ? ` · ${cours.heure_debut.slice(0, 5)}–${cours.heure_fin.slice(0, 5)}` : ""}
+        </Text>
+      </View>
 
       <View style={s.compteur}>
         <Text style={s.compteurNum}>
@@ -224,14 +233,14 @@ export function ScannerScreen({
           locaux.slice(0, 6).map((item) => (
             <View key={item.id} style={s.historiqueLigne}>
               <Text style={s.historiqueCode}>{item.code_qr}</Text>
-              <Text style={[s.historiqueEtat, { color: item.etat === "en_attente" ? theme.warn : item.etat === "rejete" ? theme.danger : theme.accent }]}>
+              <Text style={[s.historiqueEtat, { color: item.etat === "en_attente" ? theme.warn : item.etat === "rejete" ? theme.danger : theme.success }]}>
                 {item.etat === "en_attente" ? "EN ATTENTE" : item.etat === "rejete" ? "REJETÉ" : "CONFIRMÉ"}
               </Text>
             </View>
           ))
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -273,70 +282,30 @@ function Centrer({ children }: { children: React.ReactNode }) {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.paper, padding: theme.space.lg, gap: 8 },
-  titre: { fontSize: theme.type.title, fontWeight: "700", color: theme.ink },
-  meta: { color: theme.inkSoft, fontSize: theme.type.small },
-  compteur: { alignItems: "center", paddingVertical: 4 },
-  compteurNum: { fontSize: theme.type.big, fontWeight: "700", color: theme.ink },
-  compteurTotal: { fontSize: 18, color: theme.inkSoft, fontWeight: "400" },
-  compteurLabel: { fontSize: 11, color: theme.inkSoft, textTransform: "uppercase", letterSpacing: 0.5 },
-  resultat: {
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    borderRadius: theme.radiusSm,
-    backgroundColor: theme.card,
-    padding: 12,
-    gap: 2,
-  },
-  resultatTitre: { fontWeight: "700", fontSize: theme.type.body },
-  camera: {
-    flex: 1,
-    minHeight: 240,
-    borderRadius: theme.radius,
-    overflow: "hidden",
-    backgroundColor: theme.scanBg,
-    justifyContent: "flex-end",
-    padding: theme.space.md,
-  },
-  cameraHint: { color: "#E8EEF4", textAlign: "center", fontSize: theme.type.small },
-  cameraBloc: {
-    flex: 1,
-    minHeight: 200,
-    borderRadius: theme.radius,
-    backgroundColor: theme.scanBg,
-    justifyContent: "center",
-    padding: theme.space.lg,
-  },
-  manuel: { flexDirection: "row", gap: 8 },
-  input: {
-    flex: 1,
-    height: 44,
-    borderRadius: theme.radiusSm,
-    borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.white,
-    paddingHorizontal: 12,
-    color: theme.ink,
-  },
-  bouton: {
-    height: 44,
-    paddingHorizontal: 16,
-    borderRadius: theme.radiusSm,
-    backgroundColor: theme.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boutonTexte: { color: theme.white, fontWeight: "600" },
-  historique: { gap: 6 },
-  sousTitre: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: theme.inkSoft,
-    fontWeight: "600",
-  },
-  historiqueLigne: { flexDirection: "row", justifyContent: "space-between" },
-  historiqueCode: { fontFamily: "monospace", color: theme.ink, fontSize: theme.type.small },
-  historiqueEtat: { fontSize: theme.type.small, fontWeight: "600" },
+  root: { flex: 1, backgroundColor: theme.paper },
+  content: { padding: theme.space.lg, paddingBottom: 28, gap: 12 },
+  session: { padding: theme.space.lg, gap: 5, borderWidth: 1, borderColor: theme.line, borderRadius: theme.radius, backgroundColor: theme.white },
+  eyebrow: { color: theme.blue, fontSize: 9, fontWeight: "800", letterSpacing: 1.1 },
+  titre: { fontSize: 23, fontWeight: "800", letterSpacing: -0.5, color: theme.ink },
+  meta: { color: theme.inkSoft, fontSize: theme.type.small, lineHeight: 19 },
+  sessionMeta: { color: theme.inkSoft, fontSize: 12, lineHeight: 18, marginTop: 2 },
+  compteur: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: theme.space.lg, paddingVertical: 13, borderWidth: 1, borderColor: theme.line, borderRadius: theme.radius, backgroundColor: theme.white },
+  compteurNum: { fontSize: theme.type.big, fontWeight: "800", color: theme.navy, fontVariant: ["tabular-nums"] },
+  compteurTotal: { fontSize: 17, color: theme.inkSoft, fontWeight: "500" },
+  compteurLabel: { maxWidth: 125, fontSize: 10, color: theme.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: "700", textAlign: "right" },
+  resultat: { borderWidth: 1, borderLeftWidth: 4, borderRadius: theme.radius, backgroundColor: theme.white, padding: 14, gap: 4 },
+  resultatTitre: { fontWeight: "800", fontSize: 14 },
+  camera: { height: 270, borderRadius: theme.radius, overflow: "hidden", backgroundColor: theme.scanBg, justifyContent: "flex-end", padding: theme.space.md },
+  cameraHint: { alignSelf: "center", overflow: "hidden", borderRadius: 20, paddingHorizontal: 13, paddingVertical: 7, color: "#FFFFFF", backgroundColor: "rgba(23,43,69,0.72)", textAlign: "center", fontSize: 12, fontWeight: "700" },
+  cameraBloc: { height: 220, borderRadius: theme.radius, backgroundColor: theme.scanBg, borderWidth: 1, borderColor: theme.line, justifyContent: "center", alignItems: "center", padding: theme.space.lg },
+  manuel: { flexDirection: "row", alignItems: "center", gap: 8 },
+  input: { flex: 1, minWidth: 0, height: 46, borderRadius: theme.radiusSm, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.white, paddingHorizontal: 12, color: theme.ink, fontSize: 12 },
+  bouton: { minHeight: 46, paddingHorizontal: 15, borderRadius: theme.radiusSm, backgroundColor: theme.navy, alignItems: "center", justifyContent: "center" },
+  boutonTexte: { color: theme.white, fontWeight: "800", fontSize: 12 },
+  historique: { gap: 8, padding: theme.space.md, borderWidth: 1, borderColor: theme.line, borderRadius: theme.radius, backgroundColor: theme.white },
+  sousTitre: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, color: theme.inkSoft, fontWeight: "800", marginBottom: 2 },
+  historiqueLigne: { minHeight: 35, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, borderTopWidth: 1, borderTopColor: "#EEF2F6", paddingTop: 7 },
+  historiqueCode: { flexShrink: 1, fontFamily: "monospace", color: theme.ink, fontSize: 11 },
+  historiqueEtat: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
   erreur: { color: theme.danger, fontSize: theme.type.body, textAlign: "center" },
 });

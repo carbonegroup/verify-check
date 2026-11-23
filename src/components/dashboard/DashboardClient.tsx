@@ -56,6 +56,17 @@ const VUES: { id: Vue; label: string }[] = [
   { id: "comptabilite", label: "Comptabilité" },
 ];
 
+const VUE_DESCRIPTIONS: Record<Vue, string> = {
+  general: "La situation des cours et des présences pour la journée sélectionnée.",
+  absences: "Les élèves absents après la fin des cours, avec les options d'export.",
+  classes: "Les effectifs et l'activité des classes de l'établissement.",
+  cours: "Le planning des cours, leurs horaires et le suivi des présences.",
+  eleves: "Les élèves, leurs cartes et leur historique de pointage.",
+  cartes: "Les cartes d'identification QR à consulter et à imprimer.",
+  scolarite: "Le suivi des frais et des règlements par élève.",
+  comptabilite: "Le registre des recettes, des dépenses et des soldes.",
+};
+
 type StatutFrais = "regle" | "partiel" | "impaye" | "sans-frais";
 type ScolariteLigne = {
   eleve_id: string;
@@ -466,6 +477,14 @@ export default function DashboardClient() {
 
       {data && !loading && (
         <main className={styles.main}>
+          <div className={styles.pageHeading}>
+            <div>
+              <p className={styles.pageEyebrow}>ESPACE DE GESTION</p>
+              <h1 className={styles.pageTitle}>{VUES.find((item) => item.id === vue)?.label ?? "Vue générale"}</h1>
+              <p className={styles.pageDescription}>{VUE_DESCRIPTIONS[vue]}</p>
+            </div>
+            <span className={styles.pageContext}>{dateLabel}</span>
+          </div>
           {/* ---------------------------------------------- VUE GÉNÉRALE */}
           {vue === "general" && (
             <>
