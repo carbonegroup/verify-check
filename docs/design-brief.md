@@ -11,6 +11,26 @@ Une seule organisation est gérée par instance. L'interface est en français et
 
 Contraintes structurantes : connectivité parfois faible, budget nul, données d'élèves potentiellement mineurs à minimiser, et besoin de consultation rapide de registres fiables.
 
+## Directions examinées
+
+### A. Enterprise Light — retenue
+
+Une plateforme de gestion structurée : navigation latérale sur le Web, filtres persistants, tableaux de registre et surfaces claires. Côté mobile, l'identité reste légère et tactile, avec une séance clairement identifiée et un scanner immédiatement accessible.
+
+Pourquoi : meilleure adéquation avec les tâches répétées de la direction, les consultations de registres et l'usage mobile sur des réseaux irréguliers. Cette direction reprend la discipline d'un registre scolaire sans conserver l'aspect papier ancien.
+
+### B. Terminal de pointage
+
+Une interface mobile de type borne opérationnelle, très contrastée, avec gros compteurs et retours de scan très visibles.
+
+Pourquoi non retenue comme direction globale : elle fonctionne pour un terminal dédié, mais se transpose mal au dashboard administratif, aux tableaux et aux cartes imprimées. La caméra reste naturellement un flux vidéo ; les composants qui l'entourent demeurent clairs.
+
+### C. Registre éditorial / papier
+
+Une interface plus proche d'un cahier d'appel ou d'un journal, avec titres éditoriaux, longues listes et accents de papier.
+
+Pourquoi non retenue comme direction principale : elle met trop l'accent sur la métaphore documentaire et pas assez sur la navigation multi-écrans, les filtres fréquents et les actions d'administration. Les tableaux restent néanmoins un élément central de la direction retenue.
+
 ## Direction retenue
 
 **Enterprise Light — registre opérationnel scolaire.**
