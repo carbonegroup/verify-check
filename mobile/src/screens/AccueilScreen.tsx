@@ -82,12 +82,15 @@ export function AccueilScreen({
         <RefreshControl refreshing={loading} onRefresh={charger} tintColor={theme.accent} />
       }
     >
-      <Text style={s.titre}>Contexte de pointage</Text>
-      <Text style={s.meta}>
-        {ctx.jour} · {ctx.heure} (Conakry) · {email}
-      </Text>
+      <View style={s.hero}>
+        <Text style={s.eyebrow}>ESPACE DE POINTAGE</Text>
+        <Text style={s.titre}>Choisir une séance</Text>
+        <Text style={s.meta}>{ctx.jour} · {ctx.heure} · Conakry</Text>
+        <Text style={s.account}>{email}</Text>
+      </View>
 
-      <Text style={s.label}>Classe</Text>
+      <View style={s.panel}>
+        <Text style={s.label}>01  /  CLASSE</Text>
       {classesActives.length === 0 ? (
         <Text style={s.hint}>Aucune classe enregistrée. La direction doit créer les classes.</Text>
       ) : (
@@ -98,7 +101,10 @@ export function AccueilScreen({
         </View>
       )}
 
-      <Text style={s.label}>Cours du moment (actifs à l'heure de Conakry)</Text>
+      </View>
+
+      <View style={s.panel}>
+        <Text style={s.label}>02  /  COURS DU MOMENT</Text>
       {coursActifs.length === 0 ? (
         <Text style={s.hint}>Aucun cours actif pour cette classe maintenant : la direction doit mettre à jour le planning.</Text>
       ) : (
@@ -114,14 +120,18 @@ export function AccueilScreen({
         </View>
       )}
 
-      <Text style={s.label}>Salle du portique (facultatif)</Text>
-      <TextInput
-        style={s.input}
-        placeholder="ex. B12"
-        value={salle}
-        onChangeText={setSalle}
-        autoCapitalize="characters"
-      />
+      </View>
+
+      <View style={s.panel}>
+        <Text style={s.label}>03  /  SALLE (FACULTATIF)</Text>
+        <TextInput
+          style={s.input}
+          placeholder="Ex. B12"
+          value={salle}
+          onChangeText={setSalle}
+          autoCapitalize="characters"
+        />
+      </View>
 
       <TouchableOpacity
         style={[s.bouton, !ready && s.boutonOff]}
@@ -187,50 +197,64 @@ function Etat({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.paper },
-  content: { padding: theme.space.lg, gap: 10 },
-  titre: { fontSize: theme.type.title, fontWeight: "700", color: theme.ink },
+  content: { padding: theme.space.lg, paddingBottom: 28, gap: 14 },
+  hero: { paddingTop: 5, paddingBottom: 7, gap: 5 },
+  eyebrow: { color: theme.blue, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
+  titre: { fontSize: 27, fontWeight: "800", letterSpacing: -0.8, color: theme.ink },
   meta: { color: theme.inkSoft, fontSize: theme.type.small },
-  label: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: theme.inkSoft,
-    marginTop: 8,
+  account: { color: theme.muted, fontSize: 12, fontWeight: "600", marginTop: 2 },
+  panel: {
+    padding: theme.space.lg,
+    gap: 12,
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.line,
+    borderRadius: theme.radius,
   },
-  hint: { color: theme.inkSoft, fontSize: theme.type.small },
+  label: {
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    color: theme.inkSoft,
+    fontWeight: "800",
+  },
+  hint: { color: theme.inkSoft, fontSize: theme.type.small, lineHeight: 19 },
   groupe: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pill: {
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.white,
-    justifyContent: "center",
-  },
-  pillOn: { borderColor: theme.accent, backgroundColor: theme.accent },
-  pillText: { color: theme.ink, fontSize: theme.type.body },
-  pillTextOn: { color: theme.white, fontWeight: "600" },
-  input: {
-    height: 44,
+    minHeight: 42,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderRadius: theme.radiusSm,
     borderWidth: 1,
     borderColor: theme.line,
-    backgroundColor: theme.white,
-    paddingHorizontal: 12,
+    backgroundColor: "#FAFCFE",
+    justifyContent: "center",
+  },
+  pillOn: { borderColor: theme.navy, backgroundColor: theme.navySoft },
+  pillText: { color: theme.ink, fontSize: 13, fontWeight: "600" },
+  pillTextOn: { color: theme.navy, fontWeight: "800" },
+  input: {
+    height: 46,
+    borderRadius: theme.radiusSm,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: "#FAFCFE",
+    paddingHorizontal: 13,
     color: theme.ink,
+    fontSize: theme.type.body,
   },
   bouton: {
-    height: 48,
+    minHeight: 50,
     borderRadius: theme.radiusSm,
-    backgroundColor: theme.accent,
+    backgroundColor: theme.navy,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 12,
+    marginTop: 2,
+    paddingHorizontal: 16,
   },
-  boutonOff: { backgroundColor: theme.line },
-  boutonTexte: { color: theme.white, fontWeight: "600", fontSize: theme.type.body },
-  deconnexion: { alignItems: "center", padding: 14 },
-  deconnexionTexte: { color: theme.inkSoft, fontSize: theme.type.small },
-  erreur: { color: theme.danger, fontSize: theme.type.small },
+  boutonOff: { backgroundColor: "#9AA8B8" },
+  boutonTexte: { color: theme.white, fontWeight: "800", fontSize: 14 },
+  deconnexion: { alignItems: "center", padding: 12 },
+  deconnexionTexte: { color: theme.inkSoft, fontSize: 12, fontWeight: "600" },
+  erreur: { color: theme.danger, fontSize: theme.type.small, textAlign: "center" },
 });
