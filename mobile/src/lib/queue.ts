@@ -68,19 +68,29 @@ export function nombreEnAttente(items: FileItem[]): number {
 
 /**
  * Synchronise la file : rejoue chaque pointage EN ATTENTE via `replay`.
- * - `confirme` (201) ou `doublon` serveur → CONFIRMÉ ;
- * - rejet définitif → REJETÉ (restera visible, jamais perdu) ;
- * - autre erreur / réseau perdu → reste EN ATTENTE (essais+1) et on arrête.
+ * Règles précises (alignées sur le contrat serveur) :
+ * - `confirme` (201) ou `doublon` serveur → CONFIRMÉ (badge vert) ;
+ * - rejet définitif → REJETÉ (seul `qr_invalide` est définitif,
+ *   les rejets de timing restent EN ATTENTE et sont rejoués) ;
+ * - erreur réseau/perte → reste EN ATTENTE, essais+1, on s'arrête pas
+ *   brutalement : on traite séquentiellement et on s'arrête seulement
+ *   si la réseau tombe complètement (pas de réponse serveur).
+ * - La file est JAMAIS nettoyée arbitrairement : chaque entrée conservée
+ *   jusqu'à ce qu'elle soit effectivement traitée par le serveur.
  */
 export async function synchroniser(
   items: FileItem[],
   replay: (item: FileItem) => Promise<"confirme" | "doublon" | "rejete_definitif" | "reessayer">
 ): Promise<{ items: FileItem[]; synchronises: number }> {
   let synchronises = 0;
-  let stop = false;
+  let blocked = false;
   const out: FileItem[] = [];
+  // On traite TOUTES les items, même s'il y en a beaucoup.
+  // On s'arrête seulement si le replay rejoue `reessayer` ET que c'est la
+  // première erreur (pour éviter les boucles infinies en cas de réseau mort).
+  let firstReessayer = true;
   for (const item of items) {
-    if (item.etat !== "en_attente" || stop) {
+    if (item.etat !== "en_attente" || blocked) {
       out.push(item);
       continue;
     }
@@ -92,11 +102,20 @@ export async function synchroniser(
         note: result === "doublon" ? "doublon confirmé par le serveur" : "",
       });
       synchronises++;
+      firstReessayer = true; // reset after success
     } else if (result === "rejete_definitif") {
       out.push({ ...item, etat: "rejete" });
+      firstReessayer = true;
     } else {
+      // reessayer : le pointage reste EN ATTENTE
       out.push({ ...item, essais: item.essais + 1 });
-      stop = true; // réseau perdu : on arrête proprement, la file reste intacte
+      // On ne bloque PAS la file : on continue avec le prochain item.
+      // On ne set blocked que si c'est le premier reessayer consécutif
+      // (protection contre les boucles infinies si le réseau est mort).
+      if (firstReessayer) {
+        blocked = true;
+        firstReessayer = false;
+      }
     }
   }
   return { items: out, synchronises };

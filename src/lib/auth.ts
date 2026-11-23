@@ -151,3 +151,61 @@ export async function revokeSession(
     .then(() => supabase.auth.signOut())
     .catch(() => {});
 }
+
+/** Permission format : "resource.action".
+ * Exemples : "attendance.correct", "students.view", "courses.manage",
+ * "qr.generate", "qr.print", "fees.view", "expenses.view", "reports.view",
+ * "users.manage", "dashboard.access".
+ * Les permissions sont stockées dans `app_metadata.permissions` sous forme de
+ * tableau de chaînes de caractères (string[]).
+ */
+export type Permission = string;
+
+/** Vérifie si un utilisateur possède une permission spécifique dans son app_metadata.
+ * Le format attendu dans Supabase est : app_metadata.permissions: ["permission1", "permission2"]
+ * ou app_metadata.role: "admin" pour les rôles hérités (accès complet).
+ * Cette fonction est utilisée par les endpoints API pour授权 (authorization) au
+ * niveau fin-grained, au-delà du simple rôle admin.
+ */
+export function hasPermission(user: { app_metadata?: Record<string, unknown> | null }, permission: Permission): boolean {
+  // D'abord vérifier le rôle admin (accès complet)
+  if (isAdminRole(user)) return true;
+
+  // Puis vérifier les permissions spécifiques détenues par l'utilisateur
+  const perms = user?.app_metadata?.permissions;
+  if (!perms || !Array.isArray(perms)) return false;
+  return perms.includes(permission);
+}
+
+/** Vérifie si l'utilisateur a AU MOINS UNE des permissions dans la liste.
+ * UTILE pour les rôles hiérarchiques ou les périmètres partiels.
+ * Exemple : `hasAnyPermission(user, ["attendance.correct", "attendance.view"])` */
+export function hasAnyPermission(user: { app_metadata?: Record<string, unknown> | null }, permissions: Permission[]): boolean {
+  // Le rôle admin a tout accès
+  if (isAdminRole(user)) return true;
+  const perms = user?.app_metadata?.permissions;
+  if (!perms || !Array.isArray(perms)) return false;
+  return permissions.some((p) => perms.includes(p));
+}
+
+/** Créer un contexte d'autorisation enrichi à partir d'un utilisateur Supabase.
+ * À appeler dans les endpoints API après avoir vérifié l'utilisateur. */
+export function createAuthContext(user: { app_metadata?: Record<string, unknown> | null }): AuthContext {
+  const isAdmin = isAdminRole(user);
+  // Note: user.app_metadata.permissions is a string[] from Supabase, default to empty array
+  const perms: Permission[] = (user?.app_metadata?.permissions as Permission[]) || [];
+  return {
+    isAdmin,
+    permissions: perms,
+    hasPermission: (perm: Permission) => hasPermission(user, perm),
+    hasAnyPermission: (permsList: Permission[]) => hasAnyPermission(user, permsList),
+  };
+}
+
+/** Contexte d'autorisation enrichi retourné par les endpoints protégés. */
+export type AuthContext = {
+  isAdmin: boolean;
+  permissions: Permission[];
+  hasPermission: (perm: Permission) => boolean;
+  hasAnyPermission: (perms: Permission[]) => boolean;
+};

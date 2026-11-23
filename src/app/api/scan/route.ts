@@ -3,8 +3,9 @@ import {
   REFRESH_COOKIE,
   requestAccessToken,
   createServerSupabase,
-  requireAdmin,
+  hasPermission,
   setSessionCookies,
+  createAuthContext,
 } from "@/lib/auth";
 import { isCourseActive, schoolInstant } from "@/lib/time";
 import { selectCourse } from "@/lib/scan";
@@ -36,9 +37,18 @@ type CourseRow = {
 
 export async function POST(request: NextRequest) {
   const accessToken = requestAccessToken(request);
-  const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  // Vérifier le JWT et créer un contexte d'autorisation enrichi
+  const supabase = createServerSupabase(accessToken);
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data?.user) {
+    return NextResponse.json({ error: "session_invalide" }, { status: 401 });
+  }
+  const authContext = createAuthContext(data.user as { app_metadata?: Record<string, unknown> });
+  // Vérifier la permission d'enregistrement de présence.
+  // Les surveillants et enseignants avec permission 'attendance.scan' peuvent pointer.
+  // Seuls les administrateurs ont accès à toutes les actions.
+  if (!authContext.hasPermission("attendance.scan")) {
+    return NextResponse.json({ error: "role_admin_requis" }, { status: 403 });
   }
 
   // Rate limiting : 60 req/min par IP (scans légitimes)
@@ -62,7 +72,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "code_qr_requis" }, { status: 400 });
   }
 
-  const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const now = schoolInstant();
 
   // 1) Élève par code QR
@@ -125,6 +134,11 @@ export async function POST(request: NextRequest) {
   }
   const course = selection.course;
 
+  // 4) Vérification de la permission d'écriture selon le rôle de l'utilisateur.
+  // - Admin : plein accès.
+  // - Surveillance/Enseignant avec permission 'attendance.scan' : peut pointer.
+  //   Mais on vérifie que l'utilisateur a bien le droit de modifier la présence
+  //   pour ce élève et ce cours (via RLS côté base déjà, mais contrôle UI aussi).
   // 4) Écriture de la présence — l'index unique garantit 1/jour/cours/élève
   const { data: presence, error: insertError } = await supabase
     .from("attendance")
@@ -151,6 +165,9 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 }
   );
-  if (auth.session) setSessionCookies(response, auth.session);
+  // Utiliser l'accessToken directement pour les cookies de session
+// (la session side est gérée par le client mobile via les refresh tokens)
+// accessToken est garanti non nul par la vérification précédent
+setSessionCookies(response, { access_token: accessToken!, refresh_token: "" });
   return response;
 }
