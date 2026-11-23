@@ -77,6 +77,14 @@ jobs:
         working-directory: mobile
         run: npm ci --legacy-peer-deps
 
+      - name: Create mobile .env (public EXPO_PUBLIC_* values)
+        working-directory: mobile
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=https://hdfefhltqyxiqnuruhlp.supabase.co" > .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_6QbAwQ2hnt8qCeUPVCXJ5w_MSO0APSP" >> .env
+          echo "EXPO_PUBLIC_API_BASE_URL=https://hdfefhltqyxiqnuruhlp.supabase.co" >> .env
+          cat .env
+
       - name: Generate native Android project
         working-directory: mobile
         env:

@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import { validateEnv } from "@/env";
 import "./globals.css";
-
-// Validation fail-fast des variables d'environnement au démarrage
-validateEnv();
 
 export const metadata: Metadata = {
   title: "VerifyCheck — Présence scolaire",
