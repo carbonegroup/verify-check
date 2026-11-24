@@ -58,9 +58,19 @@ jobs:
             "platforms;android-34" \
             "build-tools;34.0.0"
 
+      - name: Resolve SDK-compatible lockfile
+        working-directory: mobile
+        run: npm install --package-lock-only --legacy-peer-deps
+
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci --legacy-peer-deps
+
+      - name: Validate Expo dependencies
+        working-directory: mobile
+        run: |
+          npx expo install --check
+          npx expo-doctor
 
       - name: Create mobile .env (public EXPO_PUBLIC_* values)
         working-directory: mobile
@@ -75,7 +85,12 @@ jobs:
           CI: "1"
           EXPO_DEBUG: "1"
           APP_VERSION: ${{ inputs.version || '' }}
-        run: npx expo prebuild --platform android --no-install
+        run: |
+          npx expo prebuild --platform android --no-install
+          test -x android/gradlew || {
+            echo "::error::Expo prebuild did not generate android/gradlew."
+            exit 1
+          }
 
       - name: Verify generated Android project
         working-directory: mobile
