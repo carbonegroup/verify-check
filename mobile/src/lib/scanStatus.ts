@@ -10,9 +10,9 @@ export type ScanEtat =
   | { kind: "confirmee"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "doublon"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "qr_invalide" }
-  | { kind: "pas_de_cours"; heure?: string }
-  | { kind: "cours_ambigu"; candidates: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }> }
-  | { kind: "salle_invalide"; salle?: string }
+  | { kind: "pas_de_cours"; heure?: string; eleve?: string; classe?: string }
+  | { kind: "cours_ambigu"; eleve?: string; classe?: string; candidates: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }> }
+  | { kind: "salle_invalide"; salle?: string; eleve?: string; classe?: string }
   | { kind: "session_expiree" }
   | { kind: "erreur_serveur" }
   | { kind: "hors_ligne"; fileId: string }
@@ -52,10 +52,10 @@ export function mapScanResponse(
   }
   if (err === "doublon") return { kind: "doublon", eleve: body?.eleve, classe: body?.classe, cours: body?.cours, coursId: body?.cours_id };
   if (err === "qr_invalide") return { kind: "qr_invalide" };
-  if (err === "pas_de_cours") return { kind: "pas_de_cours", heure: body?.heure };
-  if (err === "cours_ambigu") return { kind: "cours_ambigu", candidates: body?.candidates ?? [] };
+  if (err === "pas_de_cours") return { kind: "pas_de_cours", heure: body?.heure, eleve: body?.eleve, classe: body?.classe };
+  if (err === "cours_ambigu") return { kind: "cours_ambigu", eleve: body?.eleve, classe: body?.classe, candidates: body?.candidates ?? [] };
   if (err === "salle_invalide" || err === "cours_pas_actif") {
-    return { kind: "salle_invalide", salle: body?.salle };
+    return { kind: "salle_invalide", salle: body?.salle, eleve: body?.eleve, classe: body?.classe };
   }
   if (httpStatus === 401 || err === "session_requise" || err === "session_invalide") {
     return { kind: "session_expiree" };
