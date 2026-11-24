@@ -79,6 +79,7 @@ export function SessionPicker({
   function choisirClasse(id: string) {
     setClasseId(id);
     setCoursId(null);
+    setSalle("");
   }
 
   function valider() {
@@ -176,7 +177,7 @@ export function SessionPicker({
                     return (
                       <TouchableOpacity
                         key={item.id}
-                        onPress={() => setCoursId(item.id)}
+                        onPress={() => { setCoursId(item.id); setSalle(item.salle ?? ""); }}
                         style={[s.course, active && s.courseActive]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
