@@ -97,7 +97,7 @@ export function ScannerScreen({
   useEffect(() => {
     scanBloque.current = false;
     setResultat(null);
-  }, [selection?.coursId]);
+  }, [selection?.coursId, selection?.salle]);
 
   async function scanner(code: string) {
     const value = code.trim().toUpperCase();
