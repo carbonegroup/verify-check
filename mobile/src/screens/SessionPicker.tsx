@@ -34,6 +34,7 @@ export function SessionPicker({
   const [salle, setSalle] = useState(current?.salle ?? "");
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
@@ -65,7 +66,7 @@ export function SessionPicker({
     return () => {
       active = false;
     };
-  }, [visible, current?.classeId, current?.coursId, current?.salle, onSessionExpiree]);
+  }, [visible, current?.classeId, current?.coursId, current?.salle, onSessionExpiree, refreshKey]);
 
   const classes = contexte?.classes ?? [];
   const cours = (contexte?.cours ?? []).filter(
@@ -131,7 +132,7 @@ export function SessionPicker({
               <Text style={s.error}>{erreur}</Text>
               <TouchableOpacity
                 style={s.retry}
-                onPress={() => setContexte(null)}
+                onPress={() => setRefreshKey((key) => key + 1)}
                 accessibilityRole="button"
               >
                 <Text style={s.retryText}>Réessayer</Text>
