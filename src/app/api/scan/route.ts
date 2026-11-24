@@ -12,9 +12,9 @@ import { applyRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/scan — Sprint 2 : flux scan → cours actif → écriture attendance.
- * Corps : { code_qr: string, salle?: string, cours?: string }
- * Le cours est résolu automatiquement s'il est unique ; cours sert à lever
- * une ambiguïté après lecture du QR (ou à configurer un portique).
+ * Corps : { code_qr: string, salle?: string, cours?: string, preview?: boolean }
+ * preview=true retourne la fiche sans écrire de présence ; une requête normale
+ * enregistre la présence après confirmation de l'agent.
  *
  * Règles métier (vérifiées côté serveur, l'anti-doublon est garanti par l'index
  * unique d'expression en base : 1 présence par élève, par cours, par jour
