@@ -148,7 +148,9 @@ export function HistoriqueScreen() {
         renderItem={({ item }) => (
           <View style={s.row}>
             <View style={s.rowMain}>
-              <Text style={s.code} numberOfLines={1}>{item.code_qr}</Text>
+              <Text style={s.code} numberOfLines={1}>{item.eleve || item.code_qr}</Text>
+              {item.eleve ? <Text style={s.date}>{item.code_qr}</Text> : null}
+              {item.cours_nom ? <Text style={s.date}>{item.cours_nom}</Text> : null}
               <Text style={s.date}>{dateLisible(item.at)}</Text>
               {item.note ? <Text style={s.note}>{item.note}</Text> : null}
             </View>
