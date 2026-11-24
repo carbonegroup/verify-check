@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
+import { studentPhotoSrc } from "@/lib/student-photo-url";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -776,9 +777,7 @@ export default function DashboardClient() {
                       presence: e.presences.find((p) => p.course_id === c.id),
                     }));
                   // Build Supabase Storage public URL if photo_url exists
-                  const photoUrl = e.photo_url
-                    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${e.photo_url}`
-                    : null;
+                  const photoUrl = studentPhotoSrc(e.photo_url, process.env.NEXT_PUBLIC_SUPABASE_URL);
                   return (
                     <tr key={e.id}>
                       <td>
@@ -911,9 +910,7 @@ export default function DashboardClient() {
                     <tbody>
                       {scolarite.lignes.map((l) => {
                         // Build Supabase Storage public URL if photo_url exists
-                        const photoUrl = l.photo_url
-                          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${l.photo_url}`
-                          : null;
+                        const photoUrl = studentPhotoSrc(l.photo_url, process.env.NEXT_PUBLIC_SUPABASE_URL);
                         return (
                           <tr key={l.eleve_id}>
                             <td>
@@ -1117,9 +1114,7 @@ function CartesQR({
       <div className={styles.cards}>
         {eleves.map((e) => {
           // Build Supabase Storage public URL if photo_url exists
-          const photoUrl = e.photo_url
-            ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${e.photo_url}`
-            : null;
+          const photoUrl = studentPhotoSrc(e.photo_url, process.env.NEXT_PUBLIC_SUPABASE_URL);
           return (
             <article key={e.id} className={styles.card}>
               <div className={styles.cardHead}>
