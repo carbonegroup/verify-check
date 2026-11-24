@@ -24,6 +24,7 @@ type Cours = {
   salle: string | null;
   heure_debut: string;
   heure_fin: string;
+  jour_semaine: number;
 };
 type Eleve = {
   id: string;
@@ -38,6 +39,7 @@ type DashboardData = {
   jour_semaine: number;
   classes: Classe[];
   cours_prevus: Cours[];
+  cours_semaine: Cours[];
   cours_disponibles: Cours[];
   effectif: number;
   presents: number;
@@ -113,12 +115,6 @@ const CATEGORIE_LABEL: Record<string, string> = {
   loyer: "Loyer",
   autre: "Autre",
 };
-
-const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: TIME_ZONE,
-});
 
 const dateLabelFormatter = new Intl.DateTimeFormat("fr-FR", {
   weekday: "long",
@@ -454,13 +450,11 @@ export default function DashboardClient() {
               aria-label="Filtrer par cours"
             >
               <option value="">Tous les cours</option>
-              {data.cours_disponibles
-                .filter((c) => !classe || c.classe_id === classe)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nom} · {timeFormatter.format(new Date(`2000-01-01T${c.heure_debut}Z`))}
-                  </option>
-                ))}
+              {data.cours_disponibles.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][c.jour_semaine]} · {c.nom} · {c.heure_debut.slice(0, 5)}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -711,43 +705,50 @@ export default function DashboardClient() {
 
           {/* -------------------------------------------------- COURS */}
           {vue === "cours" && (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Cours</th>
-                  <th>Classe</th>
-                  <th>Heure</th>
-                  <th>Salle</th>
-                  <th>Présents</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.cours_prevus.map((c) => {
-                  const eleves = data.eleves.filter(
-                    (e) => (!classe || e.classe_id === classe) && e.classe_id === c.classe_id
-                  );
-                  const presents = eleves.filter((e) => e.presences.some((p) => p.course_id === c.id));
-                  return (
-                    <tr key={c.id}>
-                      <td>{c.nom}</td>
-                      <td>{classeLabel(c.classe_id)}</td>
-                      <td className={styles.num}>
-                        {c.heure_debut.slice(0, 5)}–{c.heure_fin.slice(0, 5)}
-                      </td>
-                      <td>{c.salle ?? "—"}</td>
-                      <td className={styles.num}>{presents.length}/{eleves.length}</td>
-                    </tr>
-                  );
-                })}
-                {data.cours_prevus.length === 0 && (
+            <>
+              <p className={styles.summaryLine}>
+                Planning hebdomadaire · {data.cours_semaine.length} cours
+                {classeNom ? " · " + classeNom : ""}
+              </p>
+              <table className={styles.table}>
+                <thead>
                   <tr>
-                    <td colSpan={5} className={styles.empty}>
-                      Aucun cours prévu ce jour.
-                    </td>
+                    <th>Jour</th>
+                    <th>Cours</th>
+                    <th>Classe</th>
+                    <th>Heure</th>
+                    <th>Salle</th>
+                    <th>Présents le {dateLabel}</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.cours_semaine.map((c) => {
+                    const eleves = data.eleves.filter((e) => e.classe_id === c.classe_id);
+                    const presents = eleves.filter((e) => e.presences.some((p) => p.course_id === c.id));
+                    const isSelectedDay = c.jour_semaine === data.jour_semaine;
+                    return (
+                      <tr key={c.id}>
+                        <td>{["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][c.jour_semaine]}</td>
+                        <td>{c.nom}</td>
+                        <td>{classeLabel(c.classe_id)}</td>
+                        <td className={styles.num}>
+                          {c.heure_debut.slice(0, 5)}–{c.heure_fin.slice(0, 5)}
+                        </td>
+                        <td>{c.salle ?? "—"}</td>
+                        <td className={styles.num}>{isSelectedDay ? presents.length + "/" + eleves.length : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  {data.cours_semaine.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className={styles.empty}>
+                        Aucun cours programmé pour ces filtres.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </>
           )}
 
           {/* -------------------------------------------------- ÉLÈVES */}
