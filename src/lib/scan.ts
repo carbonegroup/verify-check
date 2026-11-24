@@ -45,11 +45,14 @@ export function selectCourse(
   }
 
   if (salle) {
-    const match = slotCourses.find((c) => c.salle === salle);
-    if (!match) {
+    const matches = slotCourses.filter((c) => c.salle === salle);
+    if (matches.length === 0) {
       return { ok: false, error: "salle_invalide", salle };
     }
-    return { ok: true, course: match };
+    if (matches.length > 1) {
+      return { ok: false, error: "cours_ambigu", candidates: matches };
+    }
+    return { ok: true, course: matches[0] };
   }
 
   if (slotCourses.length > 1) {
