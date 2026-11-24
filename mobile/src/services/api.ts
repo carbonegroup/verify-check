@@ -96,12 +96,12 @@ export async function getDashboard(
  */
 export async function pointer(
   codeQr: string,
-  selection: { coursId: string; coursNom: string; salle?: string }
+  selection?: { coursId: string; coursNom: string; salle?: string }
 ): Promise<ScanEtat> {
   const payload = {
     code_qr: codeQr.toUpperCase(),
-    cours: selection.coursId,
-    ...(selection.salle ? { salle: selection.salle } : {}),
+    ...(selection?.coursId ? { cours: selection.coursId } : {}),
+    ...(selection?.salle ? { salle: selection.salle } : {}),
   };
   try {
     const { status, body } = await api<Parameters<typeof mapScanResponse>[1]>("/api/scan", {
@@ -122,6 +122,7 @@ export async function pointer(
 /** Rejoue un pointage en file (synchronisation). */
 export async function rejouerPointage(item: FileItem): Promise<"confirme" | "doublon" | "rejete_definitif" | "reessayer"> {
   try {
+    if (!item.cours) return "reessayer";
     const payload = {
       code_qr: item.code_qr,
       cours: item.cours,
