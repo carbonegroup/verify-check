@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  REFRESH_COOKIE,
   requestAccessToken,
   createServerSupabase,
+  requireAdmin,
   setSessionCookies,
-  createAuthContext,
 } from "@/lib/auth";
 import { isCourseActive, schoolInstant } from "@/lib/time";
 import { selectCourse } from "@/lib/scan";
@@ -35,40 +36,59 @@ type CourseRow = {
 
 export async function POST(request: NextRequest) {
   const accessToken = requestAccessToken(request);
-  // Vérifier le JWT et créer un contexte d'autorisation enrichi
-  const supabase = createServerSupabase(accessToken);
-  const { data, error } = await supabase.auth.getUser(accessToken);
-  if (error || !data?.user) {
-    return NextResponse.json({ error: "session_invalide" }, { status: 401 });
+  const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.error === "role_admin_requis" ? 403 : auth.status }
+    );
   }
-  const authContext = createAuthContext(data.user as { app_metadata?: Record<string, unknown> });
-  // Vérifier la permission d'enregistrement de présence.
-  // Les surveillants et enseignants avec permission 'attendance.scan' peuvent pointer.
-  // Seuls les administrateurs ont accès à toutes les actions.
-  if (!authContext.hasPermission("attendance.scan")) {
-    return NextResponse.json({ error: "role_admin_requis" }, { status: 403 });
-  }
+
+  // Use the rotated access token immediately when requireAdmin refreshes a session.
+  const effectiveAccessToken = auth.session?.access_token ?? accessToken!;
+  const supabase = createServerSupabase(effectiveAccessToken);
+  const respondJson = (body: unknown, init?: ResponseInit) => {
+    const response = NextResponse.json(body, init);
+    if (auth.session) setSessionCookies(response, auth.session);
+    return response;
+  };
 
   // Rate limiting : 60 req/min par IP (scans légitimes)
   const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:scan" });
   if (!rl.allowed) {
-    return NextResponse.json(
+    return respondJson(
       { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
   }
 
-  let body: { code_qr?: string; salle?: string; cours?: string };
+  let payload: unknown;
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
-  const codeQr = body.code_qr?.trim();
-  const salle = body.salle?.trim();
-  if (!codeQr) {
-    return NextResponse.json({ error: "code_qr_requis" }, { status: 400 });
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
+
+  const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown };
+  if (typeof body.code_qr !== "string" || !body.code_qr.trim()) {
+    return respondJson({ error: "code_qr_requis" }, { status: 400 });
+  }
+  if (
+    body.code_qr.trim().length > 64 ||
+    (body.salle !== undefined && body.salle !== null && typeof body.salle !== "string") ||
+    (body.cours !== undefined && body.cours !== null && typeof body.cours !== "string") ||
+    (typeof body.salle === "string" && body.salle.trim().length > 128) ||
+    (typeof body.cours === "string" && body.cours.trim().length > 64)
+  ) {
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
+  }
+
+  const codeQr = body.code_qr.trim();
+  const salle = typeof body.salle === "string" ? body.salle.trim() || undefined : undefined;
+  const cours = typeof body.cours === "string" ? body.cours.trim() || undefined : undefined;
 
   const now = schoolInstant();
 
@@ -83,12 +103,12 @@ export async function POST(request: NextRequest) {
     // il ne faut PAS la présenter comme un QR invalide, sinon le scanner
     // écarte le pointage comme rejet définitif (perte de présence).
     if (studentError.code === "PGRST116") {
-      return NextResponse.json({ error: "qr_invalide" }, { status: 404 });
+      return respondJson({ error: "qr_invalide" }, { status: 404 });
     }
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
   if (!student) {
-    return NextResponse.json({ error: "qr_invalide" }, { status: 404 });
+    return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
 
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
@@ -98,20 +118,20 @@ export async function POST(request: NextRequest) {
     .eq("classe_id", student.classe_id)
     .eq("jour_semaine", now.jourSemaine);
   if (coursesError) {
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
   const slotCourses = (courses as CourseRow[] | null ?? []).filter((course) =>
     isCourseActive(course.heure_debut, course.heure_fin, now)
   );
   if (slotCourses.length === 0) {
-    return NextResponse.json({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
+    return respondJson({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
   }
 
   // 3) Désambiguïsation : salle du portique ou cours explicite. JAMAIS de choix arbitraire.
-  const selection = selectCourse(slotCourses, { salle, cours: body.cours });
+  const selection = selectCourse(slotCourses, { salle, cours });
   if (!selection.ok) {
     if (selection.error === "cours_ambigu") {
-      return NextResponse.json(
+      return respondJson(
         {
           error: selection.error,
           candidates: selection.candidates.map((c) => ({
@@ -125,19 +145,15 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    return NextResponse.json(
+    return respondJson(
       { error: selection.error, salle: (selection as { salle?: string }).salle, cours: (selection as { cours?: string }).cours },
       { status: 409 }
     );
   }
   const course = selection.course;
 
-  // 4) Vérification de la permission d'écriture selon le rôle de l'utilisateur.
-  // - Admin : plein accès.
-  // - Surveillance/Enseignant avec permission 'attendance.scan' : peut pointer.
-  //   Mais on vérifie que l'utilisateur a bien le droit de modifier la présence
-  //   pour ce élève et ce cours (via RLS côté base déjà, mais contrôle UI aussi).
-  // 4) Écriture de la présence — l'index unique garantit 1/jour/cours/élève
+  // 4) Écriture — la politique RLS et l'index unique garantissent les droits
+  // admin et un seul pointage par élève/cours/journée scolaire.
   const { data: presence, error: insertError } = await supabase
     .from("attendance")
     .insert({ student_id: student.id, course_id: course.id })
@@ -145,12 +161,12 @@ export async function POST(request: NextRequest) {
     .single();
   if (insertError) {
     if (insertError.code === "23505") {
-      return NextResponse.json(
+      return respondJson(
         { error: "doublon", course: course.nom, jour: now.jour },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
 
   const response = NextResponse.json(
@@ -163,9 +179,8 @@ export async function POST(request: NextRequest) {
     },
     { status: 201 }
   );
-  // Utiliser l'accessToken directement pour les cookies de session
-// (la session side est gérée par le client mobile via les refresh tokens)
-// accessToken est garanti non nul par la vérification précédent
-setSessionCookies(response, { access_token: accessToken!, refresh_token: "" });
+  // Ne réécrire les cookies que si requireAdmin a effectivement renouvelé
+  // la session web. Les appels Bearer de l'app mobile ne posent pas de cookies.
+  if (auth.session) setSessionCookies(response, auth.session);
   return response;
 }

@@ -11,6 +11,7 @@
  */
 
 import { csvEscape } from "./csv.ts";
+import { isIsoDate } from "./dashboard.ts";
 
 /** Montant en GNF, séparateur de milliers insécable (affichage). */
 export function formatGnf(montant: number): string {
@@ -229,26 +230,39 @@ export function isReglementDuplicate(
   );
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Maximum positif stockable par les colonnes PostgreSQL INTEGER. */
+const MAX_GNF_AMOUNT = 2_147_483_647;
 
 /** Validation d'une saisie de règlement (avant insertion). */
 export function validateReglement(input: {
-  student_id?: string;
-  fee_id?: string;
-  montant_gnf?: number;
-  recu_le?: string;
+  student_id?: unknown;
+  fee_id?: unknown;
+  montant_gnf?: unknown;
+  recu_le?: unknown;
+  note?: unknown;
 }): { ok: true } | { ok: false; error: string } {
-  if (!input.student_id) return { ok: false, error: "eleve_requis" };
-  if (!input.fee_id) return { ok: false, error: "frais_requis" };
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, error: "corps_invalide" };
+  }
+  if (typeof input.student_id !== "string" || !input.student_id.trim()) {
+    return { ok: false, error: "eleve_requis" };
+  }
+  if (typeof input.fee_id !== "string" || !input.fee_id.trim()) {
+    return { ok: false, error: "frais_requis" };
+  }
   if (
     typeof input.montant_gnf !== "number" ||
-    !Number.isFinite(input.montant_gnf) ||
-    input.montant_gnf <= 0
+    !Number.isSafeInteger(input.montant_gnf) ||
+    input.montant_gnf <= 0 ||
+    input.montant_gnf > MAX_GNF_AMOUNT
   ) {
     return { ok: false, error: "montant_invalide" };
   }
-  if (!input.recu_le || !ISO_DATE.test(input.recu_le)) {
+  if (typeof input.recu_le !== "string" || !isIsoDate(input.recu_le)) {
     return { ok: false, error: "date_invalide" };
+  }
+  if (input.note !== undefined && input.note !== null && typeof input.note !== "string") {
+    return { ok: false, error: "note_invalide" };
   }
   return { ok: true };
 }

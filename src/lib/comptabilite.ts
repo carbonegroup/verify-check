@@ -13,6 +13,7 @@
 
 import { csvEscape } from "./csv.ts";
 import { formatGnf } from "./scolarite.ts";
+import { isIsoDate } from "./dashboard.ts";
 
 export type CategorieDepense =
   | "salaires"
@@ -170,30 +171,42 @@ export function buildComptabiliteCsv(ecritures: Ecriture[]): string {
   return `\uFEFF${lines.join("\r\n")}`;
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Maximum positif stockable par les colonnes PostgreSQL INTEGER. */
+const MAX_GNF_AMOUNT = 2_147_483_647;
 
 /** Validation d'une saisie de dépense (avant insertion). */
 export function validateDepense(input: {
-  libelle?: string;
-  categorie?: string;
-  montant_gnf?: number;
-  date_depense?: string;
+  libelle?: unknown;
+  categorie?: unknown;
+  montant_gnf?: unknown;
+  date_depense?: unknown;
+  note?: unknown;
 }): { ok: true } | { ok: false; error: string } {
-  if (!input.libelle || input.libelle.trim().length < 2) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ok: false, error: "corps_invalide" };
+  }
+  if (typeof input.libelle !== "string" || input.libelle.trim().length < 2) {
     return { ok: false, error: "libelle_requis" };
   }
-  if (!input.categorie || !CATEGORIES_DEPENSE.includes(input.categorie as CategorieDepense)) {
+  if (
+    typeof input.categorie !== "string" ||
+    !CATEGORIES_DEPENSE.includes(input.categorie as CategorieDepense)
+  ) {
     return { ok: false, error: "categorie_invalide" };
   }
   if (
     typeof input.montant_gnf !== "number" ||
-    !Number.isFinite(input.montant_gnf) ||
-    input.montant_gnf <= 0
+    !Number.isSafeInteger(input.montant_gnf) ||
+    input.montant_gnf <= 0 ||
+    input.montant_gnf > MAX_GNF_AMOUNT
   ) {
     return { ok: false, error: "montant_invalide" };
   }
-  if (!input.date_depense || !ISO_DATE.test(input.date_depense)) {
+  if (typeof input.date_depense !== "string" || !isIsoDate(input.date_depense)) {
     return { ok: false, error: "date_invalide" };
+  }
+  if (input.note !== undefined && input.note !== null && typeof input.note !== "string") {
+    return { ok: false, error: "note_invalide" };
   }
   return { ok: true };
 }

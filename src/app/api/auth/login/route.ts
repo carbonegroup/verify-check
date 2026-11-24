@@ -23,13 +23,19 @@ export async function POST(request: NextRequest) {
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
   }
-  let body: { email?: string; password?: string };
+  let payload: unknown;
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
     return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
   }
-  const { email, password } = body;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
+  }
+
+  const body = payload as { email?: unknown; password?: unknown };
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
   if (!email || !password) {
     return NextResponse.json({ error: "champs_requis" }, { status: 400 });
   }
