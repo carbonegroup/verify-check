@@ -7,11 +7,11 @@
 export type ScanApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | number;
 
 export type ScanEtat =
-  | { kind: "confirmee"; eleve?: string; cours?: string }
-  | { kind: "doublon" }
+  | { kind: "confirmee"; eleve?: string; classe?: string; cours?: string; coursId?: string }
+  | { kind: "doublon"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "qr_invalide" }
   | { kind: "pas_de_cours"; heure?: string }
-  | { kind: "cours_ambigu"; candidates: Array<{ id: string; nom: string; salle: string | null }> }
+  | { kind: "cours_ambigu"; candidates: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }> }
   | { kind: "salle_invalide"; salle?: string }
   | { kind: "session_expiree" }
   | { kind: "erreur_serveur" }
@@ -22,10 +22,12 @@ export type ScanApiBody = {
   ok?: boolean;
   error?: string;
   eleve?: string;
+  classe?: string;
   cours?: string;
+  cours_id?: string;
   heure?: string;
   salle?: string;
-  candidates?: Array<{ id: string; nom: string; salle: string | null }>;
+  candidates?: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }>;
 };
 
 /** Rejets métier définitifs en DIRECT : jamais mises en file d'attente
@@ -46,9 +48,9 @@ export function mapScanResponse(
 ): ScanEtat {
   const err = body?.error;
   if (httpStatus === 201) {
-    return { kind: "confirmee", eleve: body?.eleve, cours: body?.cours };
+    return { kind: "confirmee", eleve: body?.eleve, classe: body?.classe, cours: body?.cours, coursId: body?.cours_id };
   }
-  if (err === "doublon") return { kind: "doublon" };
+  if (err === "doublon") return { kind: "doublon", eleve: body?.eleve, classe: body?.classe, cours: body?.cours, coursId: body?.cours_id };
   if (err === "qr_invalide") return { kind: "qr_invalide" };
   if (err === "pas_de_cours") return { kind: "pas_de_cours", heure: body?.heure };
   if (err === "cours_ambigu") return { kind: "cours_ambigu", candidates: body?.candidates ?? [] };
