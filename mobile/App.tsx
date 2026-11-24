@@ -18,8 +18,6 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { AccueilScreen } from "./src/screens/AccueilScreen";
 import { ScannerScreen } from "./src/screens/ScannerScreen";
 import { HistoriqueScreen } from "./src/screens/HistoriqueScreen";
-import { SessionPicker } from "./src/screens/SessionPicker";
-import type { Selection } from "./src/screens/AccueilScreen";
 import { logout, session } from "./src/services/auth";
 import { theme } from "./src/theme";
 
@@ -34,9 +32,7 @@ const ONGLETS: Array<{ id: Onglet; label: string; icon: string }> = [
 export default function App() {
   const [email, setEmail] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
-  const [selection, setSelection] = useState<Selection | null>(null);
   const [onglet, setOnglet] = useState<Onglet>("scanner");
-  const [choixOuvert, setChoixOuvert] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -45,7 +41,6 @@ export default function App() {
         if (!active) return;
         const userEmail = stored?.user.email ?? null;
         setEmail(userEmail);
-        if (userEmail) setChoixOuvert(true);
       })
       .catch(() => {
         if (active) setEmail(null);
@@ -63,8 +58,6 @@ export default function App() {
       await logout();
     } finally {
       setEmail(null);
-      setSelection(null);
-      setChoixOuvert(false);
       setOnglet("scanner");
     }
   }, []);
@@ -74,27 +67,14 @@ export default function App() {
   }, [deconnexion]);
 
   const ouvrirMenuCompte = useCallback(() => {
-    const actions = [];
-    if (selection) {
-      actions.push({
-        text: "Changer de séance",
-        onPress: () => setChoixOuvert(true),
-      });
-    }
-    actions.push({ text: "Se déconnecter", style: "destructive" as const, onPress: () => void deconnexion() });
-    actions.push({ text: "Annuler", style: "cancel" as const });
-    Alert.alert("VerifyCheck", email ?? "", actions);
-  }, [deconnexion, email, selection]);
+    Alert.alert("VerifyCheck", email ?? "", [
+      { text: "Se déconnecter", style: "destructive", onPress: () => void deconnexion() },
+      { text: "Annuler", style: "cancel" },
+    ]);
+  }, [deconnexion, email]);
 
   const ouvrirScanner = useCallback(() => {
     setOnglet("scanner");
-    if (!selection) setChoixOuvert(true);
-  }, [selection]);
-
-  const choisirSeance = useCallback((next: Selection) => {
-    setSelection(next);
-    setOnglet("scanner");
-    setChoixOuvert(false);
   }, []);
 
   if (chargement) return <View style={s.loading} />;
@@ -105,7 +85,6 @@ export default function App() {
         onConnecte={(nextEmail) => {
           setEmail(nextEmail);
           setOnglet("scanner");
-          setChoixOuvert(true);
         }}
       />
     );
@@ -139,11 +118,7 @@ export default function App() {
           <AccueilScreen onOpenScanner={ouvrirScanner} />
         ) : null}
         {onglet === "scanner" ? (
-          <ScannerScreen
-            selection={selection}
-            onSessionExpiree={sessionExpiree}
-            onChooseSession={() => setChoixOuvert(true)}
-          />
+          <ScannerScreen onSessionExpiree={sessionExpiree} />
         ) : null}
         {onglet === "historique" ? <HistoriqueScreen /> : null}
       </View>
@@ -157,7 +132,6 @@ export default function App() {
               style={s.tab}
               onPress={() => {
                 setOnglet(item.id);
-                if (item.id === "scanner" && !selection) setChoixOuvert(true);
               }}
               accessibilityRole="button"
               accessibilityLabel={item.label}
@@ -170,14 +144,6 @@ export default function App() {
           );
         })}
       </View>
-
-      <SessionPicker
-        visible={choixOuvert}
-        current={selection}
-        onClose={() => setChoixOuvert(false)}
-        onSelect={choisirSeance}
-        onSessionExpiree={sessionExpiree}
-      />
     </SafeAreaView>
   );
 }
