@@ -76,6 +76,15 @@ jobs:
           APP_VERSION: ${{ inputs.version || '' }}
         run: npx expo prebuild --platform android --no-install
 
+      - name: Verify generated Android project
+        working-directory: mobile
+        run: |
+          if [ ! -f android/gradlew ] || [ ! -f android/app/build.gradle ]; then
+            echo "::error::Expo prebuild did not generate the Android Gradle project."
+            find android -maxdepth 3 -type f -print 2>/dev/null || true
+            exit 1
+          fi
+
       - name: Build release APK
         working-directory: mobile/android
         run: |
