@@ -47,10 +47,13 @@ export function nouvelleEntree(
 }
 
 /** Anti-doublon local : ce code est-il déjà EN ATTENTE pour ce cours ? */
-export function dejaEnAttente(items: FileItem[], codeQr: string, cours: string): boolean {
+export function dejaEnAttente(items: FileItem[], codeQr: string, cours?: string): boolean {
   const code = codeQr.toUpperCase();
   return items.some(
-    (i) => i.etat === "en_attente" && i.code_qr === code && i.cours === cours
+    (i) =>
+      i.etat === "en_attente" &&
+      i.code_qr === code &&
+      (!cours || !i.cours || i.cours === cours)
   );
 }
 
