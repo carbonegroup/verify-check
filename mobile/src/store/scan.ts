@@ -50,7 +50,7 @@ export async function enregistrerScan(
   const coursId = selection?.coursId ?? "";
 
   if (etat.kind === "hors_ligne" || etat.kind === "erreur_serveur") {
-    if (coursId && dejaEnAttente(items, codeQr, coursId)) {
+    if (dejaEnAttente(items, codeQr, coursId || undefined)) {
       return { kind: "deja_en_attente" };
     }
 
