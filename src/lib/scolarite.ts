@@ -19,7 +19,12 @@ export function formatGnf(montant: number): string {
 }
 
 export type ScolariteClasseRow = { id: string; nom: string };
-export type ScolariteEleveRow = { id: string; nom: string; classe_id: string };
+export type ScolariteEleveRow = {
+  id: string;
+  nom: string;
+  classe_id: string;
+  photo_url?: string | null;
+};
 
 export type FraisRow = {
   id: string;
@@ -68,6 +73,7 @@ export type ScolariteLigne = {
   eleve: string;
   classe_id: string;
   classe: string;
+  photo_url?: string | null;
   attendu_gnf: number;
   regle_gnf: number;
   solde_gnf: number;
@@ -135,6 +141,7 @@ export function buildScolarite(
       eleve: e.nom,
       classe_id: e.classe_id,
       classe: classeNom.get(e.classe_id) ?? "",
+      photo_url: e.photo_url,
       attendu_gnf: attendu,
       regle_gnf: regle,
       solde_gnf: attendu - regle,
