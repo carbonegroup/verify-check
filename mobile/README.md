@@ -23,7 +23,7 @@ Le choix de la séance reste obligatoire ; il est simplement déplacé dans une 
 
 ## Structure
 
-\`\`\`text
+~~~text
 mobile/
   App.tsx                         Shell, authentification et onglets
   src/
@@ -42,18 +42,18 @@ mobile/
       scanStatus.ts               Mapping des réponses serveur
       queue.ts                    File hors ligne (logique pure)
     tests/                        Tests unitaires de la file, des états et de la config
-\`\`\`
+~~~
 
 ## Commandes
 
-\`\`\`bash
+~~~bash
 cd mobile
 npm install
 npx expo start
 npm run typecheck
 npm test
 npm run lint
-\`\`\`
+~~~
 
 ## Configuration
 
