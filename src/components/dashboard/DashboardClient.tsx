@@ -785,7 +785,7 @@ export default function DashboardClient() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div className={styles.studentAvatar}>
                             {photoUrl ? (
-                              {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
+                              // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                               <img
                                 src={photoUrl}
                                 alt={`${e.nom}`}
@@ -920,7 +920,7 @@ export default function DashboardClient() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div className={styles.studentAvatar}>
                                   {photoUrl ? (
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
+                                    // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                                     <img
                                       src={photoUrl}
                                       alt={`${l.eleve}`}
@@ -1130,7 +1130,7 @@ function CartesQR({
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                   <div className={`${styles.studentAvatar} ${styles.studentAvatarLarge}`}>
                     {photoUrl ? (
-                      {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
+                      // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                       <img
                         src={photoUrl}
                         alt={`${e.nom}`}
