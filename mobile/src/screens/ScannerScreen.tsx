@@ -124,7 +124,13 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
       if ("cours" in response) affiche.cours = response.cours;
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
       if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
-      if (response.kind === "previsualisation") affiche.selection = selection;
+      if (response.kind === "previsualisation") {
+        affiche.selection = selection ?? (
+          response.coursId && response.cours
+            ? { coursId: response.coursId, coursNom: response.cours }
+            : undefined
+        );
+      }
       setResultat(affiche);
 
       if (response.kind === "session_expiree") onSessionExpiree();
