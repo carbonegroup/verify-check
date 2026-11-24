@@ -9,6 +9,12 @@ on:
     paths:
       - "mobile/**"
       - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
     inputs:
       version:
