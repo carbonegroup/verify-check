@@ -98,8 +98,8 @@ export function buildDashboard(
 
   const weeklyCourses = raw.courses
     .filter((c) => !filters.classe || c.classe_id === filters.classe)
-    .filter((c) => !filters.cours || c.id === filters.cours)
     .sort((a, b) => a.jour_semaine - b.jour_semaine || a.heure_debut.localeCompare(b.heure_debut));
+  const filteredWeeklyCourses = weeklyCourses.filter((c) => !filters.cours || c.id === filters.cours);
   const availableCourses = weeklyCourses.filter((c) => c.jour_semaine === weekday);
   const plannedCourses = availableCourses.filter(
     (c) => !filters.cours || c.id === filters.cours
@@ -132,7 +132,7 @@ export function buildDashboard(
     jour_semaine: weekday,
     classes: raw.classes,
     cours_prevus: plannedCourses,
-    cours_semaine: weeklyCourses,
+    cours_semaine: filteredWeeklyCourses,
     cours_disponibles: weeklyCourses,
     effectif: visibleStudents.length,
     presents: presentCount,
