@@ -21,7 +21,19 @@ type Props = {
   onSessionExpiree: () => void;
 };
 
-export function SessionPicker({
+export function SessionPicker(props: Props) {
+  const currentKey = props.visible
+    ? [
+        props.current?.classeId ?? "",
+        props.current?.coursId ?? "",
+        props.current?.salle ?? "",
+      ].join("|")
+    : "hidden";
+
+  return <SessionPickerContent key={currentKey} {...props} />;
+}
+
+function SessionPickerContent({
   visible,
   current,
   onClose,
@@ -32,41 +44,57 @@ export function SessionPicker({
   const [classeId, setClasseId] = useState<string | null>(current?.classeId ?? null);
   const [coursId, setCoursId] = useState<string | null>(current?.coursId ?? null);
   const [salle, setSalle] = useState(current?.salle ?? "");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(visible);
   const [erreur, setErreur] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
     let active = true;
-    setClasseId(current?.classeId ?? null);
-    setCoursId(current?.coursId ?? null);
-    setSalle(current?.salle ?? "");
-    setLoading(true);
-    setErreur(null);
 
-    void getContexte().then((result) => {
-      if (!active) return;
-      setLoading(false);
-      if (!result.ok) {
-        setErreur(
-          result.error === "reseau"
-            ? "Réseau indisponible. Vérifie la connexion puis réessaie."
-            : "Impossible de charger les séances."
-        );
-        if (result.error === "session") onSessionExpiree();
-        return;
-      }
-      setContexte(result.data);
-      if (current?.classeId && result.data.classes.some((c) => c.id === current.classeId)) {
-        setClasseId(current.classeId);
-      }
-    });
+    void getContexte()
+      .then((result) => {
+        if (!active) return;
+        setLoading(false);
+        if (!result.ok) {
+          setErreur(
+            result.error === "reseau"
+              ? "Réseau indisponible. Vérifie la connexion puis réessaie."
+              : "Impossible de charger les séances."
+          );
+          if (result.error === "session") onSessionExpiree();
+          return;
+        }
+
+        setContexte(result.data);
+        const classeInitiale =
+          current?.classeId && result.data.classes.some((item) => item.id === current.classeId)
+            ? current.classeId
+            : null;
+        setClasseId(classeInitiale);
+
+        const coursInitial =
+          current?.coursId &&
+          result.data.cours.some(
+            (item) =>
+              item.id === current.coursId &&
+              item.actif &&
+              item.classe_id === classeInitiale
+          )
+            ? current.coursId
+            : null;
+        setCoursId(coursInitial);
+      })
+      .catch(() => {
+        if (!active) return;
+        setLoading(false);
+        setErreur("Impossible de charger les séances.");
+      });
 
     return () => {
       active = false;
     };
-  }, [visible, current?.classeId, current?.coursId, current?.salle, onSessionExpiree, refreshKey]);
+  }, [visible, current?.classeId, current?.coursId, onSessionExpiree, refreshKey]);
 
   const classes = contexte?.classes ?? [];
   const cours = (contexte?.cours ?? []).filter(
@@ -133,7 +161,11 @@ export function SessionPicker({
               <Text style={s.error}>{erreur}</Text>
               <TouchableOpacity
                 style={s.retry}
-                onPress={() => setRefreshKey((key) => key + 1)}
+                onPress={() => {
+                  setErreur(null);
+                  setLoading(true);
+                  setRefreshKey((key) => key + 1);
+                }}
                 accessibilityRole="button"
               >
                 <Text style={s.retryText}>Réessayer</Text>
