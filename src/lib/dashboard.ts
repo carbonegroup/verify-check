@@ -98,7 +98,8 @@ export function buildDashboard(
 
   const weeklyCourses = raw.courses
     .filter((c) => !filters.classe || c.classe_id === filters.classe)
-    .filter((c) => !filters.cours || c.id === filters.cours);
+    .filter((c) => !filters.cours || c.id === filters.cours)
+    .sort((a, b) => a.jour_semaine - b.jour_semaine || a.heure_debut.localeCompare(b.heure_debut));
   const availableCourses = weeklyCourses.filter((c) => c.jour_semaine === weekday);
   const plannedCourses = availableCourses.filter(
     (c) => !filters.cours || c.id === filters.cours
