@@ -26,6 +26,26 @@ jobs:
         run: npm ci --legacy-peer-deps
         working-directory: mobile
 
+      - name: Verify Metro uses the patched image-size 1.x implementation
+        working-directory: mobile
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = "node_modules/metro/node_modules/image-size/package.json";
+          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+          if (pkg.name !== "image-size-next" || pkg.version !== "1.2.2") {
+            throw new Error(`Unexpected Metro image-size resolution: ${pkg.name}@${pkg.version}`);
+          }
+          console.log(`Metro image-size resolved to ${pkg.name}@${pkg.version}`);
+          NODE
+
+      - name: Audit web dependencies
+        run: npm audit --audit-level=low
+
+      - name: Audit mobile dependencies
+        run: npm audit --audit-level=low
+        working-directory: mobile
+
       - name: Validate EAS Android build types
         run: |
           node <<'NODE'
@@ -74,6 +94,10 @@ jobs:
           }
           console.log("Configuration Expo statique et surcharge APP_VERSION validées.");
           NODE
+        working-directory: mobile
+
+      - name: Export Android bundle with Metro
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/verifycheck-expo-export" --no-minify
         working-directory: mobile
 
       - name: Type check web
