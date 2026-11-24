@@ -14,7 +14,7 @@
     "db:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.119.2",
     "html5-qrcode": "^2.3.8",
     "next": "^15.1.0",
     "qrcode": "^1.5.4",
