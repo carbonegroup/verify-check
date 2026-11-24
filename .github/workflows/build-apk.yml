@@ -9,6 +9,12 @@ on:
     paths:
       - "mobile/**"
       - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
     inputs:
       version:
@@ -60,11 +66,17 @@ jobs:
 
       - name: Resolve SDK-compatible lockfile
         working-directory: mobile
-        run: npm install --package-lock-only --legacy-peer-deps
+        run: npm install --package-lock-only --legacy-peer-deps --ignore-scripts
 
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci --legacy-peer-deps
+
+      - name: Verify Expo CLI tar compatibility
+        working-directory: mobile
+        run: |
+          npm run test:expo-cli-tar-patch
+          node scripts/patch-expo-cli-tar.mjs --check
 
       - name: Validate Expo dependencies
         working-directory: mobile

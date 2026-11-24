@@ -22,6 +22,10 @@ jobs:
       - name: Install web dependencies
         run: npm ci
 
+      - name: Resolve SDK-compatible mobile lockfile
+        working-directory: mobile
+        run: npm install --package-lock-only --legacy-peer-deps --ignore-scripts
+
       - name: Install mobile dependencies from lockfile
         run: npm ci --legacy-peer-deps
         working-directory: mobile

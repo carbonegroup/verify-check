@@ -35,8 +35,8 @@ export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) 
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const charger = useCallback(async () => {
-    setLoading(true);
+  const charger = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const [recent, pending] = await Promise.all([historique(), enAttente()]);
     setItems(recent);
     setPendingCount(pending);
@@ -44,8 +44,23 @@ export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) 
   }, []);
 
   useEffect(() => {
-    void charger();
-    return onFileChange(() => void charger());
+    let active = true;
+
+    const chargerInitial = async () => {
+      const [recent, pending] = await Promise.all([historique(), enAttente()]);
+      if (!active) return;
+      setItems(recent);
+      setPendingCount(pending);
+      setLoading(false);
+    };
+
+    void chargerInitial();
+    const unsubscribe = onFileChange(() => void charger(false));
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [charger]);
 
   const pending = pendingCount;
