@@ -5,52 +5,42 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
-function escapeRegExp(value) {
-  return value.replace(/\$/g, '\\$&');
-}
-
 export function patchExpoCliTarImport(source) {
-  const importedTar = source.match(
-    /(?:^|\n)\s*(?:var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*([^\n;]*\brequire\(\s*(['"])tar\3\s*\)[^\n;]*)\s*;?/m
-  );
+  const compiledDefaultImport =
+    /((?:const|let|var)\s+)([A-Za-z_$][\w$]*)(\s*=\s*)(?:\/\*#__PURE__\*\/\s*)?_interopRequireDefault\s*\(\s*require\(\s*(['"])tar\4\s*\)\s*\)\s*;?/g;
 
-  if (!importedTar) {
-    throw new Error('Could not locate the compiled @expo/cli import of the tar package.');
-  }
-
-  const binding = importedTar[1];
-  const escapedBinding = escapeRegExp(binding);
-  const brokenAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.default\\.extract\\b', 'g');
-  const brokenMatches = [...source.matchAll(brokenAccess)].length;
-
-  if (brokenMatches === 0) {
-    const workingAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.extract\\b');
-    if (workingAccess.test(source)) {
-      return { source, changed: false, binding };
-    }
-    const diagnosticLines = source.split('\n').filter((line) => line.includes(binding) || /extract/i.test(line)).slice(0, 30);
-    throw new Error(
-      'Found the tar import in @expo/cli, but not the expected extract access. Import: ' +
-      importedTar[0].trim() +
-      ' | Relevant lines: ' +
-      diagnosticLines.join(' || ')
+  const matches = [...source.matchAll(compiledDefaultImport)];
+  if (matches.length > 0) {
+    const patched = source.replace(
+      compiledDefaultImport,
+      (_match, declaration, binding, assignment) =>
+        declaration + binding + assignment + '{ default: require("tar") };'
     );
+    return {
+      source: patched,
+      changed: true,
+      replacements: matches.length,
+      bindings: matches.map((match) => match[2]),
+    };
   }
 
-  const patched = source.replace(brokenAccess, (match, prefix) => prefix + binding + '.extract');
-  const workingAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.extract\\b');
-  if (!workingAccess.test(patched)) {
-    throw new Error('The @expo/cli tar import patch did not produce a valid extract call.');
+  const alreadyPatched =
+    /(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*\{\s*default:\s*require\(\s*(['"])tar\1\s*\)\s*\}/;
+  if (alreadyPatched.test(source)) {
+    return { source, changed: false, replacements: 0, bindings: [] };
   }
 
-  return { source: patched, changed: true, binding, replacements: brokenMatches };
+  throw new Error(
+    'Could not locate the expected compiled @expo/cli default import of tar. Refusing to modify an unknown bundle shape.'
+  );
 }
 
 async function main() {
   if (process.env.npm_config_package_lock_only === 'true') {
-    process.stdout.write('[expo-cli-tar-patch] Skipped during package-lock-only resolution.\\n');
+    process.stdout.write('[expo-cli-tar-patch] Skipped during package-lock-only resolution.\n');
     return;
   }
+
   const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const tarNamespace = require('tar');
   if (typeof tarNamespace?.extract !== 'function') {
@@ -72,9 +62,15 @@ async function main() {
 
   if (result.changed) {
     await writeFile(targetFile, result.source, 'utf8');
-    process.stdout.write('[expo-cli-tar-patch] Repaired @expo/cli tar.extract interop (' + result.replacements + ' call(s)).\n');
+    process.stdout.write(
+      '[expo-cli-tar-patch] Wrapped tar CommonJS namespace as a default export (' +
+      result.replacements +
+      ' import(s): ' +
+      result.bindings.join(', ') +
+      ').\n'
+    );
   } else {
-    process.stdout.write('[expo-cli-tar-patch] @expo/cli tar.extract interop verified.\n');
+    process.stdout.write('[expo-cli-tar-patch] @expo/cli tar default interop verified.\n');
   }
 }
 

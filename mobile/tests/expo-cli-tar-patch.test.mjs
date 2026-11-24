@@ -2,34 +2,28 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { patchExpoCliTarImport } from '../scripts/patch-expo-cli-tar.mjs';
 
-test('replaces a broken default extract access with the named tar export', () => {
+test('wraps the compiled Expo CLI default tar import around the tar namespace', () => {
   const source = [
-    'var tar_1 = _interop_require_default(require("tar"));',
-    '(0, tar_1.default.extract)({ cwd: output });',
+    'const data = /*#__PURE__*/ _interopRequireDefault(require("tar"));',
+    'const other = /*#__PURE__*/ _interopRequireDefault(require("other"));',
   ].join('\n');
   const result = patchExpoCliTarImport(source);
   assert.equal(result.changed, true);
   assert.equal(result.replacements, 1);
-  assert.match(result.source, /tar_1\.extract/);
-  assert.doesNotMatch(result.source, /tar_1\.default\.extract/);
+  assert.deepEqual(result.bindings, ['data']);
+  assert.match(result.source, /const data = \{ default: require\("tar"\) \};/);
+  assert.match(result.source, /const other = .*require\("other"\)/);
 });
 
-test('supports a direct require binding', () => {
-  const source = "const tar = require('tar');\ntar.default.extract({});";
+test('supports non-minified CommonJS declaration spacing and quote styles', () => {
+  const source = "var tarClient = _interopRequireDefault(require('tar'));";
   const result = patchExpoCliTarImport(source);
   assert.equal(result.changed, true);
-  assert.match(result.source, /tar\.extract/);
+  assert.match(result.source, /var tarClient = \{ default: require\("tar"\) \};/);
 });
 
-test('escapes generated JavaScript bindings containing a dollar sign', () => {
-  const source = 'var $tar = require("tar");\n$tar.default.extract({});';
-  const result = patchExpoCliTarImport(source);
-  assert.equal(result.changed, true);
-  assert.match(result.source, /\$tar\.extract/);
-});
-
-test('is idempotent when the named export is already used', () => {
-  const source = 'var tar_1 = require("tar");\ntar_1.extract({});';
+test('is idempotent after the tar default namespace has been wrapped', () => {
+  const source = 'const data = { default: require("tar") };';
   const result = patchExpoCliTarImport(source);
   assert.equal(result.changed, false);
   assert.equal(result.source, source);
@@ -37,7 +31,12 @@ test('is idempotent when the named export is already used', () => {
 
 test('fails closed when Expo changes its compiled module shape', () => {
   assert.throws(
-    () => patchExpoCliTarImport('var other = require("other");'),
-    /Could not locate the compiled @expo\/cli import/
+    () => patchExpoCliTarImport('const data = require("tar");'),
+    /Refusing to modify an unknown bundle shape/
   );
+});
+
+test('does not change imports of packages other than tar', () => {
+  const source = 'const data = _interopRequireDefault(require("other"));';
+  assert.throws(() => patchExpoCliTarImport(source), /unknown bundle shape/);
 });
