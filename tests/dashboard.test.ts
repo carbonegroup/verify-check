@@ -182,5 +182,5 @@ test("buildDashboard : le filtre cours peut cibler un cours hors du jour sélect
   const r = buildDashboard(base(), { date: vendredi, cours: "co-hist" });
   assert.deepEqual(r.cours_prevus, []);
   assert.deepEqual(r.cours_semaine.map((c) => c.id), ["co-hist"]);
-  assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-hist"]);
+  assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-math", "co-hist", "co-phys"]);
 });
