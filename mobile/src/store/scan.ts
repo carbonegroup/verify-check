@@ -41,6 +41,30 @@ const asyncStore: FileStore = {
 const uid = () =>
   "m-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 
+export async function mettreEnAttente(
+  codeQr: string,
+  selection?: { coursId: string; coursNom: string; salle?: string }
+): Promise<ScanEtat> {
+  const items = await asyncStore.load();
+  const coursId = selection?.coursId ?? "";
+  if (dejaEnAttente(items, codeQr, coursId || undefined)) {
+    return { kind: "deja_en_attente" };
+  }
+
+  const entry: FileItem = {
+    ...nouvelleEntree(uid(), {
+      code_qr: codeQr,
+      cours: coursId,
+      salle: selection?.salle,
+      at: new Date().toISOString(),
+    }),
+    cours_nom: selection?.coursNom,
+  };
+  await asyncStore.save([...items, entry]);
+  emitChange();
+  return { kind: "hors_ligne", fileId: entry.id };
+}
+
 export async function enregistrerScan(
   codeQr: string,
   selection?: { coursId: string; coursNom: string; salle?: string }
@@ -50,23 +74,7 @@ export async function enregistrerScan(
   const coursId = selection?.coursId ?? "";
 
   if (etat.kind === "hors_ligne" || etat.kind === "erreur_serveur") {
-    if (dejaEnAttente(items, codeQr, coursId || undefined)) {
-      return { kind: "deja_en_attente" };
-    }
-
-    const entry: FileItem = {
-      ...nouvelleEntree(uid(), {
-        code_qr: codeQr,
-        cours: coursId,
-        salle: selection?.salle,
-        at: new Date().toISOString(),
-      }),
-      cours_nom: selection?.coursNom,
-    };
-
-    await asyncStore.save([...items, entry]);
-    emitChange();
-    return { kind: "hors_ligne", fileId: entry.id };
+    return mettreEnAttente(codeQr, selection);
   }
 
   // L'historique doit conserver aussi les pointages confirmés en ligne.
