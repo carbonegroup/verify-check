@@ -41,6 +41,10 @@ export function patchExpoCliTarImport(source) {
 }
 
 async function main() {
+  if (process.env.npm_config_package_lock_only === 'true') {
+    process.stdout.write('[expo-cli-tar-patch] Skipped during package-lock-only resolution.\\n');
+    return;
+  }
   const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const tarNamespace = require('tar');
   if (typeof tarNamespace?.extract !== 'function') {
