@@ -71,6 +71,7 @@ export function mapScanResponse(
 /** Faut-il mettre le pointage en file d'attente hors ligne après cette réponse ? */
 export function doitMettreEnFile(etat: ScanEtat): boolean {
   if (
+    etat.kind === "previsualisation" ||
     etat.kind === "confirmee" ||
     etat.kind === "doublon" ||
     etat.kind === "session_expiree" ||
