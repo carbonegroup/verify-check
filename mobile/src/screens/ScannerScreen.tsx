@@ -13,11 +13,17 @@ import {
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { enregistrerScan } from "../store/scan";
+import { enregistrerScan, mettreEnAttente } from "../store/scan";
+import { previsualiserScan } from "../services/api";
 import { theme } from "../theme";
 import type { ScanEtat } from "../lib/scanStatus";
 
 const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleur: string }> = {
+  previsualisation: {
+    titre: "Carte reconnue",
+    detail: "Vérifie les informations de la carte avant de confirmer le pointage.",
+    couleur: theme.accent,
+  },
   confirmee: {
     titre: "Présence confirmée",
     detail: "Le serveur a validé la présence de cet élève.",
@@ -78,6 +84,7 @@ type ResultatAffiche = {
   cours?: string;
   heure?: string;
   candidates?: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }>;
+  selection?: { coursId: string; coursNom: string; salle?: string };
 };
 
 export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => void }) {
@@ -107,13 +114,17 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
     setBusy(true);
 
     try {
-      const response = await enregistrerScan(value, selection);
+      let response = await previsualiserScan(value, selection);
+      if (response.kind === "hors_ligne" || response.kind === "erreur_serveur") {
+        response = await mettreEnAttente(value, selection);
+      }
       const affiche: ResultatAffiche = { kind: response.kind, code: value };
       if ("eleve" in response) affiche.eleve = response.eleve;
       if ("classe" in response) affiche.classe = response.classe;
       if ("cours" in response) affiche.cours = response.cours;
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
       if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
+      if (response.kind === "previsualisation") affiche.selection = selection;
       setResultat(affiche);
 
       if (response.kind === "session_expiree") onSessionExpiree();
@@ -127,6 +138,26 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
   const gererCodeBarres = useCallback((value: { data: string }) => {
     void scanner(value.data);
   }, [scanner]);
+
+  const confirmerPointage = useCallback(async () => {
+    if (!resultat || resultat.kind !== "previsualisation" || busy) return;
+    setBusy(true);
+    try {
+      const response = await enregistrerScan(resultat.code, resultat.selection);
+      const affiche: ResultatAffiche = { kind: response.kind, code: resultat.code };
+      if ("eleve" in response) affiche.eleve = response.eleve;
+      if ("classe" in response) affiche.classe = response.classe;
+      if ("cours" in response) affiche.cours = response.cours;
+      if (response.kind === "pas_de_cours") affiche.heure = response.heure;
+      if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
+      setResultat(affiche);
+      if (response.kind === "session_expiree") onSessionExpiree();
+    } catch {
+      setResultat({ kind: "erreur_serveur", code: resultat.code });
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, onSessionExpiree, resultat]);
 
   function scannerSuivant() {
     setResultat(null);
@@ -157,7 +188,7 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
 
   if (resultat) {
     const meta = LIBELLES[resultat.kind];
-    const confirme = resultat.kind === "confirmee";
+    const confirme = resultat.kind === "confirmee" || resultat.kind === "previsualisation";
 
     return (
       <View style={s.resultScreen}>
@@ -211,7 +242,25 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
             <Text style={s.body}>Heure serveur : {resultat.heure}</Text>
           ) : null}
 
-          {resultat.kind !== "cours_ambigu" ? (
+          {resultat.kind === "previsualisation" ? (
+            <>
+              <TouchableOpacity
+                style={s.primary}
+                onPress={() => void confirmerPointage()}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.white} />
+                ) : (
+                  <Text style={s.primaryText}>Confirmer le pointage</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.secondary} onPress={scannerSuivant} disabled={busy}>
+                <Text style={s.secondaryText}>Annuler / Scanner suivant</Text>
+              </TouchableOpacity>
+            </>
+          ) : resultat.kind !== "cours_ambigu" ? (
             <TouchableOpacity style={s.primary} onPress={scannerSuivant} accessibilityRole="button">
               <Text style={s.primaryText}>Scanner le suivant</Text>
             </TouchableOpacity>
