@@ -60,7 +60,7 @@ const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleu
   },
   hors_ligne: {
     titre: "En attente de synchronisation",
-    detail: "Scan conservé sur cet appareil. Reconnecte-toi puis rescannes cette carte pour déterminer le cours et valider la présence.",
+    detail: "Scan conservé sur cet appareil. Reconnecte-toi puis rescane cette carte pour déterminer le cours et valider la présence.",
     couleur: theme.warn,
   },
   deja_en_attente: {
