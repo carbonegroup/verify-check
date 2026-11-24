@@ -3,16 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import styles from "./Shell.module.css";
+import { isDashboardViewEnabled, type DashboardView } from "@/lib/dashboard-navigation";
 
-type Vue =
-  | "general"
-  | "absences"
-  | "classes"
-  | "cours"
-  | "eleves"
-  | "cartes"
-  | "scolarite"
-  | "comptabilite";
+type Vue = DashboardView;
 
 const VUES: { id: Vue; label: string }[] = [
   { id: "general", label: "Générale" },
@@ -112,6 +105,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
   }, [router]);
 
   const choisirVue = useCallback((id: Vue) => {
+    if (!isDashboardViewEnabled(id)) return;
     onViewChange(id);
     setSidebarOpen(false);
   }, [onViewChange]);
@@ -136,8 +130,10 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
             <button
               key={v.id}
               type="button"
-              className={`${styles.navItem} ${vue === v.id ? styles.active : ""}`}
+              className={`${styles.navItem} ${vue === v.id ? styles.active : ""} ${!isDashboardViewEnabled(v.id) ? styles.disabled : ""}`}
               onClick={() => choisirVue(v.id)}
+              disabled={!isDashboardViewEnabled(v.id)}
+              title={!isDashboardViewEnabled(v.id) ? "Section indisponible" : undefined}
               aria-current={vue === v.id ? "page" : undefined}
             >
               <Icon id={v.id} />
