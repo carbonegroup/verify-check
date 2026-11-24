@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
 
-  const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown };
+  const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown; preview?: unknown };
   if (typeof body.code_qr !== "string" || !body.code_qr.trim()) {
     return respondJson({ error: "code_qr_requis" }, { status: 400 });
   }
@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     body.code_qr.trim().length > 64 ||
     (body.salle !== undefined && body.salle !== null && typeof body.salle !== "string") ||
     (body.cours !== undefined && body.cours !== null && typeof body.cours !== "string") ||
+    (body.preview !== undefined && typeof body.preview !== "boolean") ||
     (typeof body.salle === "string" && body.salle.trim().length > 128) ||
     (typeof body.cours === "string" && body.cours.trim().length > 64)
   ) {
@@ -177,6 +178,22 @@ export async function POST(request: NextRequest) {
     );
   }
   const course = selection.course;
+
+  // Prévisualisation : retourne les informations réelles de la carte sans
+  // écrire de présence. L'agent doit confirmer explicitement dans l'app mobile.
+  if (body.preview === true) {
+    return respondJson(
+      {
+        ok: true,
+        preview: true,
+        eleve: student.nom,
+        classe: studentClass.nom,
+        cours: course.nom,
+        cours_id: course.id,
+      },
+      { status: 200 }
+    );
+  }
 
   // 4) Écriture — la politique RLS et l'index unique garantissent les droits
   // admin et un seul pointage par élève/cours/journée scolaire.
