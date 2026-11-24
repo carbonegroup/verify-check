@@ -81,6 +81,7 @@ export async function enregistrerScan(
             cours: courseId,
             cours_nom: etat.cours ?? selection?.coursNom,
             eleve: etat.eleve,
+            at: new Date().toISOString(),
             etat: "confirme" as const,
             note: "résolu après validation serveur lors d'un nouveau scan",
           }
