@@ -48,8 +48,8 @@ export function HistoriqueScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const charger = useCallback(async () => {
-    setLoading(true);
+  const charger = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const [recent, pending] = await Promise.all([historique(), compterEnAttente()]);
     setItems(recent);
     setPendingCount(pending);
@@ -57,8 +57,23 @@ export function HistoriqueScreen() {
   }, []);
 
   useEffect(() => {
-    void charger();
-    return onFileChange(() => void charger());
+    let active = true;
+
+    const chargerInitial = async () => {
+      const [recent, pending] = await Promise.all([historique(), compterEnAttente()]);
+      if (!active) return;
+      setItems(recent);
+      setPendingCount(pending);
+      setLoading(false);
+    };
+
+    void chargerInitial();
+    const unsubscribe = onFileChange(() => void charger(false));
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [charger]);
 
   const enAttente = pendingCount;
