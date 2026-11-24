@@ -4,7 +4,7 @@
  * avant la réponse du serveur. Les erreurs réseau restent EN ATTENTE.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -60,7 +60,7 @@ const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleu
   },
   hors_ligne: {
     titre: "En attente de synchronisation",
-    detail: "Le scan a été conservé sur cet appareil. Il ne sera confirmé qu’après validation du serveur.",
+    detail: "Scan conservé sur cet appareil. Reconnecte-toi puis rescannes cette carte pour déterminer le cours et valider la présence.",
     couleur: theme.warn,
   },
   deja_en_attente: {
@@ -82,10 +82,18 @@ type ResultatAffiche = {
 
 export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => void }) {
   const [permission, requestPermission] = useCameraPermissions();
+  const permissionDemandee = useRef(false);
   const [cameraErreur, setCameraErreur] = useState(false);
   const [resultat, setResultat] = useState<ResultatAffiche | null>(null);
   const [busy, setBusy] = useState(false);
   const scanBloque = useRef(false);
+
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain && !permissionDemandee.current) {
+      permissionDemandee.current = true;
+      void requestPermission();
+    }
+  }, [permission, requestPermission]);
 
   const scanner = useCallback(async (
     code: string,
@@ -140,11 +148,8 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
         <View style={s.permissionCard}>
           <Text style={s.resultTitle}>Accès à la caméra requis</Text>
           <Text style={s.body}>
-            VerifyCheck utilise la caméra uniquement pour lire les QR codes des cartes élèves.
+            L’autorisation système a été refusée. Active l’accès à la caméra dans les réglages Android pour scanner les cartes.
           </Text>
-          <TouchableOpacity style={s.primary} onPress={requestPermission}>
-            <Text style={s.primaryText}>Autoriser la caméra</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -180,7 +185,10 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
                 <TouchableOpacity
                   key={candidate.id}
                   style={s.candidate}
-                  onPress={() => void scanner(resultat.code, { coursId: candidate.id, coursNom: candidate.nom })}
+                  onPress={() => {
+                    scanBloque.current = false;
+                    void scanner(resultat.code, { coursId: candidate.id, coursNom: candidate.nom });
+                  }}
                   disabled={busy}
                   accessibilityRole="button"
                 >
