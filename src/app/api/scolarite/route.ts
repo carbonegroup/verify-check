@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const [classesRes, elevesRes, fraisRes, reglementsRes] = await Promise.all([
     supabase.from("classes").select("id, nom").order("nom"),
-    supabase.from("students").select("id, nom, classe_id").order("nom"),
+    supabase.from("students").select("id, nom, classe_id, photo_url").order("nom"),
     supabase.from("fees").select("id, classe_id, libelle, annee_scolaire, montant_gnf, echeance"),
     supabase.from("payments").select("id, student_id, fee_id, montant_gnf, recu_le, note"),
   ]);

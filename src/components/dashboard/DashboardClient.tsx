@@ -30,6 +30,7 @@ type Eleve = {
   nom: string;
   code_qr: string;
   classe_id: string;
+  photo_url?: string | null;
   scans: number;
   presences: Array<{ course_id: string; scanned_at: string }>;
 };
@@ -64,6 +65,7 @@ type ScolariteLigne = {
   eleve: string;
   classe_id: string;
   classe: string;
+  photo_url?: string | null;
   attendu_gnf: number;
   regle_gnf: number;
   solde_gnf: number;
@@ -771,9 +773,31 @@ export default function DashboardClient() {
                       statut: statutEleve(e, c, date, nowConakry()),
                       presence: e.presences.find((p) => p.course_id === c.id),
                     }));
+                  // Build Supabase Storage public URL if photo_url exists
+                  const photoUrl = e.photo_url
+                    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${e.photo_url}`
+                    : null;
                   return (
                     <tr key={e.id}>
-                      <td>{e.nom}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div className={styles.studentAvatar}>
+                            {photoUrl ? (
+                              <img
+                                src={photoUrl}
+                                alt={`${e.nom}`}
+                                className={styles.studentAvatarImage}
+                                onLoad={(ev) => { ev.currentTarget.classList.add(styles.loaded); }}
+                                onError={(ev) => { ev.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : null}
+                            <div className={styles.studentAvatarFallback}>
+                              {e.nom.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <span>{e.nom}</span>
+                        </div>
+                      </td>
                       <td>{classeLabel(e.classe_id)}</td>
                       <td className={styles.code}>{e.code_qr}</td>
                       <td className={styles.num}>{e.scans}</td>
@@ -882,20 +906,44 @@ export default function DashboardClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {scolarite.lignes.map((l) => (
-                        <tr key={l.eleve_id}>
-                          <td>{l.eleve}</td>
-                          <td>{l.classe}</td>
-                          <td className={styles.num}>{formatGnf(l.attendu_gnf)}</td>
-                          <td className={styles.num}>{formatGnf(l.regle_gnf)}</td>
-                          <td className={styles.num}>{formatGnf(l.solde_gnf)}</td>
-                          <td>
-                            <span className={statutFraisClass(l.statut)}>
-                              {STATUT_FRAIS_LABEL[l.statut]}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {scolarite.lignes.map((l) => {
+                        // Build Supabase Storage public URL if photo_url exists
+                        const photoUrl = l.photo_url
+                          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${l.photo_url}`
+                          : null;
+                        return (
+                          <tr key={l.eleve_id}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div className={styles.studentAvatar}>
+                                  {photoUrl ? (
+                                    <img
+                                      src={photoUrl}
+                                      alt={`${l.eleve}`}
+                                      className={styles.studentAvatarImage}
+                                      onLoad={(ev) => { ev.currentTarget.classList.add(styles.loaded); }}
+                                      onError={(ev) => { ev.currentTarget.style.display = 'none'; }}
+                                    />
+                                  ) : null}
+                                  <div className={styles.studentAvatarFallback}>
+                                    {l.eleve.charAt(0).toUpperCase()}
+                                  </div>
+                                </div>
+                                <span>{l.eleve}</span>
+                              </div>
+                            </td>
+                            <td>{l.classe}</td>
+                            <td className={styles.num}>{formatGnf(l.attendu_gnf)}</td>
+                            <td className={styles.num}>{formatGnf(l.regle_gnf)}</td>
+                            <td className={styles.num}>{formatGnf(l.solde_gnf)}</td>
+                            <td>
+                              <span className={statutFraisClass(l.statut)}>
+                                {STATUT_FRAIS_LABEL[l.statut]}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {scolarite.lignes.length === 0 && (
                         <tr>
                           <td colSpan={6} className={styles.empty}>
@@ -1063,27 +1111,49 @@ function CartesQR({
         {classeNom ? `Cartes — ${classeNom}` : "Cartes — toutes les classes"}
       </h2>
       <div className={styles.cards}>
-        {eleves.map((e) => (
-          <article key={e.id} className={styles.card}>
-            <div className={styles.cardHead}>
-              <span className={styles.cardBrand}>VerifyCheck</span>
-              <span className={styles.cardClasse}>{classeLabel(e.classe_id)}</span>
-            </div>
-            <div className={styles.cardBody}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/cartes/qr?code=${encodeURIComponent(e.code_qr)}`}
-                alt={`QR de ${e.nom}`}
-                width={110}
-                height={110}
-              />
-              <div>
-                <div className={styles.cardNom}>{e.nom}</div>
-                <div className={styles.cardCode}>{e.code_qr}</div>
+        {eleves.map((e) => {
+          // Build Supabase Storage public URL if photo_url exists
+          const photoUrl = e.photo_url
+            ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${e.photo_url}`
+            : null;
+          return (
+            <article key={e.id} className={styles.card}>
+              <div className={styles.cardHead}>
+                <span className={styles.cardBrand}>VerifyCheck</span>
+                <span className={styles.cardClasse}>{classeLabel(e.classe_id)}</span>
               </div>
-            </div>
-          </article>
-        ))}
+              <div className={styles.cardBody}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <div className={`${styles.studentAvatar} ${styles.studentAvatarLarge}`}>
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt={`${e.nom}`}
+                        className={styles.studentAvatarImage}
+                        onLoad={(ev) => { ev.currentTarget.classList.add(styles.loaded); }}
+                        onError={(ev) => { ev.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : null}
+                    <div className={styles.studentAvatarFallback}>
+                      {e.nom.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/cartes/qr?code=${encodeURIComponent(e.code_qr)}`}
+                    alt={`QR de ${e.nom}`}
+                    width={110}
+                    height={110}
+                  />
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                  <div className={styles.cardNom}>{e.nom}</div>
+                  <div className={styles.cardCode}>{e.code_qr}</div>
+                </div>
+              </div>
+            </article>
+          );
+        })}
         {eleves.length === 0 && <p className={styles.empty}>Aucun élève pour ce filtre.</p>}
       </div>
     </section>

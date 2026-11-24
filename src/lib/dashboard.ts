@@ -46,7 +46,13 @@ export type CourseRow = {
   heure_debut: string;
   heure_fin: string;
 };
-export type StudentRow = { id: string; nom: string; code_qr: string; classe_id: string };
+export type StudentRow = {
+  id: string;
+  nom: string;
+  code_qr: string;
+  classe_id: string;
+  photo_url?: string | null;
+};
 export type AttendanceRow = {
   id: string;
   student_id: string;
@@ -77,6 +83,7 @@ export type DashboardResult = {
     nom: string;
     code_qr: string;
     classe_id: string;
+    photo_url?: string | null;
     scans: number;
     presences: Array<{ course_id: string; scanned_at: string }>;
   }>;
@@ -137,6 +144,7 @@ export function buildDashboard(
       nom: s.nom,
       code_qr: s.code_qr,
       classe_id: s.classe_id,
+      photo_url: s.photo_url,
       scans: (presencesByStudent.get(s.id) ?? []).length,
       presences: (presencesByStudent.get(s.id) ?? []).map((row) => ({
         course_id: row.course_id,

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       .from("courses")
       .select("id, nom, classe_id, salle, jour_semaine, heure_debut, heure_fin")
       .order("heure_debut"),
-    supabase.from("students").select("id, nom, code_qr, classe_id").order("nom"),
+    supabase.from("students").select("id, nom, code_qr, classe_id, photo_url").order("nom"),
     supabase
       .from("attendance")
       .select("id, student_id, course_id, scanned_at")

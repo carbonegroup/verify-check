@@ -55,7 +55,8 @@ create table students (
   id uuid primary key default gen_random_uuid(),
   code_qr text not null unique,          -- identifiant encodé dans le QR de la carte
   nom text not null,
-  classe_id uuid not null references classes(id) on delete restrict
+  classe_id uuid not null references classes(id) on delete restrict,
+  photo_url text                         -- chemin Supabase Storage vers photo de profil (ex. public/students/uuid.png)
 );
 
 create table courses (
