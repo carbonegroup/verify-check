@@ -5,7 +5,7 @@
   "type": "module",
   "dependencies": {
     "@react-native-async-storage/async-storage": "3.1.1",
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.119.2",
     "expo": "~51.0.0",
     "expo-barcode-scanner": "~13.0.0",
     "expo-camera": "~15.0.0",
