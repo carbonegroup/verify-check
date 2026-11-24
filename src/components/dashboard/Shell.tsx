@@ -147,6 +147,17 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
         </div>
 
         <div className={styles.sidebarFoot}>
+          <div className={styles.schoolIdentity}>
+            <span className={styles.schoolGlyph} aria-hidden="true">
+              <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 9 9-6 9 6M5 10v9m4-9v9m6-9v9m4-9v9M3 21h18M2 10h20" />
+              </svg>
+            </span>
+            <span className={styles.schoolCopy}>
+              <strong>Établissement</strong>
+              <small>Conakry, Guinée</small>
+            </span>
+          </div>
           <button
             type="button"
             className={styles.buttonOutline}
@@ -195,7 +206,11 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
             </div>
 
             <div className={styles.topbarRight}>
-              <div className={styles.chip}>Compte admin</div>
+              <div className={styles.account}>
+                <span className={styles.avatar}>AD</span>
+                <span>Admin</span>
+                <span className={styles.accountChevron} aria-hidden="true">⌄</span>
+              </div>
             </div>
           </div>
         </header>
