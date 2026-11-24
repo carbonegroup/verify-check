@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { getContexte, type Contexte } from "../services/api";
+import { getCourseScheduleStatus, getCoursesForClass } from "../lib/courseSchedule";
 import { theme } from "../theme";
 import type { Selection } from "./AccueilScreen";
 
@@ -88,7 +89,6 @@ function SessionPickerContent({
           result.data.cours.some(
             (item) =>
               item.id === current.coursId &&
-              item.actif &&
               item.classe_id === classeInitiale
           )
             ? current.coursId
@@ -107,9 +107,8 @@ function SessionPickerContent({
   }, [visible, current?.classeId, current?.coursId, onSessionExpiree, refreshKey]);
 
   const classes = contexte?.classes ?? [];
-  const cours = (contexte?.cours ?? []).filter(
-    (item) => item.actif && item.classe_id === classeId
-  );
+  // The picker browses the schedule; it does not validate or record attendance.
+  const cours = getCoursesForClass(contexte?.cours ?? [], classeId);
   const classeChoisie = classes.find((item) => item.id === classeId);
   const coursChoisi = cours.find((item) => item.id === coursId);
   const peutValider = Boolean(classeChoisie && coursChoisi);
@@ -139,7 +138,7 @@ function SessionPickerContent({
             <View style={s.headingCopy}>
               <Text style={s.title}>{current ? "Changer de séance" : "Choisir une séance"}</Text>
               <Text style={s.subtitle}>
-                Sélectionne la classe et le cours avant de commencer le pointage.
+                Sélectionne la classe et le cours. Les cours à venir et terminés restent sélectionnables.
               </Text>
             </View>
             {current ? (
@@ -204,11 +203,13 @@ function SessionPickerContent({
                 <Text style={s.muted}>Aucune classe disponible.</Text>
               )}
 
-              <Text style={s.label}>COURS ACTIFS</Text>
+              <Text style={s.label}>COURS DU JOUR</Text>
               {classeId && cours.length ? (
                 <View style={s.courseList}>
                   {cours.map((item) => {
                     const active = item.id === coursId;
+                    const status = getCourseScheduleStatus(item, contexte?.heure ?? "00:00");
+                    const statusLabel = status === "active" ? "En cours" : status === "upcoming" ? "À venir" : "Terminé";
                     return (
                       <TouchableOpacity
                         key={item.id}
@@ -225,6 +226,7 @@ function SessionPickerContent({
                             {item.heure_debut.slice(0, 5)}–{item.heure_fin.slice(0, 5)}
                             {item.salle ? " · " + item.salle : ""}
                           </Text>
+                          <Text style={[s.courseStatus, status === "active" && s.courseStatusActive]}>{statusLabel}</Text>
                         </View>
                         <View style={[s.radio, active && s.radioActive]}>
                           {active ? <View style={s.radioDot} /> : null}
@@ -236,7 +238,7 @@ function SessionPickerContent({
               ) : (
                 <Text style={s.muted}>
                   {classeId
-                    ? "Aucun cours actif pour cette classe."
+                    ? "Aucun cours prévu pour cette classe aujourd’hui."
                     : "Choisis d’abord une classe."}
                 </Text>
               )}
@@ -335,7 +337,7 @@ const s = StyleSheet.create({
   optionTextActive: { color: theme.white },
   courseList: { gap: 8 },
   course: {
-    minHeight: 62,
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -350,6 +352,8 @@ const s = StyleSheet.create({
   courseCopy: { flex: 1, gap: 4 },
   courseName: { color: theme.ink, fontSize: 14, fontWeight: "700" },
   courseMeta: { color: theme.inkSoft, fontSize: 12 },
+  courseStatus: { color: theme.inkSoft, fontSize: 11, fontWeight: "700" },
+  courseStatusActive: { color: theme.accent },
   radio: {
     width: 20,
     height: 20,
