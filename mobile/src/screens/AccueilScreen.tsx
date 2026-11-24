@@ -1,8 +1,6 @@
 /**
- * Écran de contexte de pointage (accueil) — données réelles de l'API :
- * classes + cours du jour (Conakry) avec statut actif. L'agent choisit le
- * contexte avant de scanner ; jamais de sélection arbitraire.
- * Habillage Enterprise Light.
+ * Accueil agent : aperçu local et raccourci vers le scanner.
+ * Cet écran ne sert plus à choisir la classe ou le cours.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -12,11 +10,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { getContexte, type Contexte } from "../services/api";
+import { historique, onFileChange, type LocalItem } from "../store/scan";
 import { theme } from "../theme";
 
 export type Selection = {
@@ -27,53 +24,29 @@ export type Selection = {
   salle?: string;
 };
 
-export function AccueilScreen({
-  onSelection,
-  onLogout,
-  email,
-}: {
-  onSelection: (s: Selection) => void;
-  onLogout: () => void;
-  email: string;
-}) {
-  const [ctx, setCtx] = useState<Contexte | null>(null);
-  const [erreur, setErreur] = useState<"session" | "reseau" | "serveur" | null>(null);
+const ETATS: Record<LocalItem["etat"], { label: string; couleur: string }> = {
+  en_attente: { label: "EN ATTENTE", couleur: theme.warn },
+  confirme: { label: "CONFIRMÉ", couleur: theme.success },
+  rejete: { label: "REJETÉ", couleur: theme.danger },
+};
+
+export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) {
+  const [items, setItems] = useState<LocalItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [classeId, setClasseId] = useState<string | null>(null);
-  const [coursId, setCoursId] = useState<string | null>(null);
-  const [salle, setSalle] = useState("");
 
   const charger = useCallback(async () => {
     setLoading(true);
-    setErreur(null);
-    const res = await getContexte();
+    setItems(await historique());
     setLoading(false);
-    if (!res.ok) {
-      setErreur(res.error);
-      return;
-    }
-    setCtx(res.data);
-    if (!classeId && res.data.classes.length > 0) setClasseId(res.data.classes[0].id);
-  }, [classeId]);
-
-  useEffect(() => {
-    charger();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading && !ctx) {
-    return <Etat racine loading text="Chargement du contexte réel…" />;
-  }
-  if (erreur === "session") return <Etat racine erreur="Session expirée — reconnecte-toi." onAction={onLogout} action="Se reconnecter" />;
-  if (erreur === "reseau") return <Etat racine erreur="Réseau indisponible." onAction={charger} action="Réessayer" />;
-  if (erreur === "serveur" || !ctx) return <Etat racine erreur="Erreur serveur." onAction={charger} action="Réessayer" />;
+  useEffect(() => {
+    void charger();
+    return onFileChange(() => void charger());
+  }, [charger]);
 
-  const classesActives = ctx.classes;
-  const coursActifs = ctx.cours.filter((c) => c.actif && c.classe_id === classeId);
-  const classe = classesActives.find((c) => c.id === classeId);
-  const cours = coursActifs.find((c) => c.id === coursId);
-
-  const ready = classeId && coursId;
+  const pending = items.filter((item) => item.etat === "en_attente").length;
+  const confirms = items.filter((item) => item.etat === "confirme").length;
 
   return (
     <ScrollView
@@ -83,161 +56,151 @@ export function AccueilScreen({
         <RefreshControl refreshing={loading} onRefresh={charger} tintColor={theme.accent} />
       }
     >
-      <Text style={s.titre}>Contexte de pointage</Text>
-      <Text style={s.meta}>
-        {ctx.jour} · {ctx.heure} (Conakry) · {email}
-      </Text>
-
-      <Text style={s.label}>Classe</Text>
-      {classesActives.length === 0 ? (
-        <Text style={s.hint}>Aucune classe enregistrée. La direction doit créer les classes.</Text>
-      ) : (
-        <View style={s.groupe}>
-          {classesActives.map((c) => (
-            <Pill key={c.id} label={c.nom} actif={c.id === classeId} onPress={() => { setClasseId(c.id); setCoursId(null); }} />
-          ))}
-        </View>
-      )}
-
-      <Text style={s.label}>Cours du moment (actifs à l’heure de Conakry)</Text>
-      {coursActifs.length === 0 ? (
-        <Text style={s.hint}>Aucun cours actif pour cette classe maintenant : la direction doit mettre à jour le planning.</Text>
-      ) : (
-        <View style={s.groupe}>
-          {coursActifs.map((c) => (
-            <Pill
-              key={c.id}
-              label={`${c.nom} · ${c.heure_debut.slice(0, 5)}–${c.heure_fin.slice(0, 5)}${c.salle ? " · " + c.salle : ""}`}
-              actif={c.id === coursId}
-              onPress={() => setCoursId(c.id)}
-            />
-          ))}
-        </View>
-      )}
-
-      <Text style={s.label}>Salle du portique (facultatif)</Text>
-      <TextInput
-        style={s.input}
-        placeholder="ex. B12"
-        value={salle}
-        onChangeText={setSalle}
-        autoCapitalize="characters"
-      />
+      <View style={s.heading}>
+        <Text style={s.kicker}>ESPACE AGENT</Text>
+        <Text style={s.title}>Votre activité</Text>
+        <Text style={s.subtitle}>Résumé des 20 derniers pointages enregistrés sur cet appareil.</Text>
+      </View>
 
       <TouchableOpacity
-        style={[s.bouton, !ready && s.boutonOff]}
-        disabled={!ready}
-        onPress={() =>
-          classe &&
-          cours &&
-          onSelection({
-            classeId: classe.id,
-            classeNom: classe.nom,
-            coursId: cours.id,
-            coursNom: cours.nom,
-            salle: salle.trim() || undefined,
-          })
-        }
+        style={s.primary}
+        onPress={onOpenScanner}
+        accessibilityRole="button"
       >
-        <Text style={s.boutonTexte}>Commencer le pointage</Text>
+        <View style={s.primaryIcon}>
+          <Text style={s.primaryGlyph}>▦</Text>
+        </View>
+        <View style={s.primaryCopy}>
+          <Text style={s.primaryTitle}>Ouvrir le scanner</Text>
+          <Text style={s.primarySubtitle}>Reprendre le pointage</Text>
+        </View>
+        <Text style={s.primaryArrow}>›</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={s.deconnexion} onPress={onLogout}>
-        <Text style={s.deconnexionTexte}>Se déconnecter</Text>
-      </TouchableOpacity>
+      <View style={s.stats}>
+        <View style={s.stat}>
+          <Text style={s.statValue}>{items.length}</Text>
+          <Text style={s.statLabel}>Pointages visibles</Text>
+        </View>
+        <View style={s.statDivider} />
+        <View style={s.stat}>
+          <Text style={[s.statValue, { color: theme.success }]}>{confirms}</Text>
+          <Text style={s.statLabel}>Confirmés</Text>
+        </View>
+        <View style={s.statDivider} />
+        <View style={s.stat}>
+          <Text style={[s.statValue, { color: pending ? theme.warn : theme.ink }]}>{pending}</Text>
+          <Text style={s.statLabel}>En attente</Text>
+        </View>
+      </View>
+
+      <View style={s.sectionHead}>
+        <Text style={s.sectionTitle}>Activité récente</Text>
+        <Text style={s.sectionMeta}>Sur cet appareil</Text>
+      </View>
+
+      {loading && items.length === 0 ? (
+        <ActivityIndicator color={theme.accent} style={s.loader} />
+      ) : items.length === 0 ? (
+        <View style={s.empty}>
+          <Text style={s.emptyTitle}>Aucun pointage pour le moment</Text>
+          <Text style={s.emptyText}>Les résultats de vos scans apparaîtront ici.</Text>
+        </View>
+      ) : (
+        items.slice(0, 5).map((item) => {
+          const status = ETATS[item.etat];
+          return (
+            <View key={item.id} style={s.item}>
+              <View style={s.itemCopy}>
+                <Text style={s.itemCode} numberOfLines={1}>{item.code_qr}</Text>
+                <Text style={s.itemDate}>
+                  {new Date(item.at).toLocaleString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+              </View>
+              <Text style={[s.itemStatus, { color: status.couleur }]}>{status.label}</Text>
+            </View>
+          );
+        })
+      )}
     </ScrollView>
-  );
-}
-
-function Pill({ label, actif, onPress }: { label: string; actif: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={[s.pill, actif && s.pillOn]} onPress={onPress}>
-      <Text style={[s.pillText, actif && s.pillTextOn]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function Etat({
-  racine,
-  loading,
-  text,
-  erreur,
-  action,
-  onAction,
-}: {
-  racine?: boolean;
-  loading?: boolean;
-  text?: string;
-  erreur?: string;
-  action?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <View style={[s.root, racine && { flex: 1, justifyContent: "center", padding: theme.space.xl }]}>
-      {loading ? <ActivityIndicator color={theme.accent} /> : null}
-      {text ? <Text style={s.meta}>{text}</Text> : null}
-      {erreur ? <Text style={s.erreur}>{erreur}</Text> : null}
-      {action && onAction ? (
-        <TouchableOpacity style={s.bouton} onPress={onAction}>
-          <Text style={s.boutonTexte}>{action}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.paper },
-  content: { padding: theme.space.lg, gap: 10 },
-  titre: { fontSize: theme.type.title, fontWeight: "700", color: theme.ink },
-  meta: { color: theme.inkSoft, fontSize: theme.type.small },
-  label: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: theme.inkSoft,
-    marginTop: 8,
-    fontWeight: "600",
-  },
-  hint: { color: theme.inkSoft, fontSize: theme.type.small },
-  groupe: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  pill: {
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: theme.radiusSm,
-    borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.white,
-    justifyContent: "center",
-  },
-  pillOn: { borderColor: theme.accent, backgroundColor: theme.accent },
-  pillText: { color: theme.ink, fontSize: theme.type.body },
-  pillTextOn: { color: theme.white, fontWeight: "600" },
-  input: {
-    height: 44,
-    borderRadius: theme.radiusSm,
-    borderWidth: 1,
-    borderColor: theme.line,
-    backgroundColor: theme.white,
-    paddingHorizontal: 12,
-    color: theme.ink,
-  },
-  bouton: {
-    height: 44,
-    borderRadius: theme.radiusSm,
+  content: { padding: 18, paddingBottom: 28, gap: 16 },
+  heading: { gap: 5 },
+  kicker: { color: theme.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  title: { color: theme.ink, fontSize: 27, fontWeight: "800", letterSpacing: -0.6 },
+  subtitle: { color: theme.inkSoft, fontSize: 13, lineHeight: 19 },
+  primary: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
     backgroundColor: theme.accent,
+  },
+  primaryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
-  boutonOff: { backgroundColor: theme.line },
-  boutonTexte: { color: theme.white, fontWeight: "600", fontSize: theme.type.body },
-  deconnexion: { alignItems: "center", padding: 14 },
-  deconnexionTexte: { color: theme.inkSoft, fontSize: theme.type.small },
-  erreur: { color: theme.danger, fontSize: theme.type.small, textAlign: "center" },
+  primaryGlyph: { color: theme.white, fontSize: 25, fontWeight: "700" },
+  primaryCopy: { flex: 1, gap: 3 },
+  primaryTitle: { color: theme.white, fontSize: 15, fontWeight: "800" },
+  primarySubtitle: { color: "#D7E3F0", fontSize: 12 },
+  primaryArrow: { color: theme.white, fontSize: 28, fontWeight: "300" },
+  stats: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.white,
+  },
+  stat: { flex: 1, alignItems: "center", gap: 3 },
+  statValue: { color: theme.ink, fontSize: 22, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  statLabel: { color: theme.inkSoft, fontSize: 10, textAlign: "center" },
+  statDivider: { width: 1, height: 34, backgroundColor: theme.line },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { color: theme.ink, fontSize: 16, fontWeight: "800" },
+  sectionMeta: { color: theme.inkSoft, fontSize: 11 },
+  loader: { marginTop: 20 },
+  empty: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.white,
+    gap: 6,
+  },
+  emptyTitle: { color: theme.ink, fontSize: 14, fontWeight: "700" },
+  emptyText: { color: theme.inkSoft, fontSize: 12, lineHeight: 18 },
+  item: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.line,
+    backgroundColor: theme.white,
+  },
+  itemCopy: { flex: 1, gap: 4 },
+  itemCode: { color: theme.ink, fontSize: 13, fontWeight: "700", fontFamily: "monospace" },
+  itemDate: { color: theme.inkSoft, fontSize: 11 },
+  itemStatus: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
 });
