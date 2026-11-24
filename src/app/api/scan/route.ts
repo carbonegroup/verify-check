@@ -111,6 +111,16 @@ export async function POST(request: NextRequest) {
     return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
 
+  // Nom de classe affiché sur la fiche après lecture du QR.
+  const { data: studentClass, error: classError } = await supabase
+    .from("classes")
+    .select("nom")
+    .eq("id", student.classe_id)
+    .single();
+  if (classError || !studentClass) {
+    return respondJson({ error: "erreur_base" }, { status: 500 });
+  }
+
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
   const { data: courses, error: coursesError } = await supabase
     .from("courses")
@@ -124,7 +134,13 @@ export async function POST(request: NextRequest) {
     isCourseActive(course.heure_debut, course.heure_fin, now)
   );
   if (slotCourses.length === 0) {
-    return respondJson({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
+    return respondJson({
+      error: "pas_de_cours",
+      jour: now.jour,
+      heure: now.heure,
+      eleve: student.nom,
+      classe: studentClass.nom,
+    }, { status: 404 });
   }
 
   // 3) Désambiguïsation : salle du portique ou cours explicite. JAMAIS de choix arbitraire.
@@ -134,6 +150,8 @@ export async function POST(request: NextRequest) {
       return respondJson(
         {
           error: selection.error,
+          eleve: student.nom,
+          classe: studentClass.nom,
           candidates: selection.candidates.map((c) => ({
             id: c.id,
             nom: c.nom,
@@ -146,7 +164,13 @@ export async function POST(request: NextRequest) {
       );
     }
     return respondJson(
-      { error: selection.error, salle: (selection as { salle?: string }).salle, cours: (selection as { cours?: string }).cours },
+      {
+        error: selection.error,
+        salle: (selection as { salle?: string }).salle,
+        cours: (selection as { cours?: string }).cours,
+        eleve: student.nom,
+        classe: studentClass.nom,
+      },
       { status: 409 }
     );
   }
@@ -162,7 +186,15 @@ export async function POST(request: NextRequest) {
   if (insertError) {
     if (insertError.code === "23505") {
       return respondJson(
-        { error: "doublon", course: course.nom, jour: now.jour },
+        {
+          error: "doublon",
+          course: course.nom,
+          cours: course.nom,
+          cours_id: course.id,
+          eleve: student.nom,
+          classe: studentClass.nom,
+          jour: now.jour,
+        },
         { status: 409 }
       );
     }
@@ -173,7 +205,9 @@ export async function POST(request: NextRequest) {
     {
       ok: true,
       eleve: student.nom,
+      classe: studentClass.nom,
       cours: course.nom,
+      cours_id: course.id,
       presence,
       jour_local: now.jour,
     },
