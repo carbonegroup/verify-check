@@ -7,6 +7,7 @@
 export type ScanApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | number;
 
 export type ScanEtat =
+  | { kind: "previsualisation"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "confirmee"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "doublon"; eleve?: string; classe?: string; cours?: string; coursId?: string }
   | { kind: "qr_invalide" }
@@ -20,6 +21,7 @@ export type ScanEtat =
 
 export type ScanApiBody = {
   ok?: boolean;
+  preview?: boolean;
   error?: string;
   eleve?: string;
   classe?: string;
@@ -47,6 +49,9 @@ export function mapScanResponse(
   body: ScanApiBody | null
 ): ScanEtat {
   const err = body?.error;
+  if (httpStatus === 200 && body?.preview === true) {
+    return { kind: "previsualisation", eleve: body.eleve, classe: body.classe, cours: body.cours, coursId: body.cours_id };
+  }
   if (httpStatus === 201) {
     return { kind: "confirmee", eleve: body?.eleve, classe: body?.classe, cours: body?.cours, coursId: body?.cours_id };
   }
