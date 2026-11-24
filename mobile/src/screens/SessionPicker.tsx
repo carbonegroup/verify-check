@@ -30,7 +30,17 @@ export function SessionPicker(props: Props) {
       ].join("|")
     : "hidden";
 
-  return <SessionPickerContent key={currentKey} {...props} />;
+  return (
+    <Modal
+      visible={props.visible}
+      transparent
+      animationType="slide"
+      onRequestClose={props.current ? props.onClose : () => undefined}
+      statusBarTranslucent
+    >
+      <SessionPickerContent key={currentKey} {...props} />
+    </Modal>
+  );
 }
 
 function SessionPickerContent({
@@ -122,14 +132,7 @@ function SessionPickerContent({
   }
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={current ? onClose : () => undefined}
-      statusBarTranslucent
-    >
-      <View style={s.overlay}>
+    <View style={s.overlay}>
         <View style={s.sheet}>
           <View style={s.handle} />
           <View style={s.heading}>
@@ -267,8 +270,7 @@ function SessionPickerContent({
             ) : null}
           </View>
         </View>
-      </View>
-    </Modal>
+    </View>
   );
 }
 
