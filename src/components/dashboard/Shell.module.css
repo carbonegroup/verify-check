@@ -16,7 +16,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
-  margin-left: 250px;
+  margin-left: 220px;
 }
 
 .sidebar {
@@ -24,7 +24,7 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 250px;
+  width: 220px;
   background: var(--vc-surface);
   border-right: 1px solid var(--vc-line);
   z-index: 100;
@@ -111,9 +111,9 @@
 }
 
 .navItem.active {
-  background: var(--vc-primary-soft);
-  color: var(--vc-primary);
-  box-shadow: inset 3px 0 0 var(--vc-primary);
+  background: #173f70;
+  color: #fff;
+  box-shadow: none;
 }
 
 .icon {
@@ -125,8 +125,48 @@
 }
 
 .sidebarFoot {
-  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 12px;
   border-top: 1px solid var(--vc-line);
+}
+
+.schoolIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #edf3fa;
+}
+
+.schoolGlyph {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  color: #173f70;
+}
+
+.schoolCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schoolCopy strong {
+  color: #17365d;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.schoolCopy small {
+  color: #64758a;
+  font-size: 10px;
 }
 
 .sidebarFoot .buttonOutline {
@@ -192,6 +232,33 @@
   flex: 0 0 auto;
 }
 
+.account {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #263b55;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #173f70;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.accountChevron {
+  color: #64758a;
+  font-size: 17px;
+  line-height: 1;
+}
+
 .chip {
   display: flex;
   align-items: center;
@@ -229,7 +296,7 @@
 .main {
   flex: 1;
   min-width: 0;
-  padding: 24px;
+  padding: 20px 20px 32px;
   overflow-y: auto;
 }
 

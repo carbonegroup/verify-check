@@ -89,3 +89,24 @@ badge ornemental, aucun emoji d'interface, aucun « fade-in » générique.
 La seule zone sombre est le cadre caméra du scanner (raison fonctionnelle :
 contraste de lecture QR). Identité portée par la structure de registre
 (tableaux, filets, encre) et non par des effets.
+
+
+---
+
+## Révision visuelle — référence de l'utilisateur (23 novembre 2026)
+
+La première maquette fournie, **« VerifyCheck Attendance Dashboard and Mobile Scanner »**, devient la référence visuelle prioritaire pour le dashboard et le scanner Android. Cette décision remplace la palette papier/vert précédente pour ces deux surfaces. La seconde maquette violette de vérification d'identité ne fait pas partie du produit et doit être ignorée.
+
+### Direction à reproduire
+
+- Fond de travail bleu-gris très clair (#F3F6FA), panneaux blancs, bordures bleu-gris fines.
+- Bleu marine (#17365D à #173F70) pour la marque, la navigation active, les actions primaires et les titres.
+- Vert pour les présences confirmées, orange pour les états en attente ou les scans, rouge pour les absences et erreurs.
+- Sidebar fixe d'environ 220 px sur desktop, en-tête supérieur blanc, titre de page, barre de filtres sur une ligne.
+- Vue générale : quatre indicateurs (effectif, présents, scans, cours prévus), puis un registre tabulaire avec classe, cours, salle, horaire, présents et absents.
+- Scanner Android : en-tête VerifyCheck bleu marine, carte de séance, compteur vert confirmé, zone caméra sombre avec repères de cadrage, saisie manuelle et bouton Vérifier pleine largeur, navigation inférieure Contexte / Scanner / Historique.
+- Sur les écrans étroits, conserver l'ordre des tâches, permettre le défilement et éviter tout débordement horizontal hors tableaux défilants.
+
+### Contrat fonctionnel inchangé
+
+La maquette décrit la présentation, pas des données de démonstration. Tous les compteurs, horaires, classes, cours et statuts doivent provenir des réponses API et du modèle métier. Aucun chiffre de la maquette ne doit être copié. Une présence n'est confirmée qu'après réponse serveur ; hors ligne, elle reste explicitement en attente jusqu'à synchronisation.

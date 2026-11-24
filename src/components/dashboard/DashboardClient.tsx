@@ -47,6 +47,17 @@ type DashboardData = {
 
 type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes" | "scolarite" | "comptabilite";
 
+const PAGE_META: Record<Vue, { title: string; description: string }> = {
+  general: { title: "Vue générale", description: "Suivi des présences en temps réel" },
+  absences: { title: "Absences", description: "Élèves absents dans les cours terminés" },
+  classes: { title: "Classes", description: "Effectifs et activité par classe" },
+  cours: { title: "Cours", description: "Planning et pointages des cours" },
+  eleves: { title: "Élèves", description: "Suivi individuel des présences" },
+  cartes: { title: "Cartes QR", description: "Cartes d’identification à imprimer" },
+  scolarite: { title: "Scolarité", description: "Suivi des frais de scolarité" },
+  comptabilite: { title: "Comptabilité", description: "Recettes, dépenses et soldes de l’établissement" },
+};
+
 type StatutFrais = "regle" | "partiel" | "impaye" | "sans-frais";
 type ScolariteLigne = {
   eleve_id: string;
@@ -400,17 +411,36 @@ export default function DashboardClient() {
 
   return (
     <Shell vue={vue} onViewChange={changementVue}>
-      {/* ---------------------------------------------------- Filtres globaux */}
+      <header className={styles.pageHeader}>
+        <div>
+          <h1 className={styles.pageTitle}>{PAGE_META[vue].title}</h1>
+          <p className={styles.pageDescription}>
+            {vue === "general" ? PAGE_META[vue].description : `${PAGE_META[vue].description} · ${dateLabel}`}
+          </p>
+        </div>
+      </header>
+
+      {/* Filtres persistants : date, classe et cours restent synchronisés avec l'API. */}
       {data && !loading && (
         <div className={styles.filters}>
           <label>
             <span>Date</span>
-            <input type="date" value={date} max={todayConakry()} onChange={(e) => setDate(e.target.value)} />
+            <input
+              type="date"
+              value={date}
+              max={todayConakry()}
+              onChange={(e) => setDate(e.target.value)}
+              aria-label="Date du suivi"
+            />
           </label>
           <label>
             <span>Classe</span>
-            <select value={classe} onChange={(e) => { setClasse(e.target.value); setCours(""); }}>
-              <option value="">Toutes</option>
+            <select
+              value={classe}
+              onChange={(e) => { setClasse(e.target.value); setCours(""); }}
+              aria-label="Filtrer par classe"
+            >
+              <option value="">Toutes les classes</option>
               {data.classes.map((c) => (
                 <option key={c.id} value={c.id}>{c.nom}</option>
               ))}
@@ -418,27 +448,36 @@ export default function DashboardClient() {
           </label>
           <label>
             <span>Cours</span>
-            <select value={cours} onChange={(e) => setCours(e.target.value)}>
-              <option value="">Tous</option>
+            <select
+              value={cours}
+              onChange={(e) => setCours(e.target.value)}
+              aria-label="Filtrer par cours"
+            >
+              <option value="">Tous les cours</option>
               {data.cours_disponibles
                 .filter((c) => !classe || c.classe_id === classe)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nom} {timeFormatter.format(new Date(`2000-01-01T${c.heure_debut}Z`))}
+                    {c.nom} · {timeFormatter.format(new Date(`2000-01-01T${c.heure_debut}Z`))}
                   </option>
                 ))}
             </select>
           </label>
-          <a className={styles.button} href={exportUrl}>
-            Exporter (CSV)
-          </a>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            Actualiser
+          </button>
         </div>
       )}
 
       {error && (
         <p className={styles.error} role="alert">
           {error}
-          <button type="button" className={styles.buttonSmall} onClick={() => load()}>
+          <button type="button" className={styles.buttonSmall} onClick={() => void load()}>
             Réessayer
           </button>
         </p>
@@ -446,79 +485,139 @@ export default function DashboardClient() {
       {loading && <p className={styles.loading}>Chargement des données réelles…</p>}
 
       {data && !loading && (
-        <main className={styles.main}>
+        <div className={styles.content}>
           {/* ---------------------------------------------- VUE GÉNÉRALE */}
           {vue === "general" && (
             <>
-              <section className={styles.resume}>
-                <div>
-                  <span className={styles.kpi}>{data.cours_prevus.length}</span>
-                  <span className={styles.kpiLabel}>cours prévus</span>
+              <section className={styles.metricGrid} aria-label="Indicateurs de présence">
+                <article className={`${styles.metricCard} ${styles.metricEffectif}`}>
+                  <span className={styles.metricIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </span>
+                  <div className={styles.metricBody}>
+                    <span className={styles.metricLabel}>Effectif</span>
+                    <strong className={styles.kpi}>{data.effectif}</strong>
+                    <span className={styles.metricDetail}>élèves inscrits</span>
+                  </div>
+                </article>
+
+                <article className={`${styles.metricCard} ${styles.metricPresence}`}>
+                  <span className={styles.metricIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m5 12 4 4L19 6" />
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                  </span>
+                  <div className={styles.metricBody}>
+                    <span className={styles.metricLabel}>Présents</span>
+                    <strong className={styles.kpi}>{data.presents}</strong>
+                    <span className={styles.metricDetail}>
+                      {data.effectif > 0 ? `${((data.presents / data.effectif) * 100).toFixed(1)} % de l’effectif` : "Aucun élève inscrit"}
+                    </span>
+                  </div>
+                </article>
+
+                <article className={`${styles.metricCard} ${styles.metricScans}`}>
+                  <span className={styles.metricIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" />
+                      <rect x="14" y="3" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" />
+                      <path d="M14 14h3v3h-3zM20 14v2m-3 3h2m2 0v2m-7-1v1" />
+                    </svg>
+                  </span>
+                  <div className={styles.metricBody}>
+                    <span className={styles.metricLabel}>Scans</span>
+                    <strong className={styles.kpi}>{data.scans}</strong>
+                    <span className={styles.metricDetail}>aujourd’hui</span>
+                  </div>
+                </article>
+
+                <article className={`${styles.metricCard} ${styles.metricCourses}`}>
+                  <span className={styles.metricIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="17" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                      <path d="M8 14h2m4 0h2m-8 3h2" />
+                    </svg>
+                  </span>
+                  <div className={styles.metricBody}>
+                    <span className={styles.metricLabel}>Cours prévus</span>
+                    <strong className={styles.kpi}>{data.cours_prevus.length}</strong>
+                    <span className={styles.metricDetail}>ce jour</span>
+                  </div>
+                </article>
+              </section>
+
+              <section className={styles.tablePanel} aria-labelledby="attendance-register-title">
+                <div className={styles.tablePanelHeader}>
+                  <h2 id="attendance-register-title" className={styles.tablePanelTitle}>
+                    Registre de présence
+                  </h2>
+                  <a className={styles.buttonOutline} href={exportUrl}>
+                    Exporter CSV
+                  </a>
                 </div>
-                <div>
-                  <span className={styles.kpi}>{data.effectif}</span>
-                  <span className={styles.kpiLabel}>élèves concernés</span>
-                </div>
-                <div>
-                  <span className={styles.kpi}>{data.presents}</span>
-                  <span className={styles.kpiLabel}>présents (≥ 1 scan)</span>
-                </div>
-                <div>
-                  <span className={styles.kpi}>{data.scans}</span>
-                  <span className={styles.kpiLabel}>scans serveur</span>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Classe</th>
+                        <th>Cours</th>
+                        <th>Salle</th>
+                        <th>Horaire</th>
+                        <th>Présents</th>
+                        <th>Absents</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.cours_prevus.map((c) => {
+                        const eleves = eleveParClasse.filter((e) => e.classe_id === c.classe_id);
+                        const statuts = eleves.map((e) => statutEleve(e, c, date, nowConakry()));
+                        const presents = statuts.filter((s) => s === "present").length;
+                        const absents = statuts.filter((s) => s === "absent").length;
+                        return (
+                          <tr key={c.id}>
+                            <td>{classeLabel(c.classe_id)}</td>
+                            <td className={styles.courseCell}>{c.nom}</td>
+                            <td>{c.salle ?? "—"}</td>
+                            <td className={styles.num}>
+                              {c.heure_debut.slice(0, 5)}–{c.heure_fin.slice(0, 5)}
+                            </td>
+                            <td>
+                              <span className={`${styles.statePill} ${styles.statePresent}`}>
+                                Présent ({presents})
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`${styles.statePill} ${styles.stateAbsent}`}>
+                                Absent ({absents})
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {data.cours_prevus.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className={styles.empty}>
+                            Aucun cours prévu pour ces filtres.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
 
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Classe</th>
-                    <th>Cours</th>
-                    <th>Salle</th>
-                    <th>Heure</th>
-                    <th>Présents</th>
-                    <th>Absents (cours terminé)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.cours_prevus.map((c) => {
-                    const eleves = eleveParClasse.filter((e) => e.classe_id === c.classe_id);
-                    const statuts = eleves.map((e) => statutEleve(e, c, date, nowConakry()));
-                    return (
-                      <tr key={c.id}>
-                        <td>{classeLabel(c.classe_id)}</td>
-                        <td>{c.nom}</td>
-                        <td>{c.salle ?? "—"}</td>
-                        <td className={styles.num}>
-                          {c.heure_debut.slice(0, 5)}–{c.heure_fin.slice(0, 5)}
-                        </td>
-                        <td className={styles.num}>
-                          {statuts.filter((s) => s === "present").length}/{eleves.length}
-                        </td>
-                        <td className={styles.num}>
-                          {statuts.filter((s) => s === "absent").length}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {data.cours_prevus.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className={styles.empty}>
-                        Aucun cours prévu ce jour.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              <p className={styles.actionsRow}>
-                <a className={styles.button} href={exportUrl}>
-                  Exporter les absences (CSV)
-                </a>
+              <div className={styles.actionsRow}>
                 <button className={styles.buttonOutline} onClick={() => window.print()}>
-                  Imprimer
+                  Imprimer le registre
                 </button>
-              </p>
+              </div>
             </>
           )}
 
@@ -934,7 +1033,7 @@ export default function DashboardClient() {
               )}
             </>
           )}
-        </main>
+        </div>
       )}
     </Shell>
   );
