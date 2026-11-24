@@ -169,3 +169,18 @@ test("buildDashboard : aucun cours prévu ce jour de semaine", () => {
   assert.deepEqual(r.cours_prevus, []);
   assert.equal(r.scans, 0);
 });
+
+ 
+test("buildDashboard : le planning hebdomadaire expose aussi les cours des autres jours", () => {
+  const r = buildDashboard(base(), { date: vendredi });
+  assert.deepEqual(r.cours_prevus.map((c) => c.id), ["co-math", "co-phys"]);
+  assert.deepEqual(r.cours_semaine.map((c) => c.id), ["co-math", "co-hist", "co-phys"]);
+  assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-math", "co-hist", "co-phys"]);
+});
+
+test("buildDashboard : le filtre cours peut cibler un cours hors du jour sélectionné", () => {
+  const r = buildDashboard(base(), { date: vendredi, cours: "co-hist" });
+  assert.deepEqual(r.cours_prevus, []);
+  assert.deepEqual(r.cours_semaine.map((c) => c.id), ["co-hist"]);
+  assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-hist"]);
+});
