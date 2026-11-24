@@ -90,7 +90,7 @@ export async function enregistrerScan(
     const alreadyResolved = unresolved.some(
       (item) => item.etat === "confirme" && item.code_qr === codeQr.toUpperCase() && item.cours === courseId
     );
-    if (!alreadyResolved) {
+    if (!alreadyResolved && etat.kind === "confirmee") {
       const entry: FileItem = {
         ...nouvelleEntree(uid(), {
           code_qr: codeQr,
