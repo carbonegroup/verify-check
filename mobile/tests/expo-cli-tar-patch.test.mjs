@@ -21,6 +21,13 @@ test('supports a direct require binding', () => {
   assert.match(result.source, /tar\.extract/);
 });
 
+test('escapes generated JavaScript bindings containing a dollar sign', () => {
+  const source = 'var $tar = require("tar");\n$tar.default.extract({});';
+  const result = patchExpoCliTarImport(source);
+  assert.equal(result.changed, true);
+  assert.match(result.source, /\$tar\.extract/);
+});
+
 test('is idempotent when the named export is already used', () => {
   const source = 'var tar_1 = require("tar");\ntar_1.extract({});';
   const result = patchExpoCliTarImport(source);

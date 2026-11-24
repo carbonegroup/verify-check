@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
+  return value.replace(/\$/g, '\\$&');
 }
 
 export function patchExpoCliTarImport(source) {
