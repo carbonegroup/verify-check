@@ -66,6 +66,12 @@ jobs:
         working-directory: mobile
         run: npm ci --legacy-peer-deps
 
+      - name: Verify Expo CLI tar compatibility
+        working-directory: mobile
+        run: |
+          npm run test:expo-cli-tar-patch
+          node scripts/patch-expo-cli-tar.mjs --check
+
       - name: Validate Expo dependencies
         working-directory: mobile
         run: |

@@ -32,7 +32,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/*.test.ts\"",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
-    "install:apk": "bash ../scripts/download-and-install-apk.sh"
+    "install:apk": "bash ../scripts/download-and-install-apk.sh",
+    "postinstall": "node scripts/patch-expo-cli-tar.mjs",
+    "test:expo-cli-tar-patch": "node --test tests/expo-cli-tar-patch.test.mjs"
   },
   "private": true,
   "overrides": {
