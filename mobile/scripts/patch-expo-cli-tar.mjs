@@ -28,7 +28,13 @@ export function patchExpoCliTarImport(source) {
     if (workingAccess.test(source)) {
       return { source, changed: false, binding };
     }
-    throw new Error('Found the tar import in @expo/cli, but not the expected extract access.');
+    const diagnosticLines = source.split('\n').filter((line) => line.includes(binding) || /extract/i.test(line)).slice(0, 30);
+    throw new Error(
+      'Found the tar import in @expo/cli, but not the expected extract access. Import: ' +
+      importedTar[0].trim() +
+      ' | Relevant lines: ' +
+      diagnosticLines.join(' || ')
+    );
   }
 
   const patched = source.replace(brokenAccess, (match, prefix) => prefix + binding + '.extract');
