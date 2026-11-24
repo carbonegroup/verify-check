@@ -127,7 +127,7 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/dist/verifycheck.apk"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: verifycheck-apk-${{ github.run_number }}
           path: dist/verifycheck.apk
