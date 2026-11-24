@@ -93,7 +93,10 @@ export async function synchroniser(
   // première erreur (pour éviter les boucles infinies en cas de réseau mort).
   let firstReessayer = true;
   for (const item of items) {
-    if (item.etat !== "en_attente" || blocked) {
+    // Une entrée sans cours a été capturée hors ligne : ne jamais la rejouer
+    // dans un autre créneau et risquer d'attribuer la présence au mauvais cours.
+    // Elle sera résolue par un nouveau scan lorsque le réseau sera disponible.
+    if (item.etat !== "en_attente" || !item.cours || blocked) {
       out.push(item);
       continue;
     }
