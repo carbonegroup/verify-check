@@ -14,6 +14,9 @@ export type FileItem = {
   at: string;
   etat: "en_attente" | "confirme" | "rejete";
   note?: string;
+  /** Informations disponibles uniquement après une réponse réelle du serveur. */
+  eleve?: string;
+  cours_nom?: string;
   essais: number;
 };
 
