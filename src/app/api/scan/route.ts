@@ -47,11 +47,16 @@ export async function POST(request: NextRequest) {
   // Use the rotated access token immediately when requireAdmin refreshes a session.
   const effectiveAccessToken = auth.session?.access_token ?? accessToken!;
   const supabase = createServerSupabase(effectiveAccessToken);
+  const respondJson = (body: unknown, init?: ResponseInit) => {
+    const response = NextResponse.json(body, init);
+    if (auth.session) setSessionCookies(response, auth.session);
+    return response;
+  };
 
   // Rate limiting : 60 req/min par IP (scans légitimes)
   const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:scan" });
   if (!rl.allowed) {
-    return NextResponse.json(
+    return respondJson(
       { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
@@ -61,15 +66,15 @@ export async function POST(request: NextRequest) {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
 
   const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown };
   if (typeof body.code_qr !== "string" || !body.code_qr.trim()) {
-    return NextResponse.json({ error: "code_qr_requis" }, { status: 400 });
+    return respondJson({ error: "code_qr_requis" }, { status: 400 });
   }
   if (
     body.code_qr.trim().length > 64 ||
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
     (typeof body.salle === "string" && body.salle.trim().length > 128) ||
     (typeof body.cours === "string" && body.cours.trim().length > 64)
   ) {
-    return NextResponse.json({ error: "corps_invalide" }, { status: 400 });
+    return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
 
   const codeQr = body.code_qr.trim();
@@ -98,12 +103,12 @@ export async function POST(request: NextRequest) {
     // il ne faut PAS la présenter comme un QR invalide, sinon le scanner
     // écarte le pointage comme rejet définitif (perte de présence).
     if (studentError.code === "PGRST116") {
-      return NextResponse.json({ error: "qr_invalide" }, { status: 404 });
+      return respondJson({ error: "qr_invalide" }, { status: 404 });
     }
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
   if (!student) {
-    return NextResponse.json({ error: "qr_invalide" }, { status: 404 });
+    return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
 
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
@@ -113,20 +118,20 @@ export async function POST(request: NextRequest) {
     .eq("classe_id", student.classe_id)
     .eq("jour_semaine", now.jourSemaine);
   if (coursesError) {
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
   const slotCourses = (courses as CourseRow[] | null ?? []).filter((course) =>
     isCourseActive(course.heure_debut, course.heure_fin, now)
   );
   if (slotCourses.length === 0) {
-    return NextResponse.json({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
+    return respondJson({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
   }
 
   // 3) Désambiguïsation : salle du portique ou cours explicite. JAMAIS de choix arbitraire.
   const selection = selectCourse(slotCourses, { salle, cours });
   if (!selection.ok) {
     if (selection.error === "cours_ambigu") {
-      return NextResponse.json(
+      return respondJson(
         {
           error: selection.error,
           candidates: selection.candidates.map((c) => ({
@@ -140,7 +145,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    return NextResponse.json(
+    return respondJson(
       { error: selection.error, salle: (selection as { salle?: string }).salle, cours: (selection as { cours?: string }).cours },
       { status: 409 }
     );
@@ -156,12 +161,12 @@ export async function POST(request: NextRequest) {
     .single();
   if (insertError) {
     if (insertError.code === "23505") {
-      return NextResponse.json(
+      return respondJson(
         { error: "doublon", course: course.nom, jour: now.jour },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: "erreur_base" }, { status: 500 });
+    return respondJson({ error: "erreur_base" }, { status: 500 });
   }
 
   const response = NextResponse.json(
