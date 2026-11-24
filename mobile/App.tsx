@@ -1,7 +1,6 @@
 /**
  * VerifyCheck — navigation mobile à trois destinations.
- * Le scanner est l’écran par défaut ; le choix de séance est une fenêtre
- * ponctuelle, jamais un onglet ou un écran permanent.
+ * Le scanner est l’écran par défaut ; le serveur détermine le cours après lecture de la carte.
  */
 
 import { useCallback, useEffect, useState } from "react";
