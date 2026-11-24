@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { historique, onFileChange, type LocalItem } from "../store/scan";
+import { enAttente, historique, onFileChange, type LocalItem } from "../store/scan";
 import { theme } from "../theme";
 
 export type Selection = {
@@ -33,10 +33,13 @@ const ETATS: Record<LocalItem["etat"], { label: string; couleur: string }> = {
 export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) {
   const [items, setItems] = useState<LocalItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const charger = useCallback(async () => {
     setLoading(true);
-    setItems(await historique());
+    const [recent, pending] = await Promise.all([historique(), enAttente()]);
+    setItems(recent);
+    setPendingCount(pending);
     setLoading(false);
   }, []);
 
@@ -45,7 +48,7 @@ export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) 
     return onFileChange(() => void charger());
   }, [charger]);
 
-  const pending = items.filter((item) => item.etat === "en_attente").length;
+  const pending = pendingCount;
   const confirms = items.filter((item) => item.etat === "confirme").length;
 
   return (
