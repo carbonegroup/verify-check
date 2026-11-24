@@ -18,10 +18,12 @@ Some vulnerable packages are pinned transitively by the currently installed Next
 | Mobile | `glob` under `cacache` | `14.0.2` | Fixed release for GHSA-3g3m-2fjr-6pw4 |
 | Mobile | `minimatch` under `cacache` | `11.0.1` | Fixed release for GHSA-g3hv-75wg-m249 |
 | Mobile | `uuid` | `11.1.1` | Fixed release for GHSA-w5hq-g745-h8pq |
-| Mobile | `image-size` | `2.1.0` | Release beyond the affected 2.0.2 ceiling |
+| Mobile | `image-size` (Metro 1.x) | `image-size-next@1.2.2` | Community-maintained 1.x drop-in with CVE-2025-71329 / CVE-2025-71330 fixes |
 | Mobile | `zod` | `4.6.7` | Fixed release for GHSA-mrhx-c7xc-m3w5 |
 
-These overrides intentionally affect transitive dependencies. A major-version override is not proof of API compatibility: clean installs, Expo validation, typechecks, tests and builds must pass before merging. In particular, review any failure involving Expo CLI, Metro, archive extraction, globbing, UUID generation or image metadata.
+The Metro `image-size` edge is aliased to `image-size-next@1.2.2`, which preserves the 1.x API and contains targeted guards for zero-size ISO-BMFF boxes, zero-length ICNS entries, and invalid JPEG segment lengths. This is a community-maintained fork, not affiliated with the original upstream; the v1.2.2 release tag is signed, its source changes are small and reviewable, and its release CI passed on Node 18/20/22. Treat that provenance difference as an explicit supply-chain tradeoff and retain the exact version lock/integrity. Do not point Metro's 1.x dependency at the 2.x API.
+
+These overrides intentionally affect transitive dependencies. Clean installs, Expo validation, typechecks, tests and builds must pass before merging. In particular, review any failure involving Expo CLI, Metro, archive extraction, globbing, UUID generation or image metadata.
 
 ## Maintenance
 
