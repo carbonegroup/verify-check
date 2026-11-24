@@ -7,6 +7,7 @@ import {
   setSessionCookies,
 } from "@/lib/auth";
 import { buildComptabilite } from "@/lib/comptabilite";
+import { isIsoDate } from "@/lib/dashboard";
 
 /**
  * GET /api/comptabilite — service comptabilité (recettes + dépenses + solde).
@@ -29,6 +30,9 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const from = params.get("from") ?? undefined;
   const to = params.get("to") ?? undefined;
+  if ((from && !isIsoDate(from)) || (to && !isIsoDate(to)) || (from && to && from > to)) {
+    return NextResponse.json({ error: "periode_invalide" }, { status: 400 });
+  }
 
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const [recettesRes, depensesRes] = await Promise.all([
