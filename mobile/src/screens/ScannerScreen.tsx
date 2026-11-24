@@ -4,7 +4,7 @@
  * avant la réponse du serveur. Les erreurs réseau restent EN ATTENTE.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -92,14 +92,19 @@ export function ScannerScreen({
   const [cameraErreur, setCameraErreur] = useState(false);
   const [resultat, setResultat] = useState<ResultatAffiche | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scanBloque, setScanBloque] = useState(false);
+  const scanBloque = useRef(false);
+
+  useEffect(() => {
+    scanBloque.current = false;
+    setResultat(null);
+  }, [selection?.coursId]);
 
   async function scanner(code: string) {
     const value = code.trim().toUpperCase();
-    if (!value || !selection || busy || scanBloque) return;
+    if (!value || !selection || busy || scanBloque.current) return;
 
     // Bloque immédiatement les événements caméra répétés pour le même QR.
-    setScanBloque(true);
+    scanBloque.current = true;
     setBusy(true);
 
     try {
@@ -127,7 +132,7 @@ export function ScannerScreen({
 
   function scannerSuivant() {
     setResultat(null);
-    setScanBloque(false);
+    scanBloque.current = false;
   }
 
   if (!selection) {
@@ -240,7 +245,7 @@ export function ScannerScreen({
             style={s.camera}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={busy || scanBloque ? undefined : (value) => void scanner(value.data)}
+            onBarcodeScanned={busy || scanBloque.current ? undefined : (value) => void scanner(value.data)}
             onMountError={() => setCameraErreur(true)}
           >
             <View pointerEvents="none" style={s.cameraOverlay}>
