@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Supabase Storage URLs are runtime-generated; QR images use the same-origin API. */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
