@@ -104,7 +104,7 @@ La première maquette fournie, **« VerifyCheck Attendance Dashboard and Mobile 
 - Vert pour les présences confirmées, orange pour les états en attente ou les scans, rouge pour les absences et erreurs.
 - Sidebar fixe d'environ 220 px sur desktop, en-tête supérieur blanc, titre de page, barre de filtres sur une ligne.
 - Vue générale : quatre indicateurs (effectif, présents, scans, cours prévus), puis un registre tabulaire avec classe, cours, salle, horaire, présents et absents.
-- Scanner Android : en-tête VerifyCheck bleu marine, caméra prioritaire avec repères de cadrage et navigation inférieure Accueil / Scanner / Historique. Aucun résumé de séance, compteur de présents ni saisie manuelle pendant le scan. La sélection classe/cours est une fenêtre ponctuelle accessible depuis les options du compte. Après une lecture, le résultat remplace la caméra avec le statut serveur, les informations élève disponibles et une action « Scanner le suivant ».
+- Scanner Android : en-tête VerifyCheck bleu marine, caméra prioritaire avec repères de cadrage et navigation inférieure Accueil / Scanner / Historique. Aucun choix préalable de classe ou de cours, aucun résumé de séance ni compteur de présents. Après lecture, le serveur identifie l'élève et détermine le cours actif à partir de sa classe. Si un seul cours correspond, le pointage est enregistré ; si plusieurs cours sont actifs, l'agent choisit parmi les candidats affichés après le scan. Le résultat remplace la caméra avec le statut serveur, le nom et la classe de l'élève, le cours retenu et une action « Scanner le suivant ».
 - Sur les écrans étroits, conserver l'ordre des tâches, permettre le défilement et éviter tout débordement horizontal hors tableaux défilants.
 
 ### Contrat fonctionnel inchangé
