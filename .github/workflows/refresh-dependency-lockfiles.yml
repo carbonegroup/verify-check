@@ -13,11 +13,20 @@ permissions:
 
 jobs:
   refresh:
+    if: >-
+      ${{ github.event.pull_request.number == 58 &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.head.ref == 'security/dependabot-remediation-2026-11-23' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
+      - name: Checkout remediation branch
         uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,7 +46,27 @@ jobs:
           npm audit --json > "$RUNNER_TEMP/audit-web.json" || true
           (cd mobile && npm audit --json > "$RUNNER_TEMP/audit-mobile.json") || true
 
-      - name: Upload refreshed lockfiles and audit reports
+      - name: Require zero known npm vulnerabilities
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          for (const [name, file] of [
+            ["web", process.env.RUNNER_TEMP + "/audit-web.json"],
+            ["mobile", process.env.RUNNER_TEMP + "/audit-mobile.json"],
+          ]) {
+            const audit = JSON.parse(fs.readFileSync(file, "utf8"));
+            const totals = audit.metadata?.vulnerabilities;
+            if (!totals || totals.total !== 0) {
+              console.error(name + " npm audit:", totals ?? "missing vulnerability summary");
+              process.exitCode = 1;
+            } else {
+              console.log(name + " npm audit: 0 vulnerabilities");
+            }
+          }
+          NODE
+
+      - name: Upload lockfiles and audit reports
         uses: actions/upload-artifact@v4
         with:
           name: dependabot-lockfile-refresh
@@ -48,3 +77,14 @@ jobs:
             ${{ runner.temp }}/audit-mobile.json
           if-no-files-found: error
           retention-days: 2
+
+      - name: Commit lockfiles and remove this temporary workflow
+        env:
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json mobile/package-lock.json
+          git rm .github/workflows/refresh-dependency-lockfiles.yml
+          git commit -m "chore(deps): regenerate npm lockfiles"
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
