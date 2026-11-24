@@ -112,7 +112,8 @@ export function AccueilScreen({ onOpenScanner }: { onOpenScanner: () => void }) 
           return (
             <View key={item.id} style={s.item}>
               <View style={s.itemCopy}>
-                <Text style={s.itemCode} numberOfLines={1}>{item.code_qr}</Text>
+                <Text style={s.itemCode} numberOfLines={1}>{item.eleve || item.code_qr}</Text>
+                {item.eleve ? <Text style={s.itemDate}>{item.code_qr}</Text> : null}
                 <Text style={s.itemDate}>
                   {new Date(item.at).toLocaleString("fr-FR", {
                     day: "2-digit",
