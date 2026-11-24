@@ -26,6 +26,19 @@ test("selectCourse : un seul cours actif sans indice → retenu sans ambiguïté
   assert.equal(r.ok ? r.course.id : "", "co-b");
 });
 
+test("selectCourse : une salle partagée par plusieurs cours actifs reste ambiguë", () => {
+  const sharedRoomCourses = [
+    { ...coursA, salle: "S1" },
+    { ...coursB, salle: "S1" },
+  ];
+  const r = selectCourse(sharedRoomCourses, { salle: "S1" });
+  assert.deepEqual(r, {
+    ok: false,
+    error: "cours_ambigu",
+    candidates: sharedRoomCourses,
+  });
+});
+
 test("selectCourse : plusieurs cours actifs sans indice → cours_ambigu (jamais de choix arbitraire)", () => {
   const r = selectCourse([coursA, coursB]);
   assert.ok(!r.ok);

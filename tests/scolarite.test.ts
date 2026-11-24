@@ -136,6 +136,11 @@ test("isReglementDuplicate : même élève + frais + montant + date", () => {
 
 test("validateReglement : rejette les saisies invalides", () => {
   assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 5000, recu_le: "2026-11-16" }), { ok: true });
+  assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 5000.5, recu_le: "2026-11-16" }), { ok: false, error: "montant_invalide" });
+  assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 2_147_483_648, recu_le: "2026-11-16" }), { ok: false, error: "montant_invalide" });
+  assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 5000, recu_le: "2026-02-31" }), { ok: false, error: "date_invalide" });
+  assert.deepEqual(validateReglement({ student_id: 123, fee_id: "fee-1", montant_gnf: 5000, recu_le: "2026-11-16" } as never), { ok: false, error: "eleve_requis" });
+  assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 5000, recu_le: "2026-11-16", note: {} } as never), { ok: false, error: "note_invalide" });
   assert.deepEqual(validateReglement({ fee_id: "fee-1", montant_gnf: 5000, recu_le: "2026-11-16" }), { ok: false, error: "eleve_requis" });
   assert.deepEqual(validateReglement({ student_id: "st-1", montant_gnf: 5000, recu_le: "2026-11-16" }), { ok: false, error: "frais_requis" });
   assert.deepEqual(validateReglement({ student_id: "st-1", fee_id: "fee-1", montant_gnf: 0, recu_le: "2026-11-16" }), { ok: false, error: "montant_invalide" });

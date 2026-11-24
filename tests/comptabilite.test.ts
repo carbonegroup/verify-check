@@ -86,6 +86,11 @@ test("validateDepense : rejette les saisies invalides", () => {
     validateDepense({ libelle: "Craies", categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-11-18" }),
     { ok: true }
   );
+  assert.deepEqual(validateDepense({ libelle: "Craies", categorie: "fournitures", montant_gnf: 80000.5, date_depense: "2026-11-18" }), { ok: false, error: "montant_invalide" });
+  assert.deepEqual(validateDepense({ libelle: "Craies", categorie: "fournitures", montant_gnf: 2_147_483_648, date_depense: "2026-11-18" }), { ok: false, error: "montant_invalide" });
+  assert.deepEqual(validateDepense({ libelle: "Craies", categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-02-31" }), { ok: false, error: "date_invalide" });
+  assert.deepEqual(validateDepense({ libelle: {}, categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-11-18" } as never), { ok: false, error: "libelle_requis" });
+  assert.deepEqual(validateDepense({ libelle: "Craies", categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-11-18", note: {} } as never), { ok: false, error: "note_invalide" });
   assert.deepEqual(validateDepense({ categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-11-18" }), { ok: false, error: "libelle_requis" });
   assert.deepEqual(validateDepense({ libelle: "X", categorie: "fournitures", montant_gnf: 80000, date_depense: "2026-11-18" }), { ok: false, error: "libelle_requis" });
   assert.deepEqual(validateDepense({ libelle: "Craies", categorie: "inconnu", montant_gnf: 80000, date_depense: "2026-11-18" }), { ok: false, error: "categorie_invalide" });
