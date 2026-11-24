@@ -20,19 +20,19 @@ export function patchExpoCliTarImport(source) {
 
   const binding = importedTar[1];
   const escapedBinding = escapeRegExp(binding);
-  const brokenAccess = new RegExp('\\b' + escapedBinding + '\\.default\\.extract\\b', 'g');
+  const brokenAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.default\\.extract\\b', 'g');
   const brokenMatches = [...source.matchAll(brokenAccess)].length;
 
   if (brokenMatches === 0) {
-    const workingAccess = new RegExp('\\b' + escapedBinding + '\\.extract\\b');
+    const workingAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.extract\\b');
     if (workingAccess.test(source)) {
       return { source, changed: false, binding };
     }
     throw new Error('Found the tar import in @expo/cli, but not the expected extract access.');
   }
 
-  const patched = source.replace(brokenAccess, binding + '.extract');
-  const workingAccess = new RegExp('\\b' + escapedBinding + '\\.extract\\b');
+  const patched = source.replace(brokenAccess, (match, prefix) => prefix + binding + '.extract');
+  const workingAccess = new RegExp('(^|[^A-Za-z0-9_$])' + escapedBinding + '\\.extract\\b');
   if (!workingAccess.test(patched)) {
     throw new Error('The @expo/cli tar import patch did not produce a valid extract call.');
   }
