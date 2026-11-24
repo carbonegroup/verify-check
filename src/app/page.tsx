@@ -73,25 +73,6 @@ const styles: Record<string, React.CSSProperties> = {
   primaryHover: {
     background: "var(--vc-primary-hover)",
   },
-  secondary: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0.7rem 1.25rem",
-    borderRadius: "var(--vc-radius-sm)",
-    border: "1px solid var(--vc-line)",
-    background: "var(--vc-surface)",
-    color: "var(--vc-ink)",
-    textDecoration: "none",
-    fontWeight: 600,
-    font: "inherit",
-    fontSize: "1rem",
-    cursor: "pointer",
-  },
-  secondaryHover: {
-    background: "var(--vc-surface-soft)",
-    borderColor: "var(--vc-line-soft)",
-  },
 };
 
 export default function Home() {
@@ -105,10 +86,7 @@ export default function Home() {
           consulte la présence réelle par classe, cours et élève.
         </p>
         <div style={styles.actions}>
-          <Link href="/scanner/" className={pageStyles.primaryLink} style={styles.primary}>
-            Scanner de salle
-          </Link>
-          <Link href="/login" className={pageStyles.secondaryLink} style={styles.secondary}>
+          <Link href="/login" className={pageStyles.primaryLink} style={styles.primary}>
             Espace direction
           </Link>
         </div>
