@@ -4,7 +4,7 @@
  * avant la réponse du serveur. Les erreurs réseau restent EN ATTENTE.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -90,16 +90,21 @@ export function ScannerScreen({
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraErreur, setCameraErreur] = useState(false);
-  const [resultat, setResultat] = useState<ResultatAffiche | null>(null);
+  const [dernierScan, setDernierScan] = useState<{
+    cleSelection: string;
+    resultat: ResultatAffiche;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const scanBloque = useRef(false);
+  const cleSelection = JSON.stringify([selection?.coursId ?? null, selection?.salle ?? null]);
+  const resultat =
+    dernierScan?.cleSelection === cleSelection ? dernierScan.resultat : null;
 
   useEffect(() => {
     scanBloque.current = false;
-    setResultat(null);
-  }, [selection?.coursId, selection?.salle]);
+  }, [cleSelection]);
 
-  async function scanner(code: string) {
+  const scanner = useCallback(async (code: string) => {
     const value = code.trim().toUpperCase();
     if (!value || !selection || busy || scanBloque.current) return;
 
@@ -120,18 +125,25 @@ export function ScannerScreen({
         affiche.cours = response.cours;
       }
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
-      setResultat(affiche);
+      setDernierScan({ cleSelection, resultat: affiche });
 
       if (response.kind === "session_expiree") onSessionExpiree();
     } catch {
-      setResultat({ kind: "erreur_serveur", code: value });
+      setDernierScan({
+        cleSelection,
+        resultat: { kind: "erreur_serveur", code: value },
+      });
     } finally {
       setBusy(false);
     }
-  }
+  }, [busy, cleSelection, onSessionExpiree, selection]);
+
+  const gererCodeBarres = useCallback((value: { data: string }) => {
+    void scanner(value.data);
+  }, [scanner]);
 
   function scannerSuivant() {
-    setResultat(null);
+    setDernierScan(null);
     scanBloque.current = false;
   }
 
@@ -245,7 +257,7 @@ export function ScannerScreen({
             style={s.camera}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={busy || scanBloque.current ? undefined : (value) => void scanner(value.data)}
+            onBarcodeScanned={busy ? undefined : gererCodeBarres}
             onMountError={() => setCameraErreur(true)}
           >
             <View pointerEvents="none" style={s.cameraOverlay}>
