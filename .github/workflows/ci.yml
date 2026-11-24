@@ -26,6 +26,13 @@ jobs:
         run: npm ci --legacy-peer-deps
         working-directory: mobile
 
+      - name: Audit web dependencies
+        run: npm audit --audit-level=low
+
+      - name: Audit mobile dependencies
+        run: npm audit --audit-level=low
+        working-directory: mobile
+
       - name: Validate EAS Android build types
         run: |
           node <<'NODE'
