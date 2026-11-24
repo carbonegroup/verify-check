@@ -7,6 +7,7 @@ import {
   setSessionCookies,
 } from "@/lib/auth";
 import { buildDashboard, dayWindow, isIsoDate } from "@/lib/dashboard";
+import { isMissingStudentPhotoUrlColumn } from "@/lib/student-photo-compat";
 import { schoolInstant } from "@/lib/time";
 
 /**
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
   );
   const { startAt, endAt } = dayWindow(date);
 
-  const [classesRes, coursesRes, studentsRes, attendanceRes] = await Promise.all([
+  const [classesRes, coursesRes, studentsWithPhotoRes, attendanceRes] = await Promise.all([
     supabase.from("classes").select("id, nom").order("nom"),
     supabase
       .from("courses")
@@ -51,6 +52,13 @@ export async function GET(request: NextRequest) {
       .gte("scanned_at", startAt)
       .lt("scanned_at", endAt),
   ]);
+
+  // A photo migration can be pending in Supabase production. Keep the dashboard
+  // operational with the legacy student fields until photo_url exists.
+  const studentsRes =
+    studentsWithPhotoRes.error && isMissingStudentPhotoUrlColumn(studentsWithPhotoRes.error)
+      ? await supabase.from("students").select("id, nom, code_qr, classe_id").order("nom")
+      : studentsWithPhotoRes;
 
   if (classesRes.error || coursesRes.error || studentsRes.error || attendanceRes.error) {
     return NextResponse.json({ error: "erreur_base" }, { status: 500 });

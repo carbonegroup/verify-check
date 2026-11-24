@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
@@ -784,6 +785,7 @@ export default function DashboardClient() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div className={styles.studentAvatar}>
                             {photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                               <img
                                 src={photoUrl}
                                 alt={`${e.nom}`}
@@ -918,6 +920,7 @@ export default function DashboardClient() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div className={styles.studentAvatar}>
                                   {photoUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                                     <img
                                       src={photoUrl}
                                       alt={`${l.eleve}`}
@@ -1127,6 +1130,7 @@ function CartesQR({
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                   <div className={`${styles.studentAvatar} ${styles.studentAvatarLarge}`}>
                     {photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL.
                       <img
                         src={photoUrl}
                         alt={`${e.nom}`}

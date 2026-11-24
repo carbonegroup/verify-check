@@ -7,6 +7,7 @@ import {
   setSessionCookies,
 } from "@/lib/auth";
 import { buildScolarite, type StatutFrais } from "@/lib/scolarite";
+import { isMissingStudentPhotoUrlColumn } from "@/lib/student-photo-compat";
 
 /**
  * GET /api/scolarite — service scolarité (frais).
@@ -36,12 +37,18 @@ export async function GET(request: NextRequest) {
     : undefined;
 
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
-  const [classesRes, elevesRes, fraisRes, reglementsRes] = await Promise.all([
+  const [classesRes, elevesWithPhotoRes, fraisRes, reglementsRes] = await Promise.all([
     supabase.from("classes").select("id, nom").order("nom"),
     supabase.from("students").select("id, nom, classe_id, photo_url").order("nom"),
     supabase.from("fees").select("id, classe_id, libelle, annee_scolaire, montant_gnf, echeance"),
     supabase.from("payments").select("id, student_id, fee_id, montant_gnf, recu_le, note"),
   ]);
+
+  // Keep the legacy Scolarité endpoint working until photo_url is migrated.
+  const elevesRes =
+    elevesWithPhotoRes.error && isMissingStudentPhotoUrlColumn(elevesWithPhotoRes.error)
+      ? await supabase.from("students").select("id, nom, classe_id").order("nom")
+      : elevesWithPhotoRes;
 
   if (classesRes.error || elevesRes.error || fraisRes.error || reglementsRes.error) {
     return NextResponse.json({ error: "erreur_base" }, { status: 500 });
