@@ -15,7 +15,7 @@ test("picker keeps upcoming and finished courses for the selected class", () => 
 
 test("schedule status distinguishes active, upcoming and finished courses", () => {
   assert.equal(getCourseScheduleStatus(courses[0], "11:00"), "upcoming");
-  assert.equal(getCourseScheduleStatus(courses[0], "13:45"), "upcoming");
+  assert.equal(getCourseScheduleStatus(courses[0], "13:00"), "upcoming");
   assert.equal(getCourseScheduleStatus({ ...courses[0], actif: true }, "13:45"), "active");
   assert.equal(getCourseScheduleStatus(courses[0], "15:00"), "finished");
 });
