@@ -140,7 +140,7 @@ test("buildDashboard : cours_disponibles garde tous les cours du jour malgré le
   );
   assert.deepEqual(
     r.cours_disponibles.map((c) => c.id),
-    ["co-math", "co-phys"]
+    ["co-math", "co-hist", "co-phys"]
   );
 });
 
