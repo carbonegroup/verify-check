@@ -16,6 +16,21 @@ test("mapScanResponse : 201 → confirmée avec élève et cours", () => {
   assert.ok(etat.kind === "confirmee" && etat.coursId === "course-1");
 });
 
+test("mapScanResponse : 200 preview → carte reconnue sans confirmer la présence", () => {
+  const etat = mapScanResponse(200, {
+    ok: true,
+    preview: true,
+    eleve: "Alpha Barry",
+    classe: "Licence 2",
+    cours: "Mathématiques",
+    cours_id: "course-1",
+  });
+  assert.equal(etat.kind, "previsualisation");
+  assert.ok(etat.kind === "previsualisation" && etat.eleve === "Alpha Barry");
+  assert.ok(etat.kind === "previsualisation" && etat.classe === "Licence 2");
+  assert.ok(etat.kind === "previsualisation" && etat.coursId === "course-1");
+});
+
 test("mapScanResponse : doublon, QR invalide, pas de cours", () => {
   assert.equal(mapScanResponse(409, { error: "doublon" }).kind, "doublon");
   assert.equal(mapScanResponse(404, { error: "qr_invalide" }).kind, "qr_invalide");
