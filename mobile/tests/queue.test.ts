@@ -78,6 +78,23 @@ test("synchroniser : réseau perdu → reste EN ATTENTE et arrête la file", asy
   assert.equal(items[1].essais, 0, "l'entrée suivante n'est pas consommée");
 });
 
+test("synchroniser : scan hors ligne sans cours reste en attente et n'est jamais attribué à un autre cours", async () => {
+  const unresolved = nouvelleEntree("id-unresolved", {
+    code_qr: "VC-UNRESOLVED",
+    cours: "",
+    at: "2026-11-23T08:05:00Z",
+  });
+  let appels = 0;
+  const { items, synchronises } = await synchroniser([unresolved], async () => {
+    appels++;
+    return "confirme";
+  });
+  assert.equal(appels, 0);
+  assert.equal(synchronises, 0);
+  assert.equal(items[0].etat, "en_attente");
+  assert.equal(items[0].cours, "");
+});
+
 test("synchroniser : les entrées déjà confirmées/rejetées ne sont pas rejouées", async () => {
   const a: FileItem = { ...nouvelleEntree("id-1", scan), etat: "confirme" };
   const rejete: FileItem = { ...nouvelleEntree("id-2", scan), etat: "rejete" };
