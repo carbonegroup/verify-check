@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
+import { isDashboardViewEnabled, type DashboardView } from "@/lib/dashboard-navigation";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -50,7 +51,7 @@ type DashboardData = {
   eleves: Eleve[];
 };
 
-type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes" | "scolarite" | "comptabilite";
+type Vue = DashboardView;
 
 const PAGE_META: Record<Vue, { title: string; description: string }> = {
   general: { title: "Vue générale", description: "Suivi des présences en temps réel" },
@@ -403,6 +404,7 @@ export default function DashboardClient() {
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
 
   const changementVue = useCallback((id: Vue) => {
+    if (!isDashboardViewEnabled(id)) return;
     setVue(id);
     // Réinitialise le filtrage par cours quand on change de vue (évite un cours
     // filtré mais masqué qui rendrait la vue confuse).
