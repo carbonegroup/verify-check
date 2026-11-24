@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { enAttente, historique, onFileChange, synchroniserFile, type LocalItem } from "../store/scan";
+import { enAttente as compterEnAttente, historique, onFileChange, synchroniserFile, type LocalItem } from "../store/scan";
 import { theme } from "../theme";
 
 const ETAT_LIBELLE: Record<LocalItem["etat"], string> = {
@@ -50,7 +50,7 @@ export function HistoriqueScreen() {
 
   const charger = useCallback(async () => {
     setLoading(true);
-    const [recent, pending] = await Promise.all([historique(), enAttente()]);
+    const [recent, pending] = await Promise.all([historique(), compterEnAttente()]);
     setItems(recent);
     setPendingCount(pending);
     setLoading(false);
