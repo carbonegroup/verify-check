@@ -12,7 +12,9 @@ import { applyRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/scan — Sprint 2 : flux scan → cours actif → écriture attendance.
- * Corps : { code_qr: string, salle?: string }
+ * Corps : { code_qr: string, salle?: string, cours?: string, preview?: boolean }
+ * preview=true retourne la fiche sans écrire de présence ; une requête normale
+ * enregistre la présence après confirmation de l'agent.
  *
  * Règles métier (vérifiées côté serveur, l'anti-doublon est garanti par l'index
  * unique d'expression en base : 1 présence par élève, par cours, par jour
@@ -22,7 +24,7 @@ import { applyRateLimit } from "@/lib/rate-limit";
  * - salle_invalide : cours actif mais salle différente de celle du portique (409) ;
  * - doublon : présence déjà enregistrée aujourd'hui pour ce cours (409).
  * Le scanner utilise la session admin du poste tablette (aucun rôle anon).
- * Rate limited : 60 requêtes/minute par IP (protection basique).
+ * Rate limited : 120 requêtes/minute par IP (prévisualisation + confirmation).
  */
 
 type CourseRow = {
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Rate limiting : 60 req/min par IP (scans légitimes)
-  const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:scan" });
+  const rl = applyRateLimit(request, { max: 120, windowMs: 60_000, keyPrefix: "api:scan" });
   if (!rl.allowed) {
     return respondJson(
       { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     return respondJson({ error: "corps_invalide" }, { status: 400 });
   }
 
-  const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown };
+  const body = payload as { code_qr?: unknown; salle?: unknown; cours?: unknown; preview?: unknown };
   if (typeof body.code_qr !== "string" || !body.code_qr.trim()) {
     return respondJson({ error: "code_qr_requis" }, { status: 400 });
   }
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
     body.code_qr.trim().length > 64 ||
     (body.salle !== undefined && body.salle !== null && typeof body.salle !== "string") ||
     (body.cours !== undefined && body.cours !== null && typeof body.cours !== "string") ||
+    (body.preview !== undefined && typeof body.preview !== "boolean") ||
     (typeof body.salle === "string" && body.salle.trim().length > 128) ||
     (typeof body.cours === "string" && body.cours.trim().length > 64)
   ) {
@@ -111,6 +114,16 @@ export async function POST(request: NextRequest) {
     return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
 
+  // Nom de classe affiché sur la fiche après lecture du QR.
+  const { data: studentClass, error: classError } = await supabase
+    .from("classes")
+    .select("nom")
+    .eq("id", student.classe_id)
+    .single();
+  if (classError || !studentClass) {
+    return respondJson({ error: "erreur_base" }, { status: 500 });
+  }
+
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
   const { data: courses, error: coursesError } = await supabase
     .from("courses")
@@ -124,7 +137,13 @@ export async function POST(request: NextRequest) {
     isCourseActive(course.heure_debut, course.heure_fin, now)
   );
   if (slotCourses.length === 0) {
-    return respondJson({ error: "pas_de_cours", jour: now.jour, heure: now.heure }, { status: 404 });
+    return respondJson({
+      error: "pas_de_cours",
+      jour: now.jour,
+      heure: now.heure,
+      eleve: student.nom,
+      classe: studentClass.nom,
+    }, { status: 404 });
   }
 
   // 3) Désambiguïsation : salle du portique ou cours explicite. JAMAIS de choix arbitraire.
@@ -134,6 +153,8 @@ export async function POST(request: NextRequest) {
       return respondJson(
         {
           error: selection.error,
+          eleve: student.nom,
+          classe: studentClass.nom,
           candidates: selection.candidates.map((c) => ({
             id: c.id,
             nom: c.nom,
@@ -146,11 +167,33 @@ export async function POST(request: NextRequest) {
       );
     }
     return respondJson(
-      { error: selection.error, salle: (selection as { salle?: string }).salle, cours: (selection as { cours?: string }).cours },
+      {
+        error: selection.error,
+        salle: (selection as { salle?: string }).salle,
+        cours: (selection as { cours?: string }).cours,
+        eleve: student.nom,
+        classe: studentClass.nom,
+      },
       { status: 409 }
     );
   }
   const course = selection.course;
+
+  // Prévisualisation : retourne les informations réelles de la carte sans
+  // écrire de présence. L'agent doit confirmer explicitement dans l'app mobile.
+  if (body.preview === true) {
+    return respondJson(
+      {
+        ok: true,
+        preview: true,
+        eleve: student.nom,
+        classe: studentClass.nom,
+        cours: course.nom,
+        cours_id: course.id,
+      },
+      { status: 200 }
+    );
+  }
 
   // 4) Écriture — la politique RLS et l'index unique garantissent les droits
   // admin et un seul pointage par élève/cours/journée scolaire.
@@ -162,7 +205,15 @@ export async function POST(request: NextRequest) {
   if (insertError) {
     if (insertError.code === "23505") {
       return respondJson(
-        { error: "doublon", course: course.nom, jour: now.jour },
+        {
+          error: "doublon",
+          course: course.nom,
+          cours: course.nom,
+          cours_id: course.id,
+          eleve: student.nom,
+          classe: studentClass.nom,
+          jour: now.jour,
+        },
         { status: 409 }
       );
     }
@@ -173,7 +224,9 @@ export async function POST(request: NextRequest) {
     {
       ok: true,
       eleve: student.nom,
+      classe: studentClass.nom,
       cours: course.nom,
+      cours_id: course.id,
       presence,
       jour_local: now.jour,
     },

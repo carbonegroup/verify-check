@@ -90,18 +90,43 @@ export async function getDashboard(
 }
 
 /**
+ * Prévisualise une carte sans enregistrer de présence.
+ * La validation effective reste dans pointer(), après confirmation de l'agent.
+ */
+export async function previsualiserScan(
+  codeQr: string,
+  selection?: { coursId: string; coursNom: string; salle?: string }
+): Promise<ScanEtat> {
+  const payload = {
+    code_qr: codeQr.toUpperCase(),
+    preview: true,
+    ...(selection?.coursId ? { cours: selection.coursId } : {}),
+    ...(selection?.salle ? { salle: selection.salle } : {}),
+  };
+  try {
+    const { status, body } = await api<Parameters<typeof mapScanResponse>[1]>("/api/scan", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return mapScanResponse(status, body);
+  } catch {
+    return { kind: "hors_ligne", fileId: "" };
+  }
+}
+
+/**
  * Pointage réel. Ne renvoie jamais « confirmée » sans réponse serveur :
  * - réponse 201 → confirmée ;
  * - réseau indisponible / erreur serveur → `hors_ligne` (mis en file EN ATTENTE).
  */
 export async function pointer(
   codeQr: string,
-  selection: { coursId: string; coursNom: string; salle?: string }
+  selection?: { coursId: string; coursNom: string; salle?: string }
 ): Promise<ScanEtat> {
   const payload = {
     code_qr: codeQr.toUpperCase(),
-    cours: selection.coursId,
-    ...(selection.salle ? { salle: selection.salle } : {}),
+    ...(selection?.coursId ? { cours: selection.coursId } : {}),
+    ...(selection?.salle ? { salle: selection.salle } : {}),
   };
   try {
     const { status, body } = await api<Parameters<typeof mapScanResponse>[1]>("/api/scan", {
@@ -122,6 +147,7 @@ export async function pointer(
 /** Rejoue un pointage en file (synchronisation). */
 export async function rejouerPointage(item: FileItem): Promise<"confirme" | "doublon" | "rejete_definitif" | "reessayer"> {
   try {
+    if (!item.cours) return "reessayer";
     const payload = {
       code_qr: item.code_qr,
       cours: item.cours,

@@ -44,10 +44,14 @@ code, cours actif, anti-doublon.
 - `GET /api/dashboard?date&classe&cours&eleve` — données réelles du jour.
 - `GET /api/dashboard/export?date&classe&cours` — CSV absences (cours terminés
   ou journée passée uniquement).
-- `POST /api/scan {code_qr, salle?}` — **correction** : plus de choix
-  arbitraire. Si plusieurs cours actifs sans désambiguïsation → `cours_ambigu`
-  (l'agent choisit la salle/le cours dans son contexte). Accepte désormais
-  `{cours: id}` optionnel pour les portiques qui sélectionnent le cours.
+- `POST /api/scan {code_qr, salle?, cours?, preview?}` — le QR identifie
+  l'élève et sa classe. Avec `preview: true`, le serveur renvoie les
+  informations de la carte et le cours actif sans écrire de présence. Un cours
+  actif unique est proposé ; si plusieurs cours sont actifs, le serveur renvoie
+  `cours_ambigu` et les candidats pour un choix **après** le scan. L'application
+  mobile envoie ensuite une requête normale pour confirmer le pointage.
+  `cours` reste optionnel pour les portiques ou pour confirmer un candidat.
+  Aucun cours n'est choisi arbitrairement.
 - `GET /api/scan/context` — **nouveau** : classes, cours du jour avec heures et
   statut actif (source de l'écran de contexte). Auth admin requise.
 

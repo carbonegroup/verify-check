@@ -3,24 +3,56 @@ import assert from "node:assert/strict";
 import { mapScanResponse, doitMettreEnFile } from "../src/lib/scanStatus.ts";
 
 test("mapScanResponse : 201 → confirmée avec élève et cours", () => {
-  const etat = mapScanResponse(201, { ok: true, eleve: "Alpha Barry", cours: "Mathématiques" });
+  const etat = mapScanResponse(201, {
+    ok: true,
+    eleve: "Alpha Barry",
+    classe: "Licence 2",
+    cours: "Mathématiques",
+    cours_id: "course-1",
+  });
   assert.equal(etat.kind, "confirmee");
   assert.ok(etat.kind === "confirmee" && etat.eleve === "Alpha Barry");
+  assert.ok(etat.kind === "confirmee" && etat.classe === "Licence 2");
+  assert.ok(etat.kind === "confirmee" && etat.coursId === "course-1");
+});
+
+test("mapScanResponse : 200 preview → carte reconnue sans confirmer la présence", () => {
+  const etat = mapScanResponse(200, {
+    ok: true,
+    preview: true,
+    eleve: "Alpha Barry",
+    classe: "Licence 2",
+    cours: "Mathématiques",
+    cours_id: "course-1",
+  });
+  assert.equal(etat.kind, "previsualisation");
+  assert.ok(etat.kind === "previsualisation" && etat.eleve === "Alpha Barry");
+  assert.ok(etat.kind === "previsualisation" && etat.classe === "Licence 2");
+  assert.ok(etat.kind === "previsualisation" && etat.coursId === "course-1");
 });
 
 test("mapScanResponse : doublon, QR invalide, pas de cours", () => {
   assert.equal(mapScanResponse(409, { error: "doublon" }).kind, "doublon");
   assert.equal(mapScanResponse(404, { error: "qr_invalide" }).kind, "qr_invalide");
-  const pdc = mapScanResponse(404, { error: "pas_de_cours", heure: "10:30" });
+  const pdc = mapScanResponse(404, {
+    error: "pas_de_cours",
+    heure: "10:30",
+    eleve: "Alpha Barry",
+    classe: "Licence 2",
+  });
   assert.ok(pdc.kind === "pas_de_cours" && pdc.heure === "10:30");
+  assert.ok(pdc.kind === "pas_de_cours" && pdc.eleve === "Alpha Barry" && pdc.classe === "Licence 2");
 });
 
 test("mapScanResponse : ambiguïté conservée avec les candidats (jamais de choix arbitraire)", () => {
   const etat = mapScanResponse(409, {
     error: "cours_ambigu",
-    candidates: [{ id: "a", nom: "Maths", salle: "B12" }, { id: "b", nom: "Physique", salle: null }],
+    eleve: "Alpha Barry",
+    classe: "Licence 2",
+    candidates: [{ id: "a", nom: "Maths", salle: "B12", heure_debut: "08:00", heure_fin: "09:00" }, { id: "b", nom: "Physique", salle: null }],
   });
   assert.ok(etat.kind === "cours_ambigu" && etat.candidates.length === 2);
+  assert.ok(etat.kind === "cours_ambigu" && etat.eleve === "Alpha Barry" && etat.classe === "Licence 2");
 });
 
 test("mapScanResponse : session expirée et erreur serveur", () => {
@@ -30,6 +62,7 @@ test("mapScanResponse : session expirée et erreur serveur", () => {
 
 test("doitMettreEnFile : uniquement réessayable, jamais rejet définitif ni confirmé (politique en DIRECT)", () => {
   assert.ok(doitMettreEnFile({ kind: "erreur_serveur" }));
+  assert.ok(!doitMettreEnFile({ kind: "previsualisation" }));
   assert.ok(!doitMettreEnFile({ kind: "confirmee" }));
   assert.ok(!doitMettreEnFile({ kind: "doublon" }));
   assert.ok(!doitMettreEnFile({ kind: "session_expiree" }));

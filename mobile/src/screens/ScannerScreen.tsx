@@ -13,12 +13,17 @@ import {
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { enregistrerScan } from "../store/scan";
+import { enregistrerScan, mettreEnAttente } from "../store/scan";
+import { previsualiserScan } from "../services/api";
 import { theme } from "../theme";
 import type { ScanEtat } from "../lib/scanStatus";
-import type { Selection } from "./AccueilScreen";
 
 const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleur: string }> = {
+  previsualisation: {
+    titre: "Carte reconnue",
+    detail: "Vérifie les informations de la carte avant de confirmer le pointage.",
+    couleur: theme.accent,
+  },
   confirmee: {
     titre: "Présence confirmée",
     detail: "Le serveur a validé la présence de cet élève.",
@@ -60,8 +65,8 @@ const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleu
     couleur: theme.danger,
   },
   hors_ligne: {
-    titre: "En attente de synchronisation",
-    detail: "Le scan a été conservé sur cet appareil. Il ne sera confirmé qu’après validation du serveur.",
+    titre: "Scan conservé — connexion requise",
+    detail: "Aucune présence n’est confirmée. Reconnecte-toi puis rescane cette carte pour déterminer le cours et valider la présence.",
     couleur: theme.warn,
   },
   deja_en_attente: {
@@ -75,90 +80,94 @@ type ResultatAffiche = {
   kind: ScanEtat["kind"];
   code: string;
   eleve?: string;
+  classe?: string;
   cours?: string;
   heure?: string;
+  candidates?: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }>;
+  selection?: { coursId: string; coursNom: string; salle?: string };
 };
 
-export function ScannerScreen({
-  selection,
-  onSessionExpiree,
-  onChooseSession,
-}: {
-  selection: Selection | null;
-  onSessionExpiree: () => void;
-  onChooseSession: () => void;
-}) {
+export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => void }) {
   const [permission, requestPermission] = useCameraPermissions();
+  const permissionDemandee = useRef(false);
   const [cameraErreur, setCameraErreur] = useState(false);
-  const [dernierScan, setDernierScan] = useState<{
-    cleSelection: string;
-    resultat: ResultatAffiche;
-  } | null>(null);
+  const [resultat, setResultat] = useState<ResultatAffiche | null>(null);
   const [busy, setBusy] = useState(false);
   const scanBloque = useRef(false);
-  const cleSelection = JSON.stringify([selection?.coursId ?? null, selection?.salle ?? null]);
-  const resultat =
-    dernierScan?.cleSelection === cleSelection ? dernierScan.resultat : null;
 
   useEffect(() => {
-    scanBloque.current = false;
-  }, [cleSelection]);
+    if (permission && !permission.granted && permission.canAskAgain && !permissionDemandee.current) {
+      permissionDemandee.current = true;
+      void requestPermission();
+    }
+  }, [permission, requestPermission]);
 
-  const scanner = useCallback(async (code: string) => {
+  const scanner = useCallback(async (
+    code: string,
+    selection?: { coursId: string; coursNom: string; salle?: string }
+  ) => {
     const value = code.trim().toUpperCase();
-    if (!value || !selection || busy || scanBloque.current) return;
+    if (!value || busy || scanBloque.current) return;
 
     // Bloque immédiatement les événements caméra répétés pour le même QR.
     scanBloque.current = true;
     setBusy(true);
 
     try {
-      const response = await enregistrerScan(value, {
-        coursId: selection.coursId,
-        coursNom: selection.coursNom,
-        salle: selection.salle,
-      });
-
-      const affiche: ResultatAffiche = { kind: response.kind, code: value };
-      if (response.kind === "confirmee") {
-        affiche.eleve = response.eleve;
-        affiche.cours = response.cours;
+      let response = await previsualiserScan(value, selection);
+      if (response.kind === "hors_ligne" || response.kind === "erreur_serveur") {
+        response = await mettreEnAttente(value, selection);
       }
+      const affiche: ResultatAffiche = { kind: response.kind, code: value };
+      if ("eleve" in response) affiche.eleve = response.eleve;
+      if ("classe" in response) affiche.classe = response.classe;
+      if ("cours" in response) affiche.cours = response.cours;
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
-      setDernierScan({ cleSelection, resultat: affiche });
+      if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
+      if (response.kind === "previsualisation") {
+        affiche.selection = selection ?? (
+          response.coursId && response.cours
+            ? { coursId: response.coursId, coursNom: response.cours }
+            : undefined
+        );
+      }
+      setResultat(affiche);
 
       if (response.kind === "session_expiree") onSessionExpiree();
     } catch {
-      setDernierScan({
-        cleSelection,
-        resultat: { kind: "erreur_serveur", code: value },
-      });
+      setResultat({ kind: "erreur_serveur", code: value });
     } finally {
       setBusy(false);
     }
-  }, [busy, cleSelection, onSessionExpiree, selection]);
+  }, [busy, onSessionExpiree]);
 
   const gererCodeBarres = useCallback((value: { data: string }) => {
     void scanner(value.data);
   }, [scanner]);
 
-  function scannerSuivant() {
-    setDernierScan(null);
-    scanBloque.current = false;
-  }
+  const confirmerPointage = useCallback(async () => {
+    if (!resultat || resultat.kind !== "previsualisation" || busy) return;
+    setBusy(true);
+    try {
+      const response = await enregistrerScan(resultat.code, resultat.selection);
+      const affiche: ResultatAffiche = { kind: response.kind, code: resultat.code };
+      if ("eleve" in response) affiche.eleve = response.eleve;
+      if ("classe" in response) affiche.classe = response.classe;
+      if ("cours" in response) affiche.cours = response.cours;
+      if (response.kind === "pas_de_cours") affiche.heure = response.heure;
+      if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
+      setResultat(affiche);
+      if (response.kind === "session_expiree") onSessionExpiree();
+    } catch {
+      setResultat({ kind: "erreur_serveur", code: resultat.code });
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, onSessionExpiree, resultat]);
 
-  if (!selection) {
-    return (
-      <View style={s.empty}>
-        <View style={s.emptyCard}>
-          <Text style={s.emptyTitle}>Aucune séance sélectionnée</Text>
-          <Text style={s.body}>Choisis une classe et un cours avant de démarrer le scanner.</Text>
-          <TouchableOpacity style={s.primary} onPress={onChooseSession} accessibilityRole="button">
-            <Text style={s.primaryText}>Choisir une séance</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  function scannerSuivant() {
+    setResultat(null);
+    scanBloque.current = false;
   }
 
   if (!permission) {
@@ -176,11 +185,8 @@ export function ScannerScreen({
         <View style={s.permissionCard}>
           <Text style={s.resultTitle}>Accès à la caméra requis</Text>
           <Text style={s.body}>
-            VerifyCheck utilise la caméra uniquement pour lire les QR codes des cartes élèves.
+            L’autorisation système a été refusée. Active l’accès à la caméra dans les réglages Android pour scanner les cartes.
           </Text>
-          <TouchableOpacity style={s.primary} onPress={requestPermission}>
-            <Text style={s.primaryText}>Autoriser la caméra</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -188,11 +194,7 @@ export function ScannerScreen({
 
   if (resultat) {
     const meta = LIBELLES[resultat.kind];
-    const confirme = resultat.kind === "confirmee";
-    const peutChanger =
-      resultat.kind === "cours_ambigu" ||
-      resultat.kind === "pas_de_cours" ||
-      resultat.kind === "salle_invalide";
+    const confirme = resultat.kind === "confirmee" || resultat.kind === "previsualisation";
 
     return (
       <View style={s.resultScreen}>
@@ -205,32 +207,74 @@ export function ScannerScreen({
           <Text style={[s.resultTitle, { color: meta.couleur }]}>{meta.titre}</Text>
           <Text style={s.body}>{meta.detail}</Text>
 
-          {resultat.eleve ? (
+          {resultat.eleve || resultat.classe || resultat.cours ? (
             <View style={s.studentBlock}>
-              <Text style={s.fieldLabel}>ÉLÈVE</Text>
-              <Text style={s.studentName}>{resultat.eleve}</Text>
-              <Text style={s.fieldLabel}>COURS</Text>
-              <Text style={s.fieldValue}>{resultat.cours || selection.coursNom}</Text>
+              {resultat.eleve ? <><Text style={s.fieldLabel}>ÉLÈVE</Text><Text style={s.studentName}>{resultat.eleve}</Text></> : null}
+              {resultat.classe ? <><Text style={s.fieldLabel}>CLASSE</Text><Text style={s.fieldValue}>{resultat.classe}</Text></> : null}
+              {resultat.cours ? <><Text style={s.fieldLabel}>COURS</Text><Text style={s.fieldValue}>{resultat.cours}</Text></> : null}
             </View>
           ) : null}
 
-          <View style={s.codeBlock}>
-            <Text style={s.fieldLabel}>CODE SCANNÉ</Text>
-            <Text style={s.codeText}>{resultat.code}</Text>
-          </View>
+          {resultat.candidates?.length ? (
+            <View style={s.candidateList}>
+              <Text style={s.fieldLabel}>PLUSIEURS COURS SONT ACTIFS — CHOISIS LE BON</Text>
+              {resultat.candidates.map((candidate) => (
+                <TouchableOpacity
+                  key={candidate.id}
+                  style={s.candidate}
+                  onPress={() => {
+                    scanBloque.current = false;
+                    void scanner(resultat.code, { coursId: candidate.id, coursNom: candidate.nom });
+                  }}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
+                  <View style={s.candidateCopy}>
+                    <Text style={s.candidateName}>{candidate.nom}</Text>
+                    <Text style={s.candidateMeta}>
+                      {candidate.heure_debut && candidate.heure_fin
+                        ? candidate.heure_debut.slice(0, 5) + "–" + candidate.heure_fin.slice(0, 5)
+                        : "Cours actif"}
+                      {candidate.salle ? " · " + candidate.salle : ""}
+                    </Text>
+                  </View>
+                  <Text style={s.candidateArrow}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
 
           {resultat.heure ? (
             <Text style={s.body}>Heure serveur : {resultat.heure}</Text>
           ) : null}
 
-          <TouchableOpacity style={s.primary} onPress={scannerSuivant} accessibilityRole="button">
-            <Text style={s.primaryText}>Scanner le suivant</Text>
-          </TouchableOpacity>
-          {peutChanger ? (
-            <TouchableOpacity style={s.secondary} onPress={onChooseSession}>
-              <Text style={s.secondaryText}>Changer de séance</Text>
+          {resultat.kind === "previsualisation" ? (
+            <>
+              <TouchableOpacity
+                style={s.primary}
+                onPress={() => void confirmerPointage()}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.white} />
+                ) : (
+                  <Text style={s.primaryText}>Confirmer le pointage</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.secondary} onPress={scannerSuivant} disabled={busy}>
+                <Text style={s.secondaryText}>Annuler / Scanner suivant</Text>
+              </TouchableOpacity>
+            </>
+          ) : resultat.kind !== "cours_ambigu" ? (
+            <TouchableOpacity style={s.primary} onPress={scannerSuivant} accessibilityRole="button">
+              <Text style={s.primaryText}>Scanner le suivant</Text>
             </TouchableOpacity>
-          ) : null}
+          ) : (
+            <TouchableOpacity style={s.secondary} onPress={scannerSuivant}>
+              <Text style={s.secondaryText}>Annuler ce scan</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -355,8 +399,12 @@ const s = StyleSheet.create({
   fieldLabel: { color: theme.inkSoft, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
   studentName: { color: theme.ink, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   fieldValue: { color: theme.ink, fontSize: 14, fontWeight: "600" },
-  codeBlock: { width: "100%", gap: 5, paddingTop: 5 },
-  codeText: { color: theme.ink, fontSize: 13, fontFamily: "monospace" },
+  candidateList: { width: "100%", gap: 8 },
+  candidate: { minHeight: 56, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: theme.line, borderRadius: 9, backgroundColor: "#F3F6FA" },
+  candidateCopy: { flex: 1, gap: 4 },
+  candidateName: { color: theme.ink, fontSize: 14, fontWeight: "700" },
+  candidateMeta: { color: theme.inkSoft, fontSize: 12 },
+  candidateArrow: { color: theme.accent, fontSize: 24, fontWeight: "700" },
   primary: {
     width: "100%",
     minHeight: 48,
@@ -369,9 +417,6 @@ const s = StyleSheet.create({
   primaryText: { color: theme.white, fontSize: 14, fontWeight: "700" },
   secondary: { minHeight: 40, alignItems: "center", justifyContent: "center" },
   secondaryText: { color: theme.accent, fontSize: 13, fontWeight: "700" },
-  empty: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: theme.paper },
-  emptyCard: { gap: 14, padding: 22, borderRadius: 14, backgroundColor: theme.white },
-  emptyTitle: { color: theme.ink, fontSize: 20, fontWeight: "800" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: theme.paper },
   permissionCard: {
     width: "100%",

@@ -41,49 +41,78 @@ const asyncStore: FileStore = {
 const uid = () =>
   "m-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 
+export async function mettreEnAttente(
+  codeQr: string,
+  selection?: { coursId: string; coursNom: string; salle?: string }
+): Promise<ScanEtat> {
+  const items = await asyncStore.load();
+  const coursId = selection?.coursId ?? "";
+  if (dejaEnAttente(items, codeQr, coursId || undefined)) {
+    return { kind: "deja_en_attente" };
+  }
+
+  const entry: FileItem = {
+    ...nouvelleEntree(uid(), {
+      code_qr: codeQr,
+      cours: coursId,
+      salle: selection?.salle,
+      at: new Date().toISOString(),
+    }),
+    cours_nom: selection?.coursNom,
+  };
+  await asyncStore.save([...items, entry]);
+  emitChange();
+  return { kind: "hors_ligne", fileId: entry.id };
+}
+
 export async function enregistrerScan(
   codeQr: string,
-  selection: { coursId: string; coursNom: string; salle?: string }
+  selection?: { coursId: string; coursNom: string; salle?: string }
 ): Promise<ScanEtat> {
   const etat = await pointer(codeQr, selection);
   const items = await asyncStore.load();
+  const coursId = selection?.coursId ?? "";
 
   if (etat.kind === "hors_ligne" || etat.kind === "erreur_serveur") {
-    if (dejaEnAttente(items, codeQr, selection.coursId)) {
-      return { kind: "deja_en_attente" };
-    }
-
-    const entry: FileItem = {
-      ...nouvelleEntree(uid(), {
-        code_qr: codeQr,
-        cours: selection.coursId,
-        salle: selection.salle,
-        at: new Date().toISOString(),
-      }),
-      cours_nom: selection.coursNom,
-    };
-
-    await asyncStore.save([...items, entry]);
-    emitChange();
-    return { kind: "hors_ligne", fileId: entry.id };
+    return mettreEnAttente(codeQr, selection);
   }
 
   // L'historique doit conserver aussi les pointages confirmés en ligne.
   // Un doublon serveur n'est pas un nouveau pointage et n'ajoute donc pas
   // une seconde ligne au registre local.
-  if (etat.kind === "confirmee") {
-    const entry: FileItem = {
-      ...nouvelleEntree(uid(), {
-        code_qr: codeQr,
-        cours: selection.coursId,
-        salle: selection.salle,
-        at: new Date().toISOString(),
-      }),
-      etat: "confirme",
-      eleve: etat.eleve,
-      cours_nom: etat.cours ?? selection.coursNom,
-    };
-    await asyncStore.save([...items, entry]);
+  if (etat.kind === "confirmee" || etat.kind === "doublon") {
+    const courseId = etat.coursId ?? coursId;
+    const unresolved = items.map((item) =>
+      item.etat === "en_attente" && !item.cours && item.code_qr === codeQr.toUpperCase()
+        ? {
+            ...item,
+            cours: courseId,
+            cours_nom: etat.cours ?? selection?.coursNom,
+            eleve: etat.eleve,
+            at: new Date().toISOString(),
+            etat: "confirme" as const,
+            note: "résolu après validation serveur lors d'un nouveau scan",
+          }
+        : item
+    );
+    const alreadyResolved = unresolved.some(
+      (item) => item.etat === "confirme" && item.code_qr === codeQr.toUpperCase() && item.cours === courseId
+    );
+    if (!alreadyResolved && etat.kind === "confirmee") {
+      const entry: FileItem = {
+        ...nouvelleEntree(uid(), {
+          code_qr: codeQr,
+          cours: courseId,
+          salle: selection?.salle,
+          at: new Date().toISOString(),
+        }),
+        etat: "confirme",
+        eleve: etat.eleve,
+        cours_nom: etat.cours ?? selection?.coursNom,
+      };
+      unresolved.push(entry);
+    }
+    await asyncStore.save(unresolved);
     emitChange();
   }
 
