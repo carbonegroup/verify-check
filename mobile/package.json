@@ -44,7 +44,7 @@
       "minimatch": "11.0.1"
     },
     "fast-xml-parser": "5.12.0",
-    "image-size": "2.1.0",
+    "image-size": "npm:image-size-next@1.2.2",
     "postcss": "8.5.23",
     "send": "0.19.2",
     "tar": "7.5.23",
