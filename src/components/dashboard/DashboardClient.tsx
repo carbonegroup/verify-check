@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- Supabase Storage URLs are runtime-generated; QR images use the same-origin API. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -786,6 +785,7 @@ export default function DashboardClient() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div className={styles.studentAvatar}>
                             {photoUrl ? (
+                              {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
                               <img
                                 src={photoUrl}
                                 alt={`${e.nom}`}
@@ -920,6 +920,7 @@ export default function DashboardClient() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div className={styles.studentAvatar}>
                                   {photoUrl ? (
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
                                     <img
                                       src={photoUrl}
                                       alt={`${l.eleve}`}
@@ -1129,6 +1130,7 @@ function CartesQR({
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                   <div className={`${styles.studentAvatar} ${styles.studentAvatarLarge}`}>
                     {photoUrl ? (
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Runtime Supabase Storage URL. */}
                       <img
                         src={photoUrl}
                         alt={`${e.nom}`}
