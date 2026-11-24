@@ -69,6 +69,10 @@ export default function App() {
     }
   }, []);
 
+  const sessionExpiree = useCallback(() => {
+    void deconnexion();
+  }, [deconnexion]);
+
   const ouvrirMenuCompte = useCallback(() => {
     const actions = [];
     if (selection) {
@@ -137,7 +141,7 @@ export default function App() {
         {onglet === "scanner" ? (
           <ScannerScreen
             selection={selection}
-            onSessionExpiree={() => void deconnexion()}
+            onSessionExpiree={sessionExpiree}
             onChooseSession={() => setChoixOuvert(true)}
           />
         ) : null}
@@ -172,7 +176,7 @@ export default function App() {
         current={selection}
         onClose={() => setChoixOuvert(false)}
         onSelect={choisirSeance}
-        onSessionExpiree={() => void deconnexion()}
+        onSessionExpiree={sessionExpiree}
       />
     </SafeAreaView>
   );
