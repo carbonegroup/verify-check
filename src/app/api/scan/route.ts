@@ -24,7 +24,7 @@ import { applyRateLimit } from "@/lib/rate-limit";
  * - salle_invalide : cours actif mais salle différente de celle du portique (409) ;
  * - doublon : présence déjà enregistrée aujourd'hui pour ce cours (409).
  * Le scanner utilise la session admin du poste tablette (aucun rôle anon).
- * Rate limited : 60 requêtes/minute par IP (protection basique).
+ * Rate limited : 120 requêtes/minute par IP (prévisualisation + confirmation).
  */
 
 type CourseRow = {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Rate limiting : 60 req/min par IP (scans légitimes)
-  const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:scan" });
+  const rl = applyRateLimit(request, { max: 120, windowMs: 60_000, keyPrefix: "api:scan" });
   if (!rl.allowed) {
     return respondJson(
       { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
