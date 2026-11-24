@@ -116,12 +116,6 @@ const CATEGORIE_LABEL: Record<string, string> = {
   autre: "Autre",
 };
 
-const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: TIME_ZONE,
-});
-
 const dateLabelFormatter = new Intl.DateTimeFormat("fr-FR", {
   weekday: "long",
   day: "numeric",
