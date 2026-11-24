@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import styles from "./Dashboard.module.css";
+import Shell from "./Shell";
 
 /**
  * Dashboard direction — données RÉELLES via GET /api/dashboard.
  * Distinction métier : présent (scan serveur) / non pointé (cours non terminé)
  * / absent (cours terminé sans scan). Jamais de mock en production.
+ * Habillage Enterprise Light (docs/design-brief.md + direction visuelle retenue).
  */
 
 const TIME_ZONE = "Africa/Conakry";
@@ -44,17 +46,6 @@ type DashboardData = {
 };
 
 type Vue = "general" | "absences" | "classes" | "cours" | "eleves" | "cartes" | "scolarite" | "comptabilite";
-
-const VUES: { id: Vue; label: string }[] = [
-  { id: "general", label: "Vue générale" },
-  { id: "absences", label: "Absences" },
-  { id: "classes", label: "Classes" },
-  { id: "cours", label: "Cours" },
-  { id: "eleves", label: "Élèves" },
-  { id: "cartes", label: "Cartes QR" },
-  { id: "scolarite", label: "Scolarité" },
-  { id: "comptabilite", label: "Comptabilité" },
-];
 
 type StatutFrais = "regle" | "partiel" | "impaye" | "sans-frais";
 type ScolariteLigne = {
@@ -151,9 +142,9 @@ function nowConakry(): { jour: string; minutes: number } {
   return { jour: todayConakry(), minutes: nowMinutesConakry() };
 }
 
-function statutClass(statut: StatutPresence, s: Record<string, string>): string {
+function statutClass(statut: StatutPresence): string {
   const key = statut === "non-pointe" ? "nonPointe" : statut;
-  return `${styles.pastille} ${s[key] ?? ""}`;
+  return `${styles.pastille} ${key}`;
 }
 
 /** Réutilise les couleurs de pastille existantes pour les statuts de frais. */
@@ -166,10 +157,11 @@ const SCOLARITE_CLASS: Record<StatutFrais, string> = {
 
 function statutFraisClass(statut: StatutFrais): string {
   const key = SCOLARITE_CLASS[statut];
-  return `${styles.pastille} ${(styles as Record<string, string>)[key] ?? ""}`;
+  return `${styles.pastille} ${key}`;
 }
 
 export default function DashboardClient() {
+  const router = useRouter();
   const [vue, setVue] = useState<Vue>("general");
   const [date, setDate] = useState(todayConakry());
   const [classe, setClasse] = useState<string>("");
@@ -191,13 +183,10 @@ export default function DashboardClient() {
 
   // Connectivité faible : on mémorise en mémoire les réponses financières déjà
   // obtenues pour ne pas les retélécharger à chaque va-et-vient entre vues.
-  // Un « Réessayer » invalide l'entrée concernée et force un rafraîchissement.
   const scolariteCache = useRef(new Map<string, ScolariteData>());
   const comptabiliteCache = useRef(new Map<string, ComptabiliteData>());
   const [scolariteReload, setScolariteReload] = useState(0);
   const [comptabiliteReload, setComptabiliteReload] = useState(0);
-
-  const router = useRouter();
 
   const load = useCallback(async () => {
     const cancelledRef = { current: false };
@@ -402,34 +391,36 @@ export default function DashboardClient() {
   );
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
 
+  const changementVue = useCallback((id: Vue) => {
+    setVue(id);
+    // Réinitialise le filtrage par cours quand on change de vue (évite un cours
+    // filtré mais masqué qui rendrait la vue confuse).
+    setCours("");
+  }, []);
+
   return (
-    <div className={styles.root}>
-      <header className={styles.header}>
-        <div>
-          <div className={styles.brand}>VerifyCheck</div>
-          <p className={styles.subtitle}>
-            {dateLabel} · {TIME_ZONE}
-          </p>
-        </div>
+    <Shell vue={vue} onViewChange={changementVue}>
+      {/* ---------------------------------------------------- Filtres globaux */}
+      {data && !loading && (
         <div className={styles.filters}>
           <label>
-            Date
+            <span>Date</span>
             <input type="date" value={date} max={todayConakry()} onChange={(e) => setDate(e.target.value)} />
           </label>
           <label>
-            Classe
+            <span>Classe</span>
             <select value={classe} onChange={(e) => { setClasse(e.target.value); setCours(""); }}>
               <option value="">Toutes</option>
-              {(data?.classes ?? []).map((c) => (
+              {data.classes.map((c) => (
                 <option key={c.id} value={c.id}>{c.nom}</option>
               ))}
             </select>
           </label>
           <label>
-            Cours
+            <span>Cours</span>
             <select value={cours} onChange={(e) => setCours(e.target.value)}>
               <option value="">Tous</option>
-              {(data?.cours_disponibles ?? [])
+              {data.cours_disponibles
                 .filter((c) => !classe || c.classe_id === classe)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
@@ -438,26 +429,16 @@ export default function DashboardClient() {
                 ))}
             </select>
           </label>
+          <a className={styles.button} href={exportUrl}>
+            Exporter (CSV)
+          </a>
         </div>
-      </header>
-
-      <nav className={styles.nav} aria-label="Sections">
-        {VUES.map((v) => (
-          <button
-            key={v.id}
-            className={vue === v.id ? styles.navOn : ""}
-            onClick={() => setVue(v.id)}
-            aria-current={vue === v.id ? "page" : undefined}
-          >
-            {v.label}
-          </button>
-        ))}
-      </nav>
+      )}
 
       {error && (
         <p className={styles.error} role="alert">
           {error}
-          <button type="button" className={styles.retry} onClick={() => load()}>
+          <button type="button" className={styles.buttonSmall} onClick={() => load()}>
             Réessayer
           </button>
         </p>
@@ -491,8 +472,12 @@ export default function DashboardClient() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Classe</th><th>Cours</th><th>Salle</th><th>Heure</th>
-                    <th>Présents</th><th>Absents (cours terminé)</th>
+                    <th>Classe</th>
+                    <th>Cours</th>
+                    <th>Salle</th>
+                    <th>Heure</th>
+                    <th>Présents</th>
+                    <th>Absents (cours terminé)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -517,13 +502,22 @@ export default function DashboardClient() {
                     );
                   })}
                   {data.cours_prevus.length === 0 && (
-                    <tr><td colSpan={6} className={styles.empty}>Aucun cours prévu ce jour.</td></tr>
+                    <tr>
+                      <td colSpan={6} className={styles.empty}>
+                        Aucun cours prévu ce jour.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
 
               <p className={styles.actionsRow}>
-                <a className={styles.button} href={exportUrl}>Exporter les absences (CSV)</a>
+                <a className={styles.button} href={exportUrl}>
+                  Exporter les absences (CSV)
+                </a>
+                <button className={styles.buttonOutline} onClick={() => window.print()}>
+                  Imprimer
+                </button>
               </p>
             </>
           )}
@@ -535,7 +529,7 @@ export default function DashboardClient() {
                 <a className={styles.button} href={exportUrl}>
                   Exporter en CSV
                 </a>
-                <button className={styles.button} onClick={() => window.print()}>
+                <button className={styles.buttonOutline} onClick={() => window.print()}>
                   Imprimer la liste
                 </button>
               </div>
@@ -589,7 +583,12 @@ export default function DashboardClient() {
           {vue === "classes" && (
             <table className={styles.table}>
               <thead>
-                <tr><th>Classe</th><th>Élèves</th><th>Présents aujourd&apos;hui</th><th>Cours prévus</th></tr>
+                <tr>
+                  <th>Classe</th>
+                  <th>Élèves</th>
+                  <th>Présents aujourd’hui</th>
+                  <th>Cours prévus</th>
+                </tr>
               </thead>
               <tbody>
                 {data.classes.map((c) => {
@@ -615,7 +614,13 @@ export default function DashboardClient() {
           {vue === "cours" && (
             <table className={styles.table}>
               <thead>
-                <tr><th>Cours</th><th>Classe</th><th>Heure</th><th>Salle</th><th>Présents</th></tr>
+                <tr>
+                  <th>Cours</th>
+                  <th>Classe</th>
+                  <th>Heure</th>
+                  <th>Salle</th>
+                  <th>Présents</th>
+                </tr>
               </thead>
               <tbody>
                 {data.cours_prevus.map((c) => {
@@ -636,7 +641,11 @@ export default function DashboardClient() {
                   );
                 })}
                 {data.cours_prevus.length === 0 && (
-                  <tr><td colSpan={5} className={styles.empty}>Aucun cours prévu ce jour.</td></tr>
+                  <tr>
+                    <td colSpan={5} className={styles.empty}>
+                      Aucun cours prévu ce jour.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -646,7 +655,13 @@ export default function DashboardClient() {
           {vue === "eleves" && (
             <table className={styles.table}>
               <thead>
-                <tr><th>Élève</th><th>Classe</th><th>Code carte</th><th>Scans</th><th>Historique</th></tr>
+                <tr>
+                  <th>Élève</th>
+                  <th>Classe</th>
+                  <th>Code carte</th>
+                  <th>Scans</th>
+                  <th>Historique</th>
+                </tr>
               </thead>
               <tbody>
                 {eleveParClasse.map((e) => {
@@ -668,10 +683,7 @@ export default function DashboardClient() {
                           <span className={styles.empty}>Aucun cours prévu.</span>
                         ) : (
                           history.map(({ cours: c, statut, presence }) => (
-                            <span
-                              key={`${e.id}-${c.id}`}
-                              className={statutClass(statut, styles as Record<string, string>)}
-                            >
+                            <span key={`${e.id}-${c.id}`} className={statutClass(statut)}>
                               {c.nom}
                               {presence
                                 ? ` · Présent · ${formatPresenceAt(presence.scanned_at)}`
@@ -684,7 +696,11 @@ export default function DashboardClient() {
                   );
                 })}
                 {eleveParClasse.length === 0 && (
-                  <tr><td colSpan={5} className={styles.empty}>Aucun élève pour ce filtre.</td></tr>
+                  <tr>
+                    <td colSpan={5} className={styles.empty}>
+                      Aucun élève pour ce filtre.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -699,8 +715,8 @@ export default function DashboardClient() {
           {vue === "scolarite" && (
             <>
               <div className={styles.actionsRow}>
-                <label className={styles.inlineFilter}>
-                  Statut
+                <div className={styles.inlineFilter}>
+                  <span>Statut</span>
                   <select
                     value={statutScolarite}
                     onChange={(e) => setStatutScolarite(e.target.value as "" | StatutFrais)}
@@ -711,15 +727,19 @@ export default function DashboardClient() {
                     <option value="regle">Réglés</option>
                     <option value="sans-frais">Sans frais</option>
                   </select>
-                </label>
-                <a className={styles.button} href={scolariteExportUrl}>Exporter en CSV</a>
-                <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
+                </div>
+                <a className={styles.button} href={scolariteExportUrl}>
+                  Exporter en CSV
+                </a>
+                <button className={styles.buttonOutline} onClick={() => window.print()}>
+                  Imprimer
+                </button>
               </div>
 
               {scolariteError && (
                 <p className={styles.error} role="alert">
                   {scolariteError}
-                  <button type="button" className={styles.retry} onClick={retryScolarite}>
+                  <button type="button" className={styles.buttonSmall} onClick={retryScolarite}>
                     Réessayer
                   </button>
                 </p>
@@ -729,10 +749,22 @@ export default function DashboardClient() {
               {scolarite && !scolariteLoading && (
                 <>
                   <section className={styles.resume}>
-                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.attendu_gnf)}</span><span className={styles.kpiLabel}>attendu</span></div>
-                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.regle_gnf)}</span><span className={styles.kpiLabel}>réglé</span></div>
-                    <div><span className={styles.kpi}>{formatGnf(scolarite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde dû</span></div>
-                    <div><span className={styles.kpi}>{Math.round(scolarite.totaux.taux * 100)} %</span><span className={styles.kpiLabel}>recouvrement</span></div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(scolarite.totaux.attendu_gnf)}</span>
+                      <span className={styles.kpiLabel}>attendu</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(scolarite.totaux.regle_gnf)}</span>
+                      <span className={styles.kpiLabel}>réglé</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(scolarite.totaux.solde_gnf)}</span>
+                      <span className={styles.kpiLabel}>solde dû</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{Math.round(scolarite.totaux.taux * 100)} %</span>
+                      <span className={styles.kpiLabel}>recouvrement</span>
+                    </div>
                   </section>
 
                   <h2 className={styles.printTitle}>
@@ -741,7 +773,14 @@ export default function DashboardClient() {
 
                   <table className={styles.table}>
                     <thead>
-                      <tr><th>Élève</th><th>Classe</th><th>Attendu</th><th>Réglé</th><th>Solde</th><th>Statut</th></tr>
+                      <tr>
+                        <th>Élève</th>
+                        <th>Classe</th>
+                        <th>Attendu</th>
+                        <th>Réglé</th>
+                        <th>Solde</th>
+                        <th>Statut</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {scolarite.lignes.map((l) => (
@@ -759,7 +798,11 @@ export default function DashboardClient() {
                         </tr>
                       ))}
                       {scolarite.lignes.length === 0 && (
-                        <tr><td colSpan={6} className={styles.empty}>Aucun élève pour ces filtres.</td></tr>
+                        <tr>
+                          <td colSpan={6} className={styles.empty}>
+                            Aucun élève pour ces filtres.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -772,32 +815,36 @@ export default function DashboardClient() {
           {vue === "comptabilite" && (
             <>
               <div className={styles.actionsRow}>
-                <label className={styles.inlineFilter}>
-                  Du
+                <div className={styles.inlineFilter}>
+                  <span>Du</span>
                   <input
                     type="date"
                     value={periodeFrom}
                     max={periodeTo || undefined}
                     onChange={(e) => setPeriodeFrom(e.target.value)}
                   />
-                </label>
-                <label className={styles.inlineFilter}>
-                  Au
+                </div>
+                <div className={styles.inlineFilter}>
+                  <span>Au</span>
                   <input
                     type="date"
                     value={periodeTo}
                     min={periodeFrom || undefined}
                     onChange={(e) => setPeriodeTo(e.target.value)}
                   />
-                </label>
-                <a className={styles.button} href={comptabiliteExportUrl}>Exporter en CSV</a>
-                <button className={styles.button} onClick={() => window.print()}>Imprimer</button>
+                </div>
+                <a className={styles.button} href={comptabiliteExportUrl}>
+                  Exporter en CSV
+                </a>
+                <button className={styles.buttonOutline} onClick={() => window.print()}>
+                  Imprimer
+                </button>
               </div>
 
               {comptabiliteError && (
                 <p className={styles.error} role="alert">
                   {comptabiliteError}
-                  <button type="button" className={styles.retry} onClick={retryComptabilite}>
+                  <button type="button" className={styles.buttonSmall} onClick={retryComptabilite}>
                     Réessayer
                   </button>
                 </p>
@@ -807,19 +854,40 @@ export default function DashboardClient() {
               {comptabilite && !comptabiliteLoading && (
                 <>
                   <section className={styles.resume}>
-                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.recettes_gnf)}</span><span className={styles.kpiLabel}>recettes</span></div>
-                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.depenses_gnf)}</span><span className={styles.kpiLabel}>dépenses</span></div>
-                    <div><span className={styles.kpi}>{formatGnf(comptabilite.totaux.solde_gnf)}</span><span className={styles.kpiLabel}>solde</span></div>
-                    <div><span className={styles.kpi}>{comptabilite.totaux.nb_ecritures}</span><span className={styles.kpiLabel}>écritures</span></div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(comptabilite.totaux.recettes_gnf)}</span>
+                      <span className={styles.kpiLabel}>recettes</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(comptabilite.totaux.depenses_gnf)}</span>
+                      <span className={styles.kpiLabel}>dépenses</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{formatGnf(comptabilite.totaux.solde_gnf)}</span>
+                      <span className={styles.kpiLabel}>solde</span>
+                    </div>
+                    <div>
+                      <span className={styles.kpi}>{comptabilite.totaux.nb_ecritures}</span>
+                      <span className={styles.kpiLabel}>écritures</span>
+                    </div>
                   </section>
 
                   <h2 className={styles.printTitle}>
-                    Grand livre{periodeFrom || periodeTo ? ` — ${periodeFrom || "début"} → ${periodeTo || "aujourd’hui"}` : ""}
+                    Grand livre{periodeFrom || periodeTo
+                      ? ` — ${periodeFrom || "début"} → ${periodeTo || "aujourd’hui"}`
+                      : ""
+                    }
                   </h2>
 
                   <table className={styles.table}>
                     <thead>
-                      <tr><th>Date</th><th>Type</th><th>Libellé</th><th>Catégorie</th><th>Montant</th></tr>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Libellé</th>
+                        <th>Catégorie</th>
+                        <th>Montant</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {comptabilite.ecritures.map((e) => (
@@ -832,7 +900,11 @@ export default function DashboardClient() {
                         </tr>
                       ))}
                       {comptabilite.ecritures.length === 0 && (
-                        <tr><td colSpan={5} className={styles.empty}>Aucune écriture pour cette période.</td></tr>
+                        <tr>
+                          <td colSpan={5} className={styles.empty}>
+                            Aucune écriture pour cette période.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -842,7 +914,10 @@ export default function DashboardClient() {
                       <h2 className={styles.printTitle}>Dépenses par catégorie</h2>
                       <table className={styles.table}>
                         <thead>
-                          <tr><th>Catégorie</th><th>Montant</th></tr>
+                          <tr>
+                            <th>Catégorie</th>
+                            <th>Montant</th>
+                          </tr>
                         </thead>
                         <tbody>
                           {comptabilite.par_categorie.map((c) => (
@@ -861,7 +936,7 @@ export default function DashboardClient() {
           )}
         </main>
       )}
-    </div>
+    </Shell>
   );
 }
 
@@ -881,11 +956,13 @@ function CartesQR({
   return (
     <section>
       <p className={styles.actionsRow}>
-        <button className={styles.button} onClick={() => window.print()}>
+        <button className={styles.buttonOutline} onClick={() => window.print()}>
           Imprimer la planche ({eleves.length} cartes)
         </button>
       </p>
-      <h2 className={styles.printTitle}>{classeNom ? `Cartes — ${classeNom}` : "Cartes — toutes les classes"}</h2>
+      <h2 className={styles.printTitle}>
+        {classeNom ? `Cartes — ${classeNom}` : "Cartes — toutes les classes"}
+      </h2>
       <div className={styles.cards}>
         {eleves.map((e) => (
           <article key={e.id} className={styles.card}>

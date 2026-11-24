@@ -1,0 +1,9 @@
+/* Page d’accueil — survols des liens (couleurs déjà dans --vc tokens). */
+.primaryLink:hover {
+  background: var(--vc-primary-hover);
+}
+
+.secondaryLink:hover {
+  background: var(--vc-surface-soft);
+  border-color: var(--vc-line-soft);
+}

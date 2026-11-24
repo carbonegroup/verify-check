@@ -1,12 +1,146 @@
-*,
-*::before,
-*::after {
+/**
+ * VerifyCheck — Système de design « Enterprise Light ».
+ *
+ * Tokens utilisés par le dashboard web et réutilisables par les composants.
+ * Aucune couleur magique en dur ailleurs : tout passe par ces variables.
+ *
+ * Palette :
+ *  - fond général   : bleu-gris très clair (#F3F6FA)
+ *  - surfaces       : blanc (#FFFFFF)
+ *  - primaire       : bleu marine (#17365D)
+ *  - secondaire     : bleu (#315B86)
+ *  - succès         : vert (#16835D)  présences confirmées
+ *  - attention      : orange (#A86F12) états en attente
+ *  - danger         : rouge (#BD4545) absences et erreurs
+ *  - bordures       : léger (#E2E8F0)
+ */
+
+:root {
+  /* Fond / surfaces */
+  --vc-bg: #F3F6FA;
+  --vc-surface: #FFFFFF;
+  --vc-surface-soft: #EFF3F7;
+
+  /* Texte */
+  --vc-ink: #162536;
+  --vc-ink-soft: #5B6B7C;
+  --vc-ink-faint: #8B97A5;
+  --vc-ink-on-primary: #FFFFFF;
+
+  /* Primaires */
+  --vc-primary: #17365D;
+  --vc-primary-hover: #0F2A4A;
+  --vc-primary-soft: #E8EEF6;
+
+  /* Secondaire */
+  --vc-secondary: #315B86;
+  --vc-secondary-hover: #274A6E;
+  --vc-secondary-soft: #E8EEF6;
+
+  /* États métier (couleur + texte, jamais la couleur seule) */
+  --vc-success: #16835D;
+  --vc-success-ink: #0B4B37;
+  --vc-success-bg: #EAF6EF;
+  --vc-warn: #A86F12;
+  --vc-warn-ink: #7A4E0D;
+  --vc-warn-bg: #FBF3E4;
+  --vc-danger: #BD4545;
+  --vc-danger-ink: #8B2E2E;
+  --vc-danger-bg: #FBEDED;
+
+  /* Bordures et ombres */
+  --vc-line: #E2E8F0;
+  --vc-line-soft: #CFD6E0;
+  --vc-focus: #315B86;
+  --vc-shadow: 0 1px 3px rgba(22, 37, 54, 0.08), 0 1px 2px rgba(22, 37, 54, 0.06);
+  --vc-shadow-lg: 0 6px 18px rgba(22, 37, 54, 0.10);
+
+  /* Espacements : base 4px -> 4/8/12/16/24/32 */
+  --vc-space-xs: 4px;
+  --vc-space-sm: 8px;
+  --vc-space-md: 12px;
+  --vc-space-lg: 16px;
+  --vc-space-xl: 24px;
+  --vc-space-2xl: 32px;
+
+  /* Rayons : 4px champs/boutons, 8px panneaux, 12px cartes grandes */
+  --vc-radius-sm: 4px;
+  --vc-radius: 8px;
+  --vc-radius-lg: 12px;
+
+  /* Typologie : pile système, zéro requête réseau */
+  --vc-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --vc-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --vc-type-xs: 12px;
+  --vc-type-sm: 14px;
+  --vc-type-base: 16px;
+  --vc-type-lg: 20px;
+  --vc-type-xl: 28px;
+
+  --vc-weight-regular: 400;
+  --vc-weight-semibold: 600;
+  --vc-weight-bold: 700;
+
+  /* Hauteur tactile minimale (accessibilité) */
+  --vc-touch: 44px;
+}
+
+* {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #111;
-  background: #fafafa;
+  color: var(--vc-ink);
+  background: var(--vc-bg);
+  font-family: var(--vc-font);
+  font-size: var(--vc-type-base);
+  font-weight: var(--vc-weight-regular);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--vc-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utilitaires de mise en page */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.visually-hidden:not(:focus):not(:active) {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--vc-font-mono);
 }

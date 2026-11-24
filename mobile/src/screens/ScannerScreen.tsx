@@ -1,8 +1,9 @@
 /**
  * Écran scanner — caméra native (expo-camera), pointage réel via /api/scan.
  * Inclut la saisie manuelle du code (carte abîmée / caméra indisponible),
- * le compteur réel du cours et l'historique local des vérifications.
+ * le compteur réel du cours et l’historique local des vérifications.
  * Aucun état « confirmée » sans réponse du serveur.
+ * Habillage Enterprise Light.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -25,7 +26,7 @@ const LIBELLES: Record<string, { titre: string; detail: string; couleur: string 
   confirmee: {
     titre: "Présence confirmée",
     detail: "Le serveur a validé le pointage.",
-    couleur: theme.accent,
+    couleur: theme.success,
   },
   doublon: {
     titre: "Déjà scanné",
@@ -39,7 +40,7 @@ const LIBELLES: Record<string, { titre: string; detail: string; couleur: string 
   },
   pas_de_cours: {
     titre: "Aucun cours applicable",
-    detail: "Aucun cours actif pour cette classe à l'heure de Conakry.",
+    detail: "Aucun cours actif pour cette classe à l’heure de Conakry.",
     couleur: theme.danger,
   },
   cours_ambigu: {
@@ -49,7 +50,7 @@ const LIBELLES: Record<string, { titre: string; detail: string; couleur: string 
   },
   salle_invalide: {
     titre: "Salle / cours incorrects",
-    detail: "Le cours choisi ne correspond pas à la salle ou n'est pas actif.",
+    detail: "Le cours choisi ne correspond pas à la salle ou n’est pas actif.",
     couleur: theme.warn,
   },
   session_expiree: {
@@ -59,12 +60,12 @@ const LIBELLES: Record<string, { titre: string; detail: string; couleur: string 
   },
   erreur_serveur: {
     titre: "Erreur serveur",
-    detail: "Réponse inattendue — le pointage n'est PAS confirmé. Réessaie.",
+    detail: "Réponse inattendue — le pointage n’est PAS confirmé. Réessaie.",
     couleur: theme.danger,
   },
   hors_ligne: {
     titre: "En attente de synchronisation",
-    detail: "Réseau indisponible — le pointage reste EN ATTENTE jusqu'à confirmation du serveur.",
+    detail: "Réseau indisponible — le pointage reste EN ATTENTE jusqu’à confirmation du serveur.",
     couleur: theme.warn,
   },
   deja_en_attente: {
@@ -83,7 +84,8 @@ export function ScannerScreen({
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraErreur, setCameraErreur] = useState(false);
-  const [etat, setEtat] = useState<{ kind: string; detail?: string } | null>(null);
+  type Affiche = { kind: string; detail: string; couleur: string; eleve?: string };
+const [etat, setEtat] = useState<Affiche | null>(null);
   const [busy, setBusy] = useState(false);
   const [manuel, setManuel] = useState("");
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -117,13 +119,19 @@ export function ScannerScreen({
 
   function afficher(res: ScanEtat) {
     const lib = LIBELLES[res.kind];
+    const couleur = lib?.couleur ?? theme.line;
     const detail =
       res.kind === "confirmee" && res.eleve
         ? `${res.eleve} · ${res.cours ?? selection.coursNom}`
         : res.kind === "pas_de_cours" && res.heure
           ? `${lib?.detail ?? ""} Il est ${res.heure}.`
           : (lib?.detail ?? "");
-    setEtat({ kind: res.kind, detail });
+    setEtat({
+      kind: res.kind,
+      detail,
+      couleur,
+      eleve: res.kind === "confirmee" ? res.eleve : undefined,
+    });
   }
 
   async function onScanCamera(result: { data?: string }) {
@@ -161,6 +169,8 @@ export function ScannerScreen({
       ).length
     : 0;
   const effectif = dashboard?.effectif ?? 0;
+  const stateColor = etat ? etat.couleur : theme.line;
+  const stateTitleColor = etat ? etat.couleur : theme.inkSoft;
 
   return (
     <View style={s.root}>
@@ -179,22 +189,18 @@ export function ScannerScreen({
         <Text style={s.compteurLabel}>présents confirmés (serveur)</Text>
       </View>
 
-      {/* Résultat du scan — affiché avec couleur + texte obligatoire */}
-      <View style={[
-        s.resultat,
-        { borderColor: etat ? LIBELLES[etat.kind]?.couleur ?? theme.line : theme.line },
-        { marginTop: 12 },
-      ]}>
-        <Text style={[s.resultatTitre, { color: etat ? LIBELLES[etat.kind]?.couleur ?? theme.ink : theme.inkSoft }, { fontWeight: "700" }]}>
-          {etat ? LIBELLES[etat.kind]?.titre ?? etat.kind : "En attente d'un scan"}
+      {/* Résultat du scan — couleur + texte obligatoire */}
+      <View style={[s.resultat, { borderColor: stateColor }, { marginTop: 12 }]}>
+        <Text style={[s.resultatTitre, { color: stateTitleColor }]}>
+          {etat ? LIBELLES[etat.kind]?.titre ?? etat.kind : "En attente d’un scan"}
         </Text>
         <Text style={s.meta}>{etat?.detail ?? "Approche la carte élève de la caméra."}</Text>
         {/* Code QR détecté en dessous pour référence */}
-        {etat && etat.kind !== "hors_ligne" && etat.kind !== "erreur_serveur" && (
+        {etat && etat.kind !== "hors_ligne" && etat.kind !== "erreur_serveur" && etat.eleve ? (
           <Text style={[s.meta, { marginTop: 4, fontSize: 12 }]}>
-            Code : {etat.eleve ? etat.eleve : ""}
+            Code : {etat.eleve}
           </Text>
-        )}
+        ) : null}
         {busy ? <ActivityIndicator color={theme.accent} style={{ marginTop: 8 }} /> : null}
       </View>
 
@@ -224,7 +230,7 @@ export function ScannerScreen({
           locaux.slice(0, 6).map((item) => (
             <View key={item.id} style={s.historiqueLigne}>
               <Text style={s.historiqueCode}>{item.code_qr}</Text>
-              <Text style={[s.historiqueEtat, { color: item.etat === "en_attente" ? theme.warn : item.etat === "rejete" ? theme.danger : theme.accent }]}>
+              <Text style={[s.historiqueEtat, { color: item.etat === "en_attente" ? theme.warn : item.etat === "rejete" ? theme.danger : theme.success }]}>
                 {item.etat === "en_attente" ? "EN ATTENTE" : item.etat === "rejete" ? "REJETÉ" : "CONFIRMÉ"}
               </Text>
             </View>
@@ -287,6 +293,7 @@ const s = StyleSheet.create({
     backgroundColor: theme.card,
     padding: 12,
     gap: 2,
+    borderColor: theme.line,
   },
   resultatTitre: { fontWeight: "700", fontSize: theme.type.body },
   camera: {
@@ -307,7 +314,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     padding: theme.space.lg,
   },
-  manuel: { flexDirection: "row", gap: 8 },
+  manuel: { flexDirection: "row", gap: 8, marginTop: 8 },
   input: {
     flex: 1,
     height: 44,

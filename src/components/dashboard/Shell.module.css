@@ -1,0 +1,275 @@
+/**
+ * Shell du dashboard — Enterprise Light.
+ * Sidebar fixe (logo + navigation) + barre supérieure (compte, date, actions),
+ * zone de contenu principale. Responsive : la sidebar se replie en panneau
+ * latéral sur les écrans étroits.
+ */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--vc-bg);
+  color: var(--vc-ink);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 250px;
+  background: var(--vc-surface);
+  border-right: 1px solid var(--vc-line);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+}
+
+.sidebar.hidden {
+  transform: translateX(-100%);
+}
+
+.sidebarHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px;
+}
+
+.logoMark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--vc-radius-sm);
+  background: var(--vc-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.logoText {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--vc-primary);
+  letter-spacing: -0.01em;
+}
+
+.logoSub {
+  font-size: 11px;
+  color: var(--vc-ink-faint);
+  margin-top: 2px;
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--vc-line);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 20px;
+  border: 0;
+  background: transparent;
+  color: var(--vc-ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.navItem:hover {
+  background: var(--vc-surface-soft);
+  color: var(--vc-ink);
+}
+
+.navItem.active {
+  background: var(--vc-primary-soft);
+  color: var(--vc-primary);
+  border-left: 3px solid var(--vc-primary);
+  padding-left: 17px;
+}
+
+.navItem .icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sidebarFoot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--vc-line);
+}
+
+.sidebarFoot a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-radius: var(--vc-radius-sm);
+  color: var(--vc-danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebarFoot a:hover {
+  background: var(--vc-danger-bg);
+  color: var(--vc-danger);
+  text-decoration: none;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--vc-surface);
+  border-bottom: 1px solid var(--vc-line);
+}
+
+.topbarInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  gap: 12px;
+}
+
+.burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--vc-line);
+  border-radius: var(--vc-radius-sm);
+  background: var(--vc-surface);
+  color: var(--vc-ink);
+  cursor: pointer;
+}
+
+.burger:hover {
+  background: var(--vc-surface-soft);
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.appName {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--vc-ink);
+}
+
+.appName strong {
+  color: var(--vc-primary);
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--vc-line);
+  border-radius: var(--vc-radius-sm);
+  background: var(--vc-surface);
+  font-size: 13px;
+  color: var(--vc-ink-soft);
+}
+
+.chip strong {
+  color: var(--vc-ink);
+  font-weight: 700;
+}
+
+.button,
+.buttonOutline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--vc-radius-sm);
+  font: inherit;
+  font-size: var(--vc-type-sm);
+  font-weight: var(--vc-weight-semibold);
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.buttonOutline {
+  border: 1px solid var(--vc-line);
+  background: var(--vc-surface);
+  color: var(--vc-ink);
+}
+
+.buttonOutline:hover {
+  background: var(--vc-surface-soft);
+  border-color: var(--vc-line-soft);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(22, 37, 54, 0.10);
+  display: none;
+}
+
+.backdrop.open {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .burger {
+    display: flex;
+  }
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar.hidden {
+    transform: translateX(-100%);
+  }
+  .main {
+    padding: 16px;
+  }
+}

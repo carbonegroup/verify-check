@@ -2,6 +2,7 @@
  * Écran de contexte de pointage (accueil) — données réelles de l'API :
  * classes + cours du jour (Conakry) avec statut actif. L'agent choisit le
  * contexte avant de scanner ; jamais de sélection arbitraire.
+ * Habillage Enterprise Light.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -98,7 +99,7 @@ export function AccueilScreen({
         </View>
       )}
 
-      <Text style={s.label}>Cours du moment (actifs à l'heure de Conakry)</Text>
+      <Text style={s.label}>Cours du moment (actifs à l’heure de Conakry)</Text>
       {coursActifs.length === 0 ? (
         <Text style={s.hint}>Aucun cours actif pour cette classe maintenant : la direction doit mettre à jour le planning.</Text>
       ) : (
@@ -196,13 +197,14 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
     color: theme.inkSoft,
     marginTop: 8,
+    fontWeight: "600",
   },
   hint: { color: theme.inkSoft, fontSize: theme.type.small },
   groupe: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pill: {
     paddingHorizontal: 12,
     height: 40,
-    borderRadius: 999,
+    borderRadius: theme.radiusSm,
     borderWidth: 1,
     borderColor: theme.line,
     backgroundColor: theme.white,
@@ -221,16 +223,21 @@ const s = StyleSheet.create({
     color: theme.ink,
   },
   bouton: {
-    height: 48,
+    height: 44,
     borderRadius: theme.radiusSm,
     backgroundColor: theme.accent,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   boutonOff: { backgroundColor: theme.line },
   boutonTexte: { color: theme.white, fontWeight: "600", fontSize: theme.type.body },
   deconnexion: { alignItems: "center", padding: 14 },
   deconnexionTexte: { color: theme.inkSoft, fontSize: theme.type.small },
-  erreur: { color: theme.danger, fontSize: theme.type.small },
+  erreur: { color: theme.danger, fontSize: theme.type.small, textAlign: "center" },
 });

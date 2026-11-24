@@ -1,15 +1,35 @@
-/** Thème mobile — « registre scolaire contemporain » (docs/design-brief.md). */
+/**
+ * Thème mobile VerifyCheck — direction « Enterprise Light ».
+ *
+ * Tokens réutilisés par tous les écrans. Aucune couleur magique en dur dans les
+ * composants : tout passe par ce thème.
+ *
+ * - fond général   : bleu-gris très clair (#F3F6FA)
+ * - surfaces       : blanc (#FFFFFF)
+ * - primaire       : bleu marine (#17365D)  boutons, états actifs
+ * - secondaire     : bleu (#315B86)
+ * - succès         : vert (#16835D)  présences confirmées
+ * - attention      : orange (#A86F12)  états en attente / doublons
+ * - danger         : rouge (#BD4545)  absences et erreurs
+ * - bordures       : léger (#E2E8F0)
+ * - zone caméra    : sombre uniquement pour le contraste de lecture QR
+ */
 
 export const theme = {
-  paper: "#FAF7F0",
-  card: "#FFFDF8",
-  ink: "#1C2733",
+  paper: "#F3F6FA",
+  card: "#FFFFFF",
+  ink: "#162536",
   inkSoft: "#5B6B7C",
-  accent: "#14604A",
-  accentInk: "#0C3D2F",
-  warn: "#9A5B00",
-  danger: "#A32E2E",
-  line: "#DCD5C8",
+  accent: "#17365D",
+  accentInk: "#0F2A4A",
+  secondary: "#315B86",
+  success: "#16835D",
+  successInk: "#0B4B37",
+  warn: "#A86F12",
+  warnInk: "#7A4E0D",
+  danger: "#BD4545",
+  dangerInk: "#8B2E2E",
+  line: "#E2E8F0",
   scanBg: "#12181F",
   white: "#FFFFFF",
   radius: 8,
@@ -19,7 +39,7 @@ export const theme = {
 } as const;
 
 export const statutCouleur: Record<string, string> = {
-  present: theme.accent,
+  present: theme.success,
   "non-pointe": theme.warn,
   absent: theme.danger,
 };

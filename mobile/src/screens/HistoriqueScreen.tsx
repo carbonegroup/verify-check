@@ -1,7 +1,8 @@
 /**
- * Écran historique mobile — pointages locaux de l'appareil avec états
+ * Écran historique mobile — pointages locaux de l’appareil avec états
  * explicites (EN ATTENTE / CONFIRMÉ / REJETÉ) et données serveur réelles
  * (compteurs par cours du jour). Aucune donnée inventée.
+ * Habillage Enterprise Light.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -25,7 +26,7 @@ const ETAT_LIBELLE: Record<LocalItem["etat"], string> = {
 };
 const ETAT_COULEUR: Record<LocalItem["etat"], string> = {
   en_attente: theme.warn,
-  confirme: theme.accent,
+  confirme: theme.success,
   rejete: theme.danger,
 };
 
@@ -67,8 +68,10 @@ export function HistoriqueScreen({ classeId, onSessionExpiree }: { classeId: str
       <View style={s.entete}>
         <Text style={s.titre}>Historique</Text>
         {enAttente > 0 ? (
-          <TouchableOpacity style={s.sync} onPress={syncManuelle}>
-            <Text style={s.syncTexte}>Synchroniser ({enAttente} en attente)</Text>
+          <TouchableOpacity style={[s.sync, { borderColor: theme.accent }]} onPress={syncManuelle}>
+            <Text style={[s.syncTexte, { color: theme.accent }]}>
+              Synchroniser ({enAttente} en attente)
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -78,7 +81,7 @@ export function HistoriqueScreen({ classeId, onSessionExpiree }: { classeId: str
 
       {erreur && !dashboard ? (
         <Text style={s.erreur}>
-          {erreur === "reseau" ? "Réseau indisponible — l'historique local reste affiché." : "Erreur serveur."}
+          {erreur === "reseau" ? "Réseau indisponible — l’historique local reste affiché." : "Erreur serveur."}
         </Text>
       ) : null}
 
@@ -89,14 +92,12 @@ export function HistoriqueScreen({ classeId, onSessionExpiree }: { classeId: str
             return (
               <View key={c.id} style={s.coursLigne}>
                 <Text style={s.coursNom}>{c.nom}</Text>
-                <Text style={s.coursCompte}>
-                  {presents}/{dashboard.effectif} présents
-                </Text>
+                <Text style={s.coursCompte}>{presents}/{dashboard.effectif} présents</Text>
               </View>
             );
           })}
           {dashboard.cours_prevus.length === 0 ? (
-            <Text style={s.meta}>Aucun cours prévu aujourd'hui.</Text>
+            <Text style={s.meta}>Aucun cours prévu aujourd’hui.</Text>
           ) : null}
         </View>
       ) : null}
@@ -130,14 +131,14 @@ const s = StyleSheet.create({
   sync: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: theme.accent,
     paddingHorizontal: 12,
     height: 32,
     justifyContent: "center",
+    backgroundColor: theme.white,
   },
-  syncTexte: { color: theme.accent, fontWeight: "600", fontSize: theme.type.small },
+  syncTexte: { fontWeight: "600", fontSize: theme.type.small },
   meta: { color: theme.inkSoft, fontSize: theme.type.small },
-  erreur: { color: theme.danger, fontSize: theme.type.small },
+  erreur: { color: theme.danger, fontSize: theme.type.small, textAlign: "center" },
   cours: { gap: 4 },
   coursLigne: { flexDirection: "row", justifyContent: "space-between" },
   coursNom: { color: theme.ink, fontSize: theme.type.body },
@@ -152,6 +153,11 @@ const s = StyleSheet.create({
     borderColor: theme.line,
     padding: 10,
     marginBottom: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   code: { fontFamily: "monospace", color: theme.ink, fontSize: theme.type.body },
   etat: { fontWeight: "700", fontSize: 12 },
