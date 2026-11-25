@@ -36,7 +36,7 @@ export function dayWindow(date: string): { startAt: string; endAt: string } {
   };
 }
 
-export type ClassRow = { id: string; nom: string };
+export type ClassRow = { id: string; nom: string; is_demo?: boolean };
 export type CourseRow = {
   id: string;
   nom: string;
