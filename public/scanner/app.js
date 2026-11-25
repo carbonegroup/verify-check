@@ -87,6 +87,7 @@
     deferredInstall: null, cameraError: null, dashboard: null, busy: false,
   };
   let toastTimer = null;
+  let scannerRefreshInterval = null;
 
   // ---------------------------------------------------------------- affichage
   const fmtTime = (iso) =>
@@ -183,7 +184,12 @@
     // le scan et le manuel sont pilotés par l'onglet une fois le contexte prêt
     if (name === "login") el.screenLogin.classList.add("on");
     if (name === "context") el.screenContext.classList.add("on");
-    if (name === "scan") { setTab(state.tab || "scan"); }
+    if (name === "scan") {
+      setTab(state.tab || "scan");
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
     document.querySelector(".tabs").hidden = !(name === "scan");
     el.settingsBtn.hidden = name === "login";
   }
@@ -431,6 +437,40 @@
     showScreen("context");
   }
 
+  // Vérifie périodiquement que la classe et le cours sélectionnés existent
+  // toujours et que le cours est encore actif selon l'heure serveur de Conakry.
+  async function refreshSessionContext() {
+    const selected = VC.api.selected;
+    if (!selected) return false;
+
+    const res = await VC.api.ensureContext();
+    if (res.status === "session") {
+      VC.api.setSelected(null);
+      showScreen("login");
+      return false;
+    }
+    if (res.status !== "ok") return false;
+
+    const ctx = VC.api.context;
+    const classe = ctx.classes.find((item) => item.id === selected.classeId);
+    const cours = ctx.cours.find((item) => item.id === selected.coursId);
+    if (!classe || !cours || !cours.actif) {
+      VC.api.setSelected(null);
+      stopCamera();
+      await enterContext();
+      toast("Le cours sélectionné n'est plus actif. Choisis le contexte actuel.");
+      return false;
+    }
+
+    VC.api.setSelected({
+      ...selected,
+      classeNom: classe.nom,
+      coursNom: cours.nom,
+    });
+    renderSession();
+    return true;
+  }
+
   function fillCoursOptions() {
     const classeId = el.ctxClasse.value;
     const actifs = VC.api.activeCourses().filter((c) => c.classe_id === classeId);
@@ -503,10 +543,37 @@
   }
 
   // ------------------------------------------------------------------ réseau
+  function stopAutoRefresh() {
+    if (scannerRefreshInterval !== null) {
+      window.clearInterval(scannerRefreshInterval);
+      scannerRefreshInterval = null;
+    }
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    if (!VC.api.selected) return;
+
+    scannerRefreshInterval = window.setInterval(async () => {
+      if (document.hidden || !VC.api.isOnline() || !VC.api.selected) return;
+      try {
+        // La file est synchronisée avant de réévaluer le cours sélectionné.
+        const { synced } = await VC.api.flushQueue();
+        if (synced) toast(synced + " pointage(s) synchronisé(s)");
+        const contextValid = await refreshSessionContext();
+        if (contextValid) await refreshDashboard();
+        await renderAll();
+      } catch {
+        await renderAll();
+      }
+    }, 45_000);
+  }
+
   async function onOnline() {
     try {
       const { synced } = await VC.api.flushQueue();
-      await refreshDashboard();
+      const contextValid = await refreshSessionContext();
+      if (contextValid) await refreshDashboard();
       await renderAll();
       toast(synced ? synced + " pointage(s) synchronisé(s)" : "Réseau rétabli");
     } catch {
@@ -572,7 +639,8 @@
         try {
           const { synced } = await VC.api.flushQueue();
           if (synced) toast(synced + " pointage(s) synchronisé(s)");
-          await refreshDashboard();
+          const contextValid = await refreshSessionContext();
+          if (contextValid) await refreshDashboard();
           await renderAll();
         } catch {
           await renderAll();
