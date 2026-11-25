@@ -3,7 +3,6 @@ import {
   REFRESH_COOKIE,
   SESSION_COOKIE,
   createServerSupabase,
-  isOperationalRole,
   setSessionCookies,
 } from "@/lib/auth";
 
@@ -49,7 +48,19 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user || !isOperationalRole(user as { app_metadata?: Record<string, unknown> })) {
+  if (!user) return redirectToLogin(request);
+
+  // Check the authoritative role registry on every protected page request.
+  // This revokes access immediately after demotion or deactivation, even while
+  // a previously issued JWT is still cryptographically valid.
+  const roleSupabase = createServerSupabase(rotated?.access_token ?? accessToken);
+  const { data: roleRow, error: roleError } = await roleSupabase
+    .from("app_user_roles")
+    .select("role, is_active")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (roleError || !roleRow || roleRow.is_active !== true ||
+      (roleRow.role !== "admin" && roleRow.role !== "dev")) {
     return redirectToLogin(request);
   }
 
