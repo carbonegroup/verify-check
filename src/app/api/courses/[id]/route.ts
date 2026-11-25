@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest, context: Context) {
   changes.updated_at = new Date().toISOString();
   const { data, error } = await supabase.from("courses").update(changes).eq("id", id)
     .select("id,nom,classe_id,salle,jour_semaine,heure_debut,heure_fin,enseignant,archived_at,is_demo").single();
+  if (error?.code === "23P01") return NextResponse.json({ error: "conflit_horaire_concurrent" }, { status: 409 });
   if (error) return NextResponse.json({ error: "modification_impossible" }, { status: 500 });
   const response = NextResponse.json({ course: data });
   if (auth.session) setSessionCookies(response, auth.session);
