@@ -34,11 +34,9 @@ export async function GET(request: NextRequest) {
   let studentsQuery = supabase.from("students")
     .select("id, nom, prenom, code_qr, classe_id, photo_url")
     .is("archived_at", null).order("nom");
-  if (!includeDemo) {
-    classesQuery = classesQuery.eq("is_demo", false);
-    coursesQuery = coursesQuery.eq("is_demo", false);
-    studentsQuery = studentsQuery.eq("is_demo", false);
-  }
+  classesQuery = classesQuery.eq("is_demo", includeDemo);
+  coursesQuery = coursesQuery.eq("is_demo", includeDemo);
+  studentsQuery = studentsQuery.eq("is_demo", includeDemo);
 
   const [classesRes, coursesRes, studentsWithPhotoRes, attendanceRes] = await Promise.all([
     classesQuery,
@@ -51,9 +49,8 @@ export async function GET(request: NextRequest) {
 
   const studentsRes =
     studentsWithPhotoRes.error && isMissingStudentPhotoUrlColumn(studentsWithPhotoRes.error)
-      ? await (includeDemo
-          ? supabase.from("students").select("id, nom, code_qr, classe_id").is("archived_at", null).order("nom")
-          : supabase.from("students").select("id, nom, code_qr, classe_id").is("archived_at", null).eq("is_demo", false).order("nom"))
+      ? await supabase.from("students").select("id, nom, code_qr, classe_id")
+          .is("archived_at", null).eq("is_demo", includeDemo).order("nom")
       : studentsWithPhotoRes;
 
   if (classesRes.error || coursesRes.error || studentsRes.error || attendanceRes.error) {
