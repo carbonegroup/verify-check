@@ -263,11 +263,11 @@ export default function DashboardClient() {
         credentials: "same-origin",
         cache: "no-store",
       });
+      if (requestId !== dashboardRequestId.current) return;
       if (res.status === 401) {
         router.push("/login?next=%2Fdashboard");
         return;
       }
-      if (requestId !== dashboardRequestId.current) return;
       if (!res.ok) {
         setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
         if (!silent) setData(null);
@@ -392,9 +392,13 @@ export default function DashboardClient() {
   // Réconcilie les données avec les autres appareils sans solliciter le réseau
   // lorsque l'onglet est en arrière-plan. Les caches financiers sont invalidés
   // même quand leur vue n'est pas ouverte.
+  const lastAutomaticRefreshAt = useRef(0);
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastAutomaticRefreshAt.current < 5_000) return;
+      lastAutomaticRefreshAt.current = now;
 
       void load({ silent: true });
       scolariteCache.current.clear();
