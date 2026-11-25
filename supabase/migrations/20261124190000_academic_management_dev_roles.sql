@@ -112,6 +112,46 @@ grant execute on function private.current_app_role() to authenticated;
 grant execute on function private.has_app_role(text) to authenticated;
 grant execute on function private.is_operational_user() to authenticated;
 
+-- Serialize role revocations so two concurrent account changes cannot remove
+-- the final active DEV account. This applies even to privileged service-role writes.
+create or replace function private.prevent_last_active_dev()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  remaining_devs bigint;
+  removing_active_dev boolean;
+begin
+  perform pg_advisory_xact_lock(74001, 20261124);
+  if tg_op = 'DELETE' then
+    removing_active_dev := old.role = 'dev' and old.is_active;
+  else
+    removing_active_dev := old.role = 'dev' and old.is_active
+      and (new.role <> 'dev' or new.is_active is not true);
+  end if;
+
+  if removing_active_dev then
+    select count(*) into remaining_devs
+    from public.app_user_roles
+    where role = 'dev' and is_active is true and user_id <> old.user_id;
+    if remaining_devs < 1 then
+      raise exception 'last_active_dev_protected'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$;
+revoke all on function private.prevent_last_active_dev() from public, anon, authenticated;
+drop trigger if exists protect_last_active_dev on public.app_user_roles;
+create trigger protect_last_active_dev
+  before update or delete on public.app_user_roles
+  for each row execute function private.prevent_last_active_dev();
+
 -- Replace the single-role policies without exposing DEV-only fixtures to ADMIN.
 drop policy if exists "admin full access classes" on public.classes;
 create policy "operational access classes" on public.classes
