@@ -15,6 +15,9 @@ export type ScanEtat =
   | { kind: "cours_ambigu"; eleve?: string; classe?: string; candidates: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }> }
   | { kind: "salle_invalide"; salle?: string; eleve?: string; classe?: string }
   | { kind: "session_expiree" }
+  | { kind: "acces_refuse" }
+  | { kind: "erreur_requete" }
+  | { kind: "stockage_impossible" }
   | { kind: "erreur_serveur" }
   | { kind: "hors_ligne"; fileId: string }
   | { kind: "deja_en_attente" };
@@ -65,6 +68,8 @@ export function mapScanResponse(
   if (httpStatus === 401 || err === "session_requise" || err === "session_invalide") {
     return { kind: "session_expiree" };
   }
+  if (httpStatus === 403) return { kind: "acces_refuse" };
+  if (httpStatus === 400 || httpStatus === 404) return { kind: "erreur_requete" };
   return { kind: "erreur_serveur" };
 }
 
@@ -75,6 +80,9 @@ export function doitMettreEnFile(etat: ScanEtat): boolean {
     etat.kind === "confirmee" ||
     etat.kind === "doublon" ||
     etat.kind === "session_expiree" ||
+    etat.kind === "acces_refuse" ||
+    etat.kind === "erreur_requete" ||
+    etat.kind === "stockage_impossible" ||
     etat.kind === "hors_ligne" ||
     etat.kind === "deja_en_attente"
   ) {

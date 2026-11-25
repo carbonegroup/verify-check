@@ -167,3 +167,23 @@ export async function rejouerPointage(item: FileItem): Promise<"confirme" | "dou
     return "reessayer";
   }
 }
+
+/**
+ * Vérifie que l'instance VerifyCheck est joignable via sa racine publique.
+ * Ce contrôle ne dépend pas des permissions d'un agent et ne lit aucune donnée.
+ */
+export async function verifierDisponibiliteServeur(): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  try {
+    const response = await fetch(getConfig().apiBaseUrl, {
+      method: "HEAD",
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

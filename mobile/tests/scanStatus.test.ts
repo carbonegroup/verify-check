@@ -58,6 +58,9 @@ test("mapScanResponse : ambiguïté conservée avec les candidats (jamais de cho
 test("mapScanResponse : session expirée et erreur serveur", () => {
   assert.equal(mapScanResponse(401, { error: "session_requise" }).kind, "session_expiree");
   assert.equal(mapScanResponse(500, { error: "erreur_base" }).kind, "erreur_serveur");
+  assert.equal(mapScanResponse(403, { error: "role_requis" }).kind, "acces_refuse");
+  assert.equal(mapScanResponse(400, { error: "payload_invalide" }).kind, "erreur_requete");
+  assert.equal(mapScanResponse(404, { error: "ressource_absente" }).kind, "erreur_requete");
 });
 
 test("doitMettreEnFile : uniquement réessayable, jamais rejet définitif ni confirmé (politique en DIRECT)", () => {
@@ -66,6 +69,9 @@ test("doitMettreEnFile : uniquement réessayable, jamais rejet définitif ni con
   assert.ok(!doitMettreEnFile({ kind: "confirmee" }));
   assert.ok(!doitMettreEnFile({ kind: "doublon" }));
   assert.ok(!doitMettreEnFile({ kind: "session_expiree" }));
+  assert.ok(!doitMettreEnFile({ kind: "acces_refuse" }));
+  assert.ok(!doitMettreEnFile({ kind: "erreur_requete" }));
+  assert.ok(!doitMettreEnFile({ kind: "stockage_impossible" }));
   assert.ok(!doitMettreEnFile({ kind: "qr_invalide" }));
   assert.ok(!doitMettreEnFile({ kind: "pas_de_cours", heure: "10:30" }));
   assert.ok(!doitMettreEnFile({ kind: "cours_ambigu", candidates: [] }));
