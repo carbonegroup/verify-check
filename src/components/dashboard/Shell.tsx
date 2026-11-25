@@ -37,7 +37,7 @@ const NAV_SECTIONS: {
     label: "Administration technique DEV",
     developerOnly: true,
     items: [
-      { id: "developpeur", label: "Vue d’ensemble DEV" },
+      { id: "developpeur", label: "Espace développeur" },
       { id: "utilisateurs", label: "Comptes et rôles" },
       { id: "jeux-test", label: "Jeux de test" },
       { id: "journal", label: "Journal d’audit détaillé" },
