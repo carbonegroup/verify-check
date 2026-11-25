@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import styles from "./Shell.module.css";
 import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
 
@@ -158,7 +158,60 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
   // off-canvas navigation on narrow viewports.
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const toggleSidebar = useCallback(() => setSidebarOpen((open) => !open), []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    accountMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
+  }, [accountMenuOpen]);
+
+  const fermerMenuCompte = useCallback((restoreFocus = true) => {
+    setAccountMenuOpen(false);
+    if (restoreFocus) accountTriggerRef.current?.focus();
+  }, []);
+
+  const gererClavierMenuCompte = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+    );
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+      case "ArrowDown":
+        nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+        break;
+      case "ArrowUp":
+        nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = items.length - 1;
+        break;
+      case "Escape":
+        event.preventDefault();
+        fermerMenuCompte();
+        return;
+      case "Tab":
+        // Return focus to the trigger before the browser performs normal tab order.
+        // The transparent outside-click button is removed and never enters that order.
+        fermerMenuCompte();
+        return;
+      default:
+        return;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      items[nextIndex]?.focus();
+    }
+  }, [fermerMenuCompte]);
 
   const deconnexion = useCallback(async () => {
     try {
@@ -274,10 +327,12 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
             <div className={styles.topbarRight}>
               <div className={styles.accountMenu}>
                 <button
+                  ref={accountTriggerRef}
                   type="button"
                   className={styles.account}
                   aria-haspopup="menu"
                   aria-expanded={accountMenuOpen}
+                  aria-controls="verifycheck-account-menu"
                   onClick={() => setAccountMenuOpen((open) => !open)}
                 >
                   <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
@@ -288,11 +343,19 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
                   <>
                     <button
                       type="button"
+                      tabIndex={-1}
                       className={styles.menuDismiss}
                       aria-label="Fermer le menu du compte"
-                      onClick={() => setAccountMenuOpen(false)}
+                      onClick={() => fermerMenuCompte()}
                     />
-                    <div className={styles.accountDropdown} role="menu" aria-label="Menu du compte">
+                    <div
+                      ref={accountMenuRef}
+                      id="verifycheck-account-menu"
+                      className={styles.accountDropdown}
+                      role="menu"
+                      aria-label="Menu du compte"
+                      onKeyDown={gererClavierMenuCompte}
+                    >
                       <div className={styles.accountMenuHeading}>
                         <strong>Mon compte</strong>
                         <span>{role === "dev" ? "Compte développeur" : "Compte administrateur"}</span>
@@ -301,7 +364,10 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
                         type="button"
                         role="menuitem"
                         className={styles.accountMenuItem}
-                        onClick={() => choisirVue("securite")}
+                        onClick={() => {
+                          choisirVue("securite");
+                          accountTriggerRef.current?.focus();
+                        }}
                       >
                         <span className={styles.menuItemIcon} aria-hidden="true">♙</span>
                         <span><strong>Gérer mon compte</strong><small>Mot de passe et sécurité</small></span>
@@ -311,7 +377,7 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
                         type="button"
                         role="menuitem"
                         className={styles.accountMenuItem}
-                        onClick={() => { setAccountMenuOpen(false); void deconnexion(); }}
+                        onClick={() => { fermerMenuCompte(false); void deconnexion(); }}
                       >
                         <span className={styles.menuItemIcon} aria-hidden="true">↪</span>
                         <span><strong>Se déconnecter</strong><small>Quitter cette session</small></span>
