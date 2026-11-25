@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   setSessionCookies,
   supabaseAnonKey,
+  isOperationalRole,
   supabaseUrl,
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
@@ -9,7 +10,7 @@ import { applyRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/login — connexion admin (email + mot de passe).
- * Rejette tout compte dont `app_metadata.role` n'est pas `admin`.
+ * Accepte les comptes opérationnels ADMIN et DEV via `app_metadata.role`.
  * Pose des cookies httpOnly (access + refresh) utilisés par le middleware et les endpoints.
  * Rate limited : 5 requêtes/minute par IP (brute-force protection).
  */
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   const role = (data.user.app_metadata as Record<string, unknown> | undefined)?.role;
-  if (role !== "admin") {
+  if (!isOperationalRole({ app_metadata: { role } })) {
     // Session créée mais rôle insuffisant : on la termine immédiatement.
     await supabase.auth.signOut().catch(() => {});
     return NextResponse.json({ error: "role_admin_requis" }, { status: 403 });

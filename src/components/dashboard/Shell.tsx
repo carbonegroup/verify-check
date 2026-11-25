@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import styles from "./Shell.module.css";
-import { isDashboardViewEnabled, type DashboardView } from "@/lib/dashboard-navigation";
+import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
 
 type Vue = DashboardView;
 
@@ -13,7 +13,13 @@ const VUES: { id: Vue; label: string }[] = [
   { id: "classes", label: "Classes" },
   { id: "cours", label: "Cours" },
   { id: "eleves", label: "Élèves" },
-  { id: "cartes", label: "Cartes" },
+  { id: "cartes", label: "Cartes QR" },
+  { id: "gestion-eleves", label: "Gestion des élèves" },
+  { id: "gestion-cours", label: "Gestion des cours" },
+  { id: "presences", label: "Saisie des présences" },
+  { id: "utilisateurs", label: "Comptes utilisateurs" },
+  { id: "journal", label: "Journal d'audit" },
+  { id: "securite", label: "Sécurité du compte" },
   { id: "scolarite", label: "Scolarité" },
   { id: "comptabilite", label: "Comptabilité" },
 ];
@@ -62,6 +68,40 @@ function Icon({ id }: { id: Vue }) {
         <line x1="14" y1="17" x2="21" y2="17" />
       </svg>
     ),
+    "gestion-eleves": (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="9" cy="7" r="4" />
+        <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M18 8h4m-2-2v4" />
+      </svg>
+    ),
+    "gestion-cours": (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18M8 14h8m-8 3h5" />
+      </svg>
+    ),
+    presences: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 4h16v16H4zM8 9l2 2 5-5M8 16h8" />
+      </svg>
+    ),
+    utilisateurs: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="9" cy="7" r="4" />
+        <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M19 8v6m-3-3h6" />
+      </svg>
+    ),
+    journal: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+    securite: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="4" y="11" width="16" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2" />
+      </svg>
+    ),
     scolarite: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <line x1="12" y1="1" x2="12" y2="23" />
@@ -81,11 +121,12 @@ function Icon({ id }: { id: Vue }) {
 
 interface ShellProps {
   vue: Vue;
+  role: "admin" | "dev";
   onViewChange: (id: Vue) => void;
   children: React.ReactNode;
 }
 
-export default function Shell({ vue, onViewChange, children }: ShellProps) {
+export default function Shell({ vue, role, onViewChange, children }: ShellProps) {
   const router = useRouter();
   // The desktop sidebar is always visible; this state only controls the
   // off-canvas navigation on narrow viewports.
@@ -105,10 +146,10 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
   }, [router]);
 
   const choisirVue = useCallback((id: Vue) => {
-    if (!isDashboardViewEnabled(id)) return;
+    if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && role !== "dev")) return;
     onViewChange(id);
     setSidebarOpen(false);
-  }, [onViewChange]);
+  }, [onViewChange, role]);
 
   return (
     <div className={styles.shell}>
@@ -126,7 +167,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
         </div>
 
         <div className={styles.nav}>
-          {VUES.map((v) => (
+          {VUES.filter((v) => !isDeveloperView(v.id) || role === "dev").map((v) => (
             <button
               key={v.id}
               type="button"
@@ -150,7 +191,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
               </svg>
             </span>
             <span className={styles.schoolCopy}>
-              <strong>Établissement</strong>
+              <strong>UCAO</strong>
               <small>Conakry, Guinée</small>
             </span>
           </div>
@@ -198,13 +239,13 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
             </button>
 
             <div className={styles.topbarLeft}>
-              <div className={styles.appName}>VerifyCheck <strong>· Direction</strong></div>
+              <div className={styles.appName}>UCAO <strong>· Direction</strong></div>
             </div>
 
             <div className={styles.topbarRight}>
               <div className={styles.account}>
-                <span className={styles.avatar}>AD</span>
-                <span>Admin</span>
+                <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
+                <span>{role === "dev" ? "Développeur" : "Administration"}</span>
                 <span className={styles.accountChevron} aria-hidden="true">⌄</span>
               </div>
             </div>

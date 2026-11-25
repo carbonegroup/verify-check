@@ -5,6 +5,7 @@
  */
 
 import { SCHOOL_TIME_ZONE } from "./time.ts";
+import { findScheduleConflictDetail } from "./course-conflicts.ts";
 
 /**
  * Vrai uniquement pour une date calendaire réelle `YYYY-MM-DD`.
@@ -36,7 +37,7 @@ export function dayWindow(date: string): { startAt: string; endAt: string } {
   };
 }
 
-export type ClassRow = { id: string; nom: string };
+export type ClassRow = { id: string; nom: string; is_demo?: boolean };
 export type CourseRow = {
   id: string;
   nom: string;
@@ -45,6 +46,7 @@ export type CourseRow = {
   jour_semaine: number;
   heure_debut: string;
   heure_fin: string;
+  enseignant?: string | null;
 };
 export type StudentRow = {
   id: string;
@@ -58,6 +60,9 @@ export type AttendanceRow = {
   student_id: string;
   course_id: string;
   scanned_at: string;
+  statut?: "present" | "absent" | "retard";
+  source?: "scan" | "manual";
+  motif?: string | null;
 };
 
 export type DashboardFilters = {
@@ -65,6 +70,18 @@ export type DashboardFilters = {
   classe?: string;
   cours?: string;
   eleve?: string;
+};
+
+export type DashboardAlert = {
+  id: string;
+  type: "schedule_conflict";
+  conflict: "class" | "teacher" | "room";
+  course_id: string;
+  course_name: string;
+  other_course_id: string;
+  other_course_name: string;
+  jour_semaine: number;
+  message: string;
 };
 
 export type DashboardResult = {
@@ -80,6 +97,8 @@ export type DashboardResult = {
   effectif: number;
   presents: number;
   scans: number;
+  presences_enregistrees: number;
+  alerts: DashboardAlert[];
   eleves: Array<{
     id: string;
     nom: string;
@@ -88,6 +107,7 @@ export type DashboardResult = {
     photo_url?: string | null;
     scans: number;
     presences: Array<{ course_id: string; scanned_at: string }>;
+    absences: Array<{ course_id: string; motif?: string | null }>;
   }>;
 };
 
@@ -107,6 +127,37 @@ export function buildDashboard(
     .filter((c) => !filters.classe || c.classe_id === filters.classe)
     .sort((a, b) => a.jour_semaine - b.jour_semaine || a.heure_debut.localeCompare(b.heure_debut));
   const filteredWeeklyCourses = weeklyCourses.filter((c) => !filters.cours || c.id === filters.cours);
+  const allCoursesByDay = new Map<number, CourseRow[]>();
+  for (const course of raw.courses) {
+    const list = allCoursesByDay.get(course.jour_semaine) ?? [];
+    list.push(course);
+    allCoursesByDay.set(course.jour_semaine, list);
+  }
+  const alertCandidates = raw.courses.filter((course) =>
+    (!filters.classe || course.classe_id === filters.classe) &&
+    (!filters.cours || course.id === filters.cours)
+  );
+  const alerts: DashboardAlert[] = [];
+  const seenConflictPairs = new Set<string>();
+  for (const course of alertCandidates) {
+    const detail = findScheduleConflictDetail(course, allCoursesByDay.get(course.jour_semaine) ?? []);
+    if (!detail || !detail.other.id) continue;
+    const pair = [course.id, detail.other.id].sort();
+    const pairKey = pair.join("|");
+    if (seenConflictPairs.has(pairKey)) continue;
+    seenConflictPairs.add(pairKey);
+    alerts.push({
+      id: pairKey,
+      type: "schedule_conflict",
+      conflict: detail.kind,
+      course_id: course.id,
+      course_name: course.nom,
+      other_course_id: detail.other.id,
+      other_course_name: raw.courses.find((candidate) => candidate.id === detail.other.id)?.nom ?? detail.other.id,
+      jour_semaine: course.jour_semaine,
+      message: detail.message,
+    });
+  }
   const availableCourses = weeklyCourses.filter((c) => c.jour_semaine === weekday);
   const plannedCourses = availableCourses.filter(
     (c) => !filters.cours || c.id === filters.cours
@@ -121,9 +172,11 @@ export function buildDashboard(
   const rows = raw.attendance.filter(
     (a) => plannedCourseIds.has(a.course_id) && visibleStudentIds.has(a.student_id)
   );
+  const presenceRows = rows.filter((row) => row.statut !== "absent");
+  const scanRows = rows.filter((row) => row.source === undefined || row.source === "scan");
 
   const presencesByStudent = new Map<string, AttendanceRow[]>();
-  for (const row of rows) {
+  for (const row of presenceRows) {
     const list = presencesByStudent.get(row.student_id) ?? [];
     list.push(row);
     presencesByStudent.set(row.student_id, list);
@@ -143,17 +196,23 @@ export function buildDashboard(
     cours_disponibles: weeklyCourses,
     effectif: visibleStudents.length,
     presents: presentCount,
-    scans: rows.length,
+    scans: scanRows.length,
+    presences_enregistrees: presenceRows.length,
+    alerts,
     eleves: visibleStudents.map((s) => ({
       id: s.id,
       nom: s.nom,
       code_qr: s.code_qr,
       classe_id: s.classe_id,
       photo_url: s.photo_url,
-      scans: (presencesByStudent.get(s.id) ?? []).length,
+      scans: scanRows.filter((row) => row.student_id === s.id).length,
       presences: (presencesByStudent.get(s.id) ?? []).map((row) => ({
         course_id: row.course_id,
         scanned_at: row.scanned_at,
+      })),
+      absences: rows.filter((row) => row.student_id === s.id && row.statut === "absent").map((row) => ({
+        course_id: row.course_id,
+        motif: row.motif ?? null,
       })),
     })),
   };

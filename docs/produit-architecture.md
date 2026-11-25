@@ -128,3 +128,54 @@ Optimisations pour un usage léger à Conakry (réseau 2G/3G intermittent) :
   — le QR d'un code est déterministe, utile pour réimprimer une planche.
 - Aucun fichier audio/image lourd : feedback sonore généré (WebAudio), polices
   système, icônes PNG < 7 Ko.
+
+
+## VerifyCheck 2.0 — gestion académique et rôles (2026-11)
+
+### Routes supplémentaires
+
+- `GET/POST /api/students` — recherche paginée et création d'étudiants.
+- `PATCH/DELETE /api/students/:id` — modification partielle, archivage/réactivation ou suppression physique après confirmation.
+- `POST /api/students/import` — import atomique d'un lot de 1 à 500 lignes déjà analysées (CSV/XLSX analysé côté navigateur).
+- `GET/POST /api/courses` — consultation paginée, filtres et création.
+- `PATCH/DELETE /api/courses/:id` — modification, archivage/réactivation ou suppression physique après confirmation.
+- `GET/POST /api/attendance` — historique paginé et saisie manuelle.
+- `PATCH /api/attendance/:id` — correction avec statut et justification obligatoires.
+- `GET /api/activity` — flux d'activité minimal, autorisé aux comptes opérationnels.
+- `GET/POST /api/admin/users`, `PATCH /api/admin/users/:id`, `POST /api/admin/users/:id/reset` — opérations DEV sur les comptes.
+- `GET /api/admin/audit` — journal complet et filtres, DEV uniquement.
+- `GET /api/auth/session`, `POST /api/auth/password` — rôle courant et changement sécurisé du mot de passe.
+- `GET /api/dashboard?demo=1` — jeu de test explicite, DEV uniquement.
+
+### Modèle additionnel
+
+La migration `supabase/migrations/20261124190000_academic_management_dev_roles.sql` ajoute les champs `prenom`, `email`, `telephone`, `archived_at`, `is_demo`, `created_at` et `updated_at` aux étudiants, `enseignant`, `archived_at`, `is_demo` et les horodatages aux cours/classes, ainsi que `statut`, `source`, `motif`, `updated_by` et `updated_at` aux présences. Les champs supplémentaires sont additifs et n'effacent pas les enregistrements préexistants.
+
+### Autorisations
+
+- `app_user_roles` est le registre d'autorisation actif. Les rôles admis sont `admin` et `dev`.
+- `app_metadata.role` reste synchronisé pour le contrôle de connexion ; `user_metadata` n'est jamais une source d'autorité.
+- `requireAdmin` et le middleware vérifient Auth puis le registre actif. Les routes DEV refusent ADMIN côté serveur.
+- Les politiques RLS limitent ADMIN aux données non-démo ; DEV peut également accéder au jeu de test.
+- Le dernier DEV actif est protégé par un trigger transactionnel.
+- `audit_logs` est append-only côté utilisateur. Les triggers conservent les changements académiques ; les ADMIN ne disposent que des colonnes du flux récent, le journal détaillé est DEV uniquement.
+
+### Jeu de test
+
+La migration insère une classe réservée `[TEST UNIQUEMENT] VerifyCheck — disponibilité 24/7`, trois étudiants fictifs et un cours 00:00–23:59 pour chaque jour (dimanche à samedi). Les lignes ont `is_demo=true`, ne sont pas visibles par ADMIN et sont omises du dashboard normal. Les données de test apparaissent uniquement après migration ; elles ne sont pas ajoutées par le navigateur.
+
+### Suppression et archivage
+
+L'archivage est le comportement normal et préserve les présences. La suppression physique exige la confirmation textuelle `SUPPRIMER DEFINITIVEMENT`. Le schéma historique contient des clés étrangères `ON DELETE CASCADE` : une suppression physique d'étudiant/cours peut supprimer les présences liées (et la suppression d'étudiant peut aussi supprimer ses règlements associés). Cette opération est donc clairement avertie et ne doit jamais être utilisée comme méthode d'archivage.
+
+### Mise en service (obligatoire)
+
+Ne pas déployer les nouvelles routes avant :
+1. sauvegarde vérifiée de la base ;
+2. application et validation de la migration sur un environnement non-productif ;
+3. revue humaine des changements RLS, rôle et données élèves ;
+4. configuration de `SUPABASE_SERVICE_ROLE_KEY` côté serveur uniquement ;
+5. confirmation de l'adresse e-mail du premier DEV et exécution de `npm run admin:bootstrap-dev` avec les variables de confirmation requises ;
+6. essais avec un compte ADMIN et un compte DEV, y compris les accès directs aux API et le scan de la carte démo.
+
+La migration n'est pas appliquée à la base distante par cette branche. Les secrets Vercel/Supabase et l'identité du premier DEV sont des opérations manuelles contrôlées.

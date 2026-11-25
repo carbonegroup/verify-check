@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
-import { isDashboardViewEnabled, type DashboardView } from "@/lib/dashboard-navigation";
+import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
+import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager } from "./ManagementViews";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -19,7 +20,7 @@ import Shell from "./Shell";
 
 const TIME_ZONE = "Africa/Conakry";
 
-type Classe = { id: string; nom: string };
+type Classe = { id: string; nom: string; is_demo?: boolean };
 type Cours = {
   id: string;
   nom: string;
@@ -37,7 +38,9 @@ type Eleve = {
   photo_url?: string | null;
   scans: number;
   presences: Array<{ course_id: string; scanned_at: string }>;
+  absences: Array<{ course_id: string; motif?: string | null }>;
 };
+type ActivityEvent = { id: string; actor_role: string | null; action: string; entity_table: string; entity_id: string | null; created_at: string };
 type DashboardData = {
   date: string;
   jour_semaine: number;
@@ -48,7 +51,21 @@ type DashboardData = {
   effectif: number;
   presents: number;
   scans: number;
+  presences_enregistrees: number;
+  alerts: Array<{
+    id: string;
+    type: "schedule_conflict";
+    conflict: "class" | "teacher" | "room";
+    course_id: string;
+    course_name: string;
+    other_course_id: string;
+    other_course_name: string;
+    jour_semaine: number;
+    message: string;
+  }>;
   eleves: Eleve[];
+  demo_mode?: boolean;
+  role?: "admin" | "dev";
 };
 
 type Vue = DashboardView;
@@ -60,6 +77,12 @@ const PAGE_META: Record<Vue, { title: string; description: string }> = {
   cours: { title: "Cours", description: "Planning et pointages des cours" },
   eleves: { title: "Élèves", description: "Suivi individuel des présences" },
   cartes: { title: "Cartes QR", description: "Cartes d’identification à imprimer" },
+  "gestion-eleves": { title: "Gestion des élèves", description: "Créer, modifier, archiver et importer les fiches" },
+  "gestion-cours": { title: "Gestion des cours", description: "Gérer les cours, enseignants et horaires" },
+  presences: { title: "Gestion des présences", description: "Enregistrer et corriger les présences" },
+  utilisateurs: { title: "Comptes utilisateurs", description: "Gérer les accès ADMIN et DEV" },
+  journal: { title: "Journal d’audit", description: "Consulter les opérations administratives" },
+  securite: { title: "Sécurité du compte", description: "Mettre à jour ton mot de passe" },
   scolarite: { title: "Scolarité", description: "Suivi des frais de scolarité" },
   comptabilite: { title: "Comptabilité", description: "Recettes, dépenses et soldes de l’établissement" },
 };
@@ -176,9 +199,12 @@ export default function DashboardClient() {
   const router = useRouter();
   const [vue, setVue] = useState<Vue>("general");
   const [date, setDate] = useState(todayConakry());
+  const [demoMode, setDemoMode] = useState(false);
   const [classe, setClasse] = useState<string>("");
   const [cours, setCours] = useState<string>("");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [activityError, setActivityError] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [classeNom, setClasseNom] = useState<string>("");
@@ -207,6 +233,7 @@ export default function DashboardClient() {
     const params = new URLSearchParams({ date });
     if (classe) params.set("classe", classe);
     if (cours) params.set("cours", cours);
+    if (demoMode) params.set("demo", "1");
     try {
       const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
       if (res.status === 401) {
@@ -228,7 +255,7 @@ export default function DashboardClient() {
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
-  }, [date, classe, cours, router]);
+  }, [date, classe, cours, demoMode, router]);
 
   useEffect(() => {
     const cancelledRef = { current: false };
@@ -238,6 +265,7 @@ export default function DashboardClient() {
       const params = new URLSearchParams({ date });
       if (classe) params.set("classe", classe);
       if (cours) params.set("cours", cours);
+      if (demoMode) params.set("demo", "1");
       try {
         const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
         if (res.status === 401) {
@@ -263,7 +291,7 @@ export default function DashboardClient() {
     return () => {
       cancelledRef.current = true;
     };
-  }, [date, classe, cours, router]);
+  }, [date, classe, cours, demoMode, router]);
 
   // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
   useEffect(() => {
@@ -402,17 +430,52 @@ export default function DashboardClient() {
     [data, date]
   );
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
+  const isSelectedToday = date === todayConakry();
+  const currentMinute = nowMinutesConakry();
+  const currentCourses = isSelectedToday ? (data?.cours_prevus ?? []).filter((course) => {
+    const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
+    const end = Number(course.heure_fin.slice(0, 2)) * 60 + Number(course.heure_fin.slice(3, 5));
+    return currentMinute >= start && currentMinute <= end;
+  }) : [];
+  const upcomingCourses = isSelectedToday ? (data?.cours_prevus ?? [])
+    .filter((course) => {
+      const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
+      return start > currentMinute;
+    })
+    .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut)) : [];
+
+  useEffect(() => {
+    if (vue !== "general" || !data) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/activity", { credentials: "same-origin" });
+        const body = (await response.json()) as { events?: ActivityEvent[]; error?: string };
+        if (!response.ok) throw new Error(body.error ?? "activite_indisponible");
+        if (!cancelled) {
+          setActivity(body.events ?? []);
+          setActivityError("");
+        }
+      } catch {
+        if (!cancelled) {
+          setActivity([]);
+          setActivityError("Journal d’activité indisponible. Vérifie que la migration VerifyCheck 2.0 est appliquée.");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [vue, data]);
 
   const changementVue = useCallback((id: Vue) => {
-    if (!isDashboardViewEnabled(id)) return;
+    if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
     setVue(id);
     // Réinitialise le filtrage par cours quand on change de vue (évite un cours
     // filtré mais masqué qui rendrait la vue confuse).
     setCours("");
-  }, []);
+  }, [data?.role]);
 
   return (
-    <Shell vue={vue} onViewChange={changementVue}>
+    <Shell vue={vue} role={data?.role ?? "admin"} onViewChange={changementVue}>
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>{PAGE_META[vue].title}</h1>
@@ -463,6 +526,19 @@ export default function DashboardClient() {
               ))}
             </select>
           </label>
+          {data.role === "dev" && (
+            <label>
+              <span>Jeu de données</span>
+              <select
+                value={demoMode ? "demo" : "production"}
+                onChange={(e) => { setDemoMode(e.target.value === "demo"); setClasse(""); setCours(""); }}
+                aria-label="Mode des données"
+              >
+                <option value="production">Données réelles</option>
+                <option value="demo">Données de test (DEV)</option>
+              </select>
+            </label>
+          )}
           <button
             type="button"
             className={styles.button}
@@ -493,65 +569,109 @@ export default function DashboardClient() {
                 <article className={`${styles.metricCard} ${styles.metricEffectif}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Effectif</span>
-                    <strong className={styles.kpi}>{data.effectif}</strong>
-                    <span className={styles.metricDetail}>élèves inscrits</span>
+                    <span className={styles.metricLabel}>Cours en cours</span>
+                    <strong className={styles.kpi}>{currentCourses.length}</strong>
+                    <span className={styles.metricDetail}>selon l’heure locale de Conakry</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricPresence}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m5 12 4 4L19 6" />
-                      <circle cx="12" cy="12" r="10" />
+                      <path d="M4 5h16M4 12h16M4 19h9" /><path d="m16 17 2 2 4-4" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Présents</span>
-                    <strong className={styles.kpi}>{data.presents}</strong>
-                    <span className={styles.metricDetail}>
-                      {data.effectif > 0 ? `${((data.presents / data.effectif) * 100).toFixed(1)} % de l’effectif` : "Aucun élève inscrit"}
-                    </span>
+                    <span className={styles.metricLabel}>Prochains cours</span>
+                    <strong className={styles.kpi}>{upcomingCourses.length}</strong>
+                    <span className={styles.metricDetail}>{upcomingCourses[0] ? `Prochain : ${upcomingCourses[0].heure_debut.slice(0, 5)}` : "Aucun autre cours aujourd'hui"}</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricScans}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7" />
-                      <rect x="14" y="3" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" />
-                      <path d="M14 14h3v3h-3zM20 14v2m-3 3h2m2 0v2m-7-1v1" />
+                      <path d="m5 12 4 4L19 6" /><circle cx="12" cy="12" r="10" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Scans</span>
-                    <strong className={styles.kpi}>{data.scans}</strong>
-                    <span className={styles.metricDetail}>aujourd’hui</span>
+                    <span className={styles.metricLabel}>Présences enregistrées</span>
+                    <strong className={styles.kpi}>{data.presences_enregistrees}</strong>
+                    <span className={styles.metricDetail}>{data.scans} scan(s) serveur confirmé(s)</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricCourses}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="17" rx="2" />
-                      <path d="M16 2v4M8 2v4M3 10h18" />
-                      <path d="M8 14h2m4 0h2m-8 3h2" />
+                      <circle cx="12" cy="12" r="9" /><path d="M8 8l8 8m0-8-8 8" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Cours prévus</span>
-                    <strong className={styles.kpi}>{data.cours_prevus.length}</strong>
-                    <span className={styles.metricDetail}>ce jour</span>
+                    <span className={styles.metricLabel}>Absences</span>
+                    <strong className={styles.kpi}>{absences.length}</strong>
+                    <span className={styles.metricDetail}>cours terminé ou saisie manuelle</span>
                   </div>
                 </article>
               </section>
+
+              {data.alerts.length > 0 && (
+                <section className={styles.alertPanel} aria-labelledby="schedule-alerts-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="schedule-alerts-title" className={styles.tablePanelTitle}>Alertes de planning</h2>
+                    <span className={styles.alertCount}>{data.alerts.length} conflit(s) détecté(s)</span>
+                  </div>
+                  <div className={styles.alertList}>
+                    {data.alerts.slice(0, 8).map((alert) => (
+                      <div className={styles.alertItem} key={alert.id}>
+                        <span className={styles.alertMark} aria-hidden="true">!</span>
+                        <div>
+                          <strong>{alert.course_name} · {alert.other_course_name}</strong>
+                          <small>{["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][alert.jour_semaine]} · {alert.conflict === "class" ? "Même classe" : alert.conflict === "teacher" ? "Même enseignant" : "Même salle"} · {alert.message}</small>
+                        </div>
+                      </div>
+                    ))}
+                    {data.alerts.length > 8 && <p className={styles.summaryLine}>8 premiers conflits affichés sur {data.alerts.length}. Consulte la gestion des cours pour les autres.</p>}
+                  </div>
+                </section>
+              )}
+              {!isSelectedToday && <p className={styles.summaryLine}>Le planning en temps réel est affiché uniquement pour la date du jour ; cette date historique reste consultable dans le registre.</p>}
+              <div className={styles.scheduleGrid}>
+                <section className={styles.tablePanel} aria-labelledby="current-courses-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="current-courses-title" className={styles.tablePanelTitle}>Cours en cours</h2>
+                    <span className={styles.metricDetail}>{currentCourses.length} session(s)</span>
+                  </div>
+                  <div className={styles.scheduleList}>
+                    {currentCourses.map((course) => (
+                      <div className={styles.scheduleItem} key={course.id}>
+                        <div><strong>{course.nom}</strong><small>{classeLabel(course.classe_id)} · {course.salle ?? "Salle non renseignée"}</small></div>
+                        <span>{course.heure_debut.slice(0, 5)}–{course.heure_fin.slice(0, 5)}</span>
+                      </div>
+                    ))}
+                    {currentCourses.length === 0 && <p className={styles.empty}>Aucun cours en cours à cette heure.</p>}
+                  </div>
+                </section>
+                <section className={styles.tablePanel} aria-labelledby="upcoming-courses-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="upcoming-courses-title" className={styles.tablePanelTitle}>Prochains cours</h2>
+                    <span className={styles.metricDetail}>{upcomingCourses.length} à venir</span>
+                  </div>
+                  <div className={styles.scheduleList}>
+                    {upcomingCourses.slice(0, 5).map((course) => (
+                      <div className={styles.scheduleItem} key={course.id}>
+                        <div><strong>{course.nom}</strong><small>{classeLabel(course.classe_id)} · {course.salle ?? "Salle non renseignée"}</small></div>
+                        <span>{course.heure_debut.slice(0, 5)}</span>
+                      </div>
+                    ))}
+                    {upcomingCourses.length === 0 && <p className={styles.empty}>Aucun cours à venir aujourd’hui.</p>}
+                  </div>
+                </section>
+              </div>
 
               <section className={styles.tablePanel} aria-labelledby="attendance-register-title">
                 <div className={styles.tablePanelHeader}>
@@ -611,6 +731,27 @@ export default function DashboardClient() {
                     </tbody>
                   </table>
                 </div>
+              </section>
+
+              <section className={styles.tablePanel} aria-labelledby="recent-activity-title">
+                <div className={styles.tablePanelHeader}>
+                  <h2 id="recent-activity-title" className={styles.tablePanelTitle}>Activité récente</h2>
+                  {data.role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => setVue("journal")}>Journal complet</button>}
+                </div>
+                {activityError ? <p className={styles.error}>{activityError}</p> : (
+                  <div className={styles.scheduleList}>
+                    {activity.map((event) => (
+                      <div className={styles.scheduleItem} key={event.id}>
+                        <div>
+                          <strong>{event.action} · {event.entity_table}</strong>
+                          <small>{event.actor_role ?? "Système"} · {event.entity_id ?? "Élément sans identifiant"}</small>
+                        </div>
+                        <span>{new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(event.created_at))}</span>
+                      </div>
+                    ))}
+                    {activity.length === 0 && <p className={styles.empty}>Aucune opération récente.</p>}
+                  </div>
+                )}
               </section>
 
               <div className={styles.actionsRow}>
@@ -837,6 +978,19 @@ export default function DashboardClient() {
           {vue === "cartes" && (
             <CartesQR eleves={eleveParClasse} classeLabel={classeLabel} classeNom={classeNom} />
           )}
+
+          {vue === "gestion-eleves" && (
+            <StudentsManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "gestion-cours" && (
+            <CoursesManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "presences" && (
+            <AttendanceManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
+          {vue === "journal" && data.role === "dev" && <AuditManager />}
+          {vue === "securite" && <PasswordManager />}
 
           {/* ---------------------------------------------- SCOLARITÉ */}
           {vue === "scolarite" && (

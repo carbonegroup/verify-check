@@ -11,53 +11,46 @@ import { isMissingStudentPhotoUrlColumn } from "@/lib/student-photo-compat";
 import { schoolInstant } from "@/lib/time";
 
 /**
- * GET /api/dashboard — Sprint 3 : requêtes du dashboard direction.
- * Params : date (YYYY-MM-DD, défaut = aujourd'hui Conakry), classe?, cours?, eleve?
- * Réponse : planning du jour (cours de la classe prévus ce jour de semaine local),
- * effectif, présences de la journée, résumé par cours.
- * L'accès est protégé par la session admin ; RLS filtre les lignes côté base.
- * Si la session a dû être renouvelée (access token expiré), les cookies sont ré-écrits.
+ * GET /api/dashboard — real academic data, with demo fixtures excluded by default.
+ * DEV may opt into the isolated test dataset via ?demo=1.
  */
-
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(
-    requestAccessToken(request),
-    request.cookies.get(REFRESH_COOKIE)?.value
-  );
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
-  }
+  const accessToken = requestAccessToken(request);
+  const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const params = request.nextUrl.searchParams;
   const date = params.get("date") ?? schoolInstant().jour;
-  if (!isIsoDate(date)) {
-    return NextResponse.json({ error: "date_invalide" }, { status: 400 });
-  }
+  if (!isIsoDate(date)) return NextResponse.json({ error: "date_invalide" }, { status: 400 });
 
-  const supabase = createServerSupabase(
-    auth.session?.access_token ?? requestAccessToken(request)
-  );
+  const includeDemo = auth.user.role === "dev" && params.get("demo") === "1";
+  const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const { startAt, endAt } = dayWindow(date);
 
+  let classesQuery = supabase.from("classes").select("id, nom, is_demo").is("archived_at", null).order("nom");
+  let coursesQuery = supabase.from("courses")
+    .select("id, nom, classe_id, salle, jour_semaine, heure_debut, heure_fin, enseignant")
+    .is("archived_at", null).order("heure_debut");
+  let studentsQuery = supabase.from("students")
+    .select("id, nom, prenom, code_qr, classe_id, photo_url")
+    .is("archived_at", null).order("nom");
+  classesQuery = classesQuery.eq("is_demo", includeDemo);
+  coursesQuery = coursesQuery.eq("is_demo", includeDemo);
+  studentsQuery = studentsQuery.eq("is_demo", includeDemo);
+
   const [classesRes, coursesRes, studentsWithPhotoRes, attendanceRes] = await Promise.all([
-    supabase.from("classes").select("id, nom").order("nom"),
-    supabase
-      .from("courses")
-      .select("id, nom, classe_id, salle, jour_semaine, heure_debut, heure_fin")
-      .order("heure_debut"),
-    supabase.from("students").select("id, nom, code_qr, classe_id, photo_url").order("nom"),
-    supabase
-      .from("attendance")
-      .select("id, student_id, course_id, scanned_at")
-      .gte("scanned_at", startAt)
-      .lt("scanned_at", endAt),
+    classesQuery,
+    coursesQuery,
+    studentsQuery,
+    supabase.from("attendance")
+      .select("id, student_id, course_id, scanned_at, statut, source, motif")
+      .gte("scanned_at", startAt).lt("scanned_at", endAt),
   ]);
 
-  // A photo migration can be pending in Supabase production. Keep the dashboard
-  // operational with the legacy student fields until photo_url exists.
   const studentsRes =
     studentsWithPhotoRes.error && isMissingStudentPhotoUrlColumn(studentsWithPhotoRes.error)
-      ? await supabase.from("students").select("id, nom, code_qr, classe_id").order("nom")
+      ? await supabase.from("students").select("id, nom, code_qr, classe_id")
+          .is("archived_at", null).eq("is_demo", includeDemo).order("nom")
       : studentsWithPhotoRes;
 
   if (classesRes.error || coursesRes.error || studentsRes.error || attendanceRes.error) {
@@ -78,9 +71,8 @@ export async function GET(request: NextRequest) {
       eleve: params.get("eleve") ?? undefined,
     }
   );
-  // Le jour de semaine du planning est calculé dans buildDashboard (weekdayOfIso).
 
-  const response = NextResponse.json(result);
+  const response = NextResponse.json({ ...result, demo_mode: includeDemo, role: auth.user.role });
   if (auth.session) setSessionCookies(response, auth.session);
   return response;
 }

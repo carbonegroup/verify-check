@@ -184,3 +184,67 @@ test("buildDashboard : le filtre cours peut cibler un cours hors du jour sélect
   assert.deepEqual(r.cours_semaine.map((c) => c.id), ["co-hist"]);
   assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-hist", "co-math", "co-phys"]);
 });
+
+test("buildDashboard: une absence saisie manuellement n'est pas comptée comme présence ni comme scan", () => {
+  const raw = {
+    ...base(),
+    attendance: [{
+      id: "manual-absent",
+      student_id: "st-1",
+      course_id: "co-math",
+      scanned_at: "2026-11-13T08:05:00Z",
+      statut: "absent" as const,
+      source: "manual" as const,
+    }],
+  };
+  const r = buildDashboard(raw, { date: vendredi });
+  assert.equal(r.scans, 0);
+  assert.equal(r.presents, 0);
+  assert.equal(r.eleves.find((e) => e.id === "st-1")?.scans, 0);
+  assert.deepEqual(r.eleves.find((e) => e.id === "st-1")?.presences, []);
+});
+
+test("buildDashboard: un retard manuel compte comme présence, mais pas comme scan", () => {
+  const raw = {
+    ...base(),
+    attendance: [{
+      id: "manual-late",
+      student_id: "st-1",
+      course_id: "co-math",
+      scanned_at: "2026-11-13T08:05:00Z",
+      statut: "retard" as const,
+      source: "manual" as const,
+    }],
+  };
+  const r = buildDashboard(raw, { date: vendredi });
+  assert.equal(r.scans, 0);
+  assert.equal(r.presents, 1);
+});
+
+test("buildDashboard: remonte un conflit horaire existant une seule fois", () => {
+  const conflicting: CourseRow = {
+    id: "co-math-extra",
+    nom: "Algèbre",
+    classe_id: "cl-1",
+    salle: "B13",
+    jour_semaine: 5,
+    heure_debut: "08:30",
+    heure_fin: "09:30",
+    enseignant: "Mme Barry",
+  };
+  const original: CourseRow = {
+    ...courses[0],
+    enseignant: "Mme Barry",
+  };
+  const raw = { ...base(), courses: [original, ...courses.slice(1), conflicting] };
+  const result = buildDashboard(raw, { date: vendredi });
+  assert.equal(result.alerts.length, 1);
+  assert.equal(result.alerts[0].type, "schedule_conflict");
+  assert.equal(result.alerts[0].conflict, "class");
+  assert.ok(result.alerts[0].message.includes("co-math-extra"));
+});
+
+test("buildDashboard: n'invente aucune alerte sans chevauchement", () => {
+  const result = buildDashboard(base(), { date: vendredi });
+  assert.deepEqual(result.alerts, []);
+});

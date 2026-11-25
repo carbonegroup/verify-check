@@ -31,6 +31,7 @@ type CourseRow = {
   id: string;
   nom: string;
   salle: string | null;
+  is_demo: boolean;
   jour_semaine: number;
   heure_debut: string;
   heure_fin: string;
@@ -98,8 +99,9 @@ export async function POST(request: NextRequest) {
   // 1) Élève par code QR
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id, nom, classe_id")
+    .select("id, nom, classe_id, is_demo")
     .eq("code_qr", codeQr)
+    .is("archived_at", null)
     .single();
   if (studentError) {
     // PGRST116 = 0 ligne (QR inconnu) ; toute autre erreur est une panne base :
@@ -113,12 +115,17 @@ export async function POST(request: NextRequest) {
   if (!student) {
     return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
+  if (student.is_demo && auth.user.role !== "dev") {
+    return respondJson({ error: "qr_invalide" }, { status: 404 });
+  }
 
   // Nom de classe affiché sur la fiche après lecture du QR.
   const { data: studentClass, error: classError } = await supabase
     .from("classes")
-    .select("nom")
+    .select("nom, is_demo")
     .eq("id", student.classe_id)
+    .eq("is_demo", student.is_demo)
+    .is("archived_at", null)
     .single();
   if (classError || !studentClass) {
     return respondJson({ error: "erreur_base" }, { status: 500 });
@@ -127,8 +134,10 @@ export async function POST(request: NextRequest) {
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
   const { data: courses, error: coursesError } = await supabase
     .from("courses")
-    .select("id, nom, salle, jour_semaine, heure_debut, heure_fin")
+    .select("id, nom, salle, is_demo, jour_semaine, heure_debut, heure_fin")
     .eq("classe_id", student.classe_id)
+    .eq("is_demo", student.is_demo)
+    .is("archived_at", null)
     .eq("jour_semaine", now.jourSemaine);
   if (coursesError) {
     return respondJson({ error: "erreur_base" }, { status: 500 });

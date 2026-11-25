@@ -26,6 +26,15 @@ test("csvEscape échappe les guillemets", () => {
   assert.equal(csvEscape("Alpha Barry"), '"Alpha Barry"');
 });
 
+test("csvEscape neutralise les cellules pouvant déclencher une formule", () => {
+  assert.equal(csvEscape("=1+1"), "\"'=1+1\"");
+  assert.equal(csvEscape("+SUM(A1:A2)"), "\"'+SUM(A1:A2)\"");
+  assert.equal(csvEscape("-2+3"), "\"'-2+3\"");
+  assert.equal(csvEscape("@SUM(A1)"), "\"'@SUM(A1)\"");
+  assert.equal(csvEscape("  =HYPERLINK(\"https://example.test\")"), "\"'  =HYPERLINK(\"\"https://example.test\"\")\"");
+  assert.equal(csvEscape("ordinary text"), "\"ordinary text\"");
+});
+
 test("buildAbsencesCsv : une ligne d'absence par élève × cours terminé", () => {
   const csv = buildAbsencesCsv(
     { classes, courses, students, attendance: [] },
