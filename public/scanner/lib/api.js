@@ -90,7 +90,7 @@ VC.api = (function () {
 
   // ------------------------------------------------------------ HTTP base
   async function apiFetch(url, options) {
-    const res = await fetch(url, Object.assign({ credentials: "same-origin" }, options));
+    const res = await fetch(url, Object.assign({ credentials: "same-origin", cache: "no-store" }, options));
     let body = {};
     try { body = await res.json(); } catch { /* */ }
     return { status: res.status, body, headers: res.headers };
@@ -143,7 +143,7 @@ VC.api = (function () {
     selected: null,
     async ensureContext() {
       const { status, body } = await apiFetch("/api/scan/context");
-      if (status === 401) return { status: "session" };
+      if (status === 401 || status === 403) return { status: "session" };
       if (status !== 200) return { status: "server-error" };
       this.context = body;
       emit();
