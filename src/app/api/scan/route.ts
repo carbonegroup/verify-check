@@ -31,6 +31,7 @@ type CourseRow = {
   id: string;
   nom: string;
   salle: string | null;
+  is_demo: boolean;
   jour_semaine: number;
   heure_debut: string;
   heure_fin: string;
@@ -98,8 +99,9 @@ export async function POST(request: NextRequest) {
   // 1) Élève par code QR
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id, nom, classe_id")
+    .select("id, nom, classe_id, is_demo")
     .eq("code_qr", codeQr)
+    .is("archived_at", null)
     .single();
   if (studentError) {
     // PGRST116 = 0 ligne (QR inconnu) ; toute autre erreur est une panne base :
@@ -113,11 +115,14 @@ export async function POST(request: NextRequest) {
   if (!student) {
     return respondJson({ error: "qr_invalide" }, { status: 404 });
   }
+  if (student.is_demo && auth.user.role !== "dev") {
+    return respondJson({ error: "qr_invalide" }, { status: 404 });
+  }
 
   // Nom de classe affiché sur la fiche après lecture du QR.
   const { data: studentClass, error: classError } = await supabase
     .from("classes")
-    .select("nom")
+    .select("nom, is_demo")
     .eq("id", student.classe_id)
     .single();
   if (classError || !studentClass) {
