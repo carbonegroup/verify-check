@@ -692,6 +692,9 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [courses, setCourses] = useState<Course[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [search, setSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [filterClass, setFilterClass] = useState("");
   const [filterCourse, setFilterCourse] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -711,27 +714,32 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const loadOptions = useCallback(async () => {
     try {
       const [studentResult, courseResult] = await Promise.all([
-        responseJson<{ students: Student[] }>(await fetch(`/api/students?perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" })),
+        responseJson<{ students: Student[] }>(await fetch(`/api/students?perPage=50${demoMode ? "&demo=1" : ""}${studentSearch.trim() ? `&q=${encodeURIComponent(studentSearch.trim())}` : ""}`, { credentials: "same-origin" })),
         responseJson<{ courses: Course[] }>(await fetch(`/api/courses?perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" })),
       ]);
       setStudents(studentResult.students);
       setCourses(courseResult.courses);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
-  }, [demoMode]);
+  }, [demoMode, studentSearch]);
   const loadRecords = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ date, perPage: "100" });
+      const params = new URLSearchParams({ date, page: String(page), perPage: "50" });
       if (demoMode) params.set("demo", "1");
       if (search.trim()) params.set("q", search.trim());
       if (filterClass) params.set("classe", filterClass);
       if (filterCourse) params.set("cours", filterCourse);
       if (filterStatus) params.set("statut", filterStatus);
-      const result = await responseJson<{ attendances: AttendanceRecord[] }>(await fetch(`/api/attendance?${params}`, { credentials: "same-origin" }));
+      const result = await responseJson<{ attendances: AttendanceRecord[]; total: number }>(await fetch(`/api/attendance?${params}`, { credentials: "same-origin" }));
       setRecords(result.attendances);
+      setTotalRecords(result.total);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
-  }, [date, demoMode, search, filterClass, filterCourse, filterStatus]);
+  }, [date, page, demoMode, search, filterClass, filterCourse, filterStatus]);
+  // Debounce the server-side student search; course options are refreshed at the same time.
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
-  useEffect(() => { void loadOptions(); }, [loadOptions]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadOptions(); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [loadOptions]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
@@ -768,11 +776,15 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
         <h2 className={styles.panelTitle}>Saisie manuelle d’une présence</h2>
         <form onSubmit={submit}>
           <div className={styles.formGrid}>
+            <label className={styles.field}>Rechercher un étudiant
+              <input className={styles.input} value={studentSearch} onChange={(e) => { setStudentSearch(e.target.value); setStudentId(""); setCourseId(""); }} placeholder="Nom, prénom ou matricule" />
+            </label>
             <label className={styles.field}>Étudiant *
               <select className={styles.select} required value={studentId} onChange={(e) => { setStudentId(e.target.value); setCourseId(""); }}>
                 <option value="">Sélectionner un étudiant</option>
                 {students.filter((student) => Boolean(student.is_demo) === demoMode).map((student) => <option key={student.id} value={student.id}>{student.prenom ? student.prenom + " " : ""}{student.nom} — {classes.find((c) => c.id === student.classe_id)?.nom ?? "—"}</option>)}
               </select>
+              <span className={styles.hint}>{students.length} résultat(s) chargés · recherche serveur, 50 par page de résultats</span>
             </label>
             <label className={styles.field}>Cours *
               <select className={styles.select} required value={courseId} onChange={(e) => setCourseId(e.target.value)}>
@@ -831,23 +843,30 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
           <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className={styles.field}>Classe
-          <select className={styles.select} value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
+          <select className={styles.select} value={filterClass} onChange={(e) => { setPage(1); setFilterClass(e.target.value); }}>
             <option value="">Toutes</option>
             {classes.filter((c) => Boolean(c.is_demo) === demoMode).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
           </select>
         </label>
         <label className={styles.field}>Cours
-          <select className={styles.select} value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}>
+          <select className={styles.select} value={filterCourse} onChange={(e) => { setPage(1); setFilterCourse(e.target.value); }}>
             <option value="">Tous</option>
             {courses.filter((course) => Boolean(course.is_demo) === demoMode && (!filterClass || course.classe_id === filterClass)).map((course) => <option key={course.id} value={course.id}>{course.nom}</option>)}
           </select>
         </label>
         <label className={styles.field}>Statut
-          <select className={styles.select} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <select className={styles.select} value={filterStatus} onChange={(e) => { setPage(1); setFilterStatus(e.target.value); }}>
             <option value="">Tous</option><option value="present">Présent</option><option value="absent">Absent</option><option value="retard">Retard</option>
           </select>
         </label>
         <button className={styles.buttonSecondary} type="button" onClick={() => void loadRecords()}>Actualiser</button>
+      </div>
+      <div className={styles.pagination}>
+        <span>{totalRecords} enregistrement(s) · page {page}</span>
+        <div className={styles.actions}>
+          <button className={styles.buttonSecondary} type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Précédent</button>
+          <button className={styles.buttonSecondary} type="button" disabled={page * 50 >= totalRecords} onClick={() => setPage((value) => value + 1)}>Suivant</button>
+        </div>
       </div>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
