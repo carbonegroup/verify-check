@@ -32,9 +32,12 @@ export function createServerSupabase(accessToken?: string): SupabaseClient {
 export const ACCESS_COOKIE_MAX_AGE = 60 * 60; // 1 h
 export const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 8; // 8 h — journée scolaire
 
+export type OperationalRole = "admin" | "dev";
+
 export type AuthUser = {
   id: string;
   email: string | null;
+  role: OperationalRole;
 };
 
 /** Rôle admin lu dans app_metadata (jamais user_metadata). */
@@ -42,6 +45,20 @@ export function isAdminRole(user: {
   app_metadata?: Record<string, unknown> | null;
 }): boolean {
   return user.app_metadata?.role === "admin";
+}
+
+/** ADMIN and DEV both have operational access; DEV has additional privileges. */
+export function isOperationalRole(user: {
+  app_metadata?: Record<string, unknown> | null;
+}): boolean {
+  const role = user.app_metadata?.role;
+  return role === "admin" || role === "dev";
+}
+
+export function isDevRole(user: {
+  app_metadata?: Record<string, unknown> | null;
+}): boolean {
+  return user.app_metadata?.role === "dev";
 }
 
 /** Détermine si l'environnement est production (Vercel, etc.) */
@@ -100,7 +117,7 @@ export async function requireAdmin(
   refreshToken?: string | null
 ): Promise<
   | { ok: true; user: AuthUser; session?: { access_token: string; refresh_token: string } }
-  | { ok: false; status: 401; error: string }
+  | { ok: false; status: 401 | 403; error: string }
 > {
   if (!accessToken) {
     return { ok: false, status: 401, error: "session_requise" };
@@ -126,12 +143,17 @@ export async function requireAdmin(
   if (!user) {
     return { ok: false, status: 401, error: "session_invalide" };
   }
-  if (!isAdminRole(user as { app_metadata?: Record<string, unknown> })) {
-    return { ok: false, status: 401, error: "role_admin_requis" };
+  const roleUser = user as { app_metadata?: Record<string, unknown> };
+  if (!isOperationalRole(roleUser)) {
+    return { ok: false, status: 403, error: "role_admin_requis" };
   }
   return {
     ok: true,
-    user: { id: user.id, email: user.email ?? null },
+    user: {
+      id: user.id,
+      email: user.email ?? null,
+      role: roleUser.app_metadata?.role as OperationalRole,
+    },
     session,
   };
 }
