@@ -198,7 +198,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
             </button>
 
             <div className={styles.topbarLeft}>
-              <div className={styles.appName}>UCAO <strong>· VerifyCheck — Direction</strong></div>
+              <div className={styles.appName}>UCAO <strong>· Direction</strong></div>
             </div>
 
             <div className={styles.topbarRight}>
