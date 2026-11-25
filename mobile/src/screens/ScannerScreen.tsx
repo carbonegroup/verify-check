@@ -104,7 +104,6 @@ type ResultatAffiche = {
   classe?: string;
   cours?: string;
   heure?: string;
-  candidates?: Array<{ id: string; nom: string; salle: string | null; heure_debut?: string; heure_fin?: string }>;
   selection?: SelectionScan;
 };
 
@@ -178,7 +177,6 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
       if ("classe" in response) affiche.classe = response.classe;
       if ("cours" in response) affiche.cours = response.cours;
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
-      if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
       if (response.kind === "previsualisation") {
         affiche.selection = selection ?? (
           response.coursId && response.cours
@@ -303,25 +301,6 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
                   <Text style={s.fieldValue}>{resultat.cours}</Text>
                 </>
               ) : null}
-            </View>
-          ) : null}
-
-          {resultat.candidates?.length ? (
-            <View style={s.candidateList}>
-              <Text style={s.fieldLabel}>COURS QUI CORRESPONDENT</Text>
-              {resultat.candidates.map((candidate) => (
-                <View key={candidate.id} style={s.candidate}>
-                  <View style={s.candidateCopy}>
-                    <Text style={s.candidateName}>{candidate.nom}</Text>
-                    <Text style={s.candidateMeta}>
-                      {candidate.heure_debut && candidate.heure_fin
-                        ? candidate.heure_debut.slice(0, 5) + "–" + candidate.heure_fin.slice(0, 5)
-                        : "Horaire non communiqué"}
-                      {candidate.salle ? " · " + candidate.salle : ""}
-                    </Text>
-                  </View>
-                </View>
-              ))}
             </View>
           ) : null}
 
@@ -509,11 +488,6 @@ const s = StyleSheet.create({
   fieldLabel: { color: theme.inkSoft, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
   studentName: { color: theme.ink, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   fieldValue: { color: theme.ink, fontSize: 14, fontWeight: "600" },
-  candidateList: { width: "100%", gap: 8 },
-  candidate: { minHeight: 50, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: theme.line, borderRadius: 9, backgroundColor: "#F3F6FA" },
-  candidateCopy: { flex: 1, gap: 4 },
-  candidateName: { color: theme.ink, fontSize: 13, fontWeight: "700" },
-  candidateMeta: { color: theme.inkSoft, fontSize: 11 },
   primary: { width: "100%", minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, backgroundColor: theme.accent, marginTop: 4 },
   primaryText: { color: theme.white, fontSize: 14, fontWeight: "700" },
   secondary: { minHeight: 40, alignItems: "center", justifyContent: "center" },
