@@ -212,7 +212,6 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
       if ("classe" in response) affiche.classe = response.classe;
       if ("cours" in response) affiche.cours = response.cours;
       if (response.kind === "pas_de_cours") affiche.heure = response.heure;
-      if (response.kind === "cours_ambigu") affiche.candidates = response.candidates;
       setResultat(affiche);
 
       if (response.kind === "confirmee") vibrationSucces();
