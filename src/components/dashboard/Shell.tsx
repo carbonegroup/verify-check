@@ -343,13 +343,14 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
                   ref={accountTriggerRef}
                   type="button"
                   className={styles.account}
+                  aria-label={role === "dev" ? "Compte DEV" : "Compte ADMIN"}
                   aria-haspopup="menu"
                   aria-expanded={accountMenuOpen}
                   aria-controls="verifycheck-account-menu"
                   onClick={() => setAccountMenuOpen((open) => !open)}
                 >
                   <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
-                  <span>{role === "dev" ? "Développeur" : "Administration"}</span>
+                  <span className={styles.accountLabel}>{role === "dev" ? "Développeur" : "Administration"}</span>
                   <span className={styles.accountChevron} aria-hidden="true">{accountMenuOpen ? "⌃" : "⌄"}</span>
                 </button>
                 {accountMenuOpen && (

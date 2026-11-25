@@ -80,7 +80,10 @@
 }
 .tableWrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #dce5ef;
   border-radius: 9px;
   background: white;
@@ -224,4 +227,79 @@
   color: #8a5718;
   font-size: 11px;
   font-weight: 750;
+}
+
+
+/* Responsive management screens: forms reflow and dense tables scroll locally. */
+@media (max-width: 800px) {
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .field {
+    flex-basis: 200px;
+  }
+
+  .previewRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .panel {
+    padding: 12px;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar > .field,
+  .toolbar > button {
+    width: 100%;
+  }
+
+  .actions {
+    align-items: stretch;
+  }
+
+  .actions > button {
+    flex: 1 1 auto;
+  }
+
+  .pagination {
+    gap: 12px;
+  }
+
+  .pagination .actions {
+    width: 100%;
+  }
+
+  .diagnosticItem {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .previewRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tableWrap {
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 360px) {
+  .panel {
+    padding: 10px;
+  }
+
+  .button,
+  .buttonSecondary,
+  .buttonDanger {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
 }
