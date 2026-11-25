@@ -1036,7 +1036,7 @@ export default function DashboardClient() {
             <DemoDataManager demoMode={demoMode} onToggleDemo={toggleDeveloperDemo} />
           )}
           {vue === "journal" && role === "dev" && <AuditManager />}
-          {vue === "parametres" && role === "dev" && <DeveloperSettings />
+          {vue === "parametres" && role === "dev" && <DeveloperSettings />}
           {vue === "securite" && <PasswordManager />}
 
           {/* ---------------------------------------------- SCOLARITÉ */}
