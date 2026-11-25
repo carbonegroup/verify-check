@@ -75,6 +75,11 @@ const LIBELLES: Record<ScanEtat["kind"], { titre: string; detail: string; couleu
     detail: "Le serveur n'a pas accepté cette opération. Aucun pointage n'a été ajouté à la file locale.",
     couleur: theme.danger,
   },
+  stockage_impossible: {
+    titre: "Enregistrement local impossible",
+    detail: "Le scan n'a pas pu être conservé sur cet appareil. Aucune confirmation n'est affichée ; reconnecte-toi et rescane la carte.",
+    couleur: theme.danger,
+  },
   erreur_serveur: {
     titre: "Validation impossible",
     detail: "Le serveur n'a pas confirmé ce pointage. Vérifie son état dans l'historique.",
@@ -189,7 +194,7 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
       if (response.kind === "session_expiree") onSessionExpiree();
     } catch {
       vibrationAlerte();
-      setResultat({ kind: "erreur_serveur", code: value });
+      setResultat({ kind: "stockage_impossible", code: value });
     } finally {
       setBusy(false);
     }
@@ -218,7 +223,7 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
       if (response.kind === "session_expiree") onSessionExpiree();
     } catch {
       vibrationAlerte();
-      setResultat({ kind: "erreur_serveur", code: resultat.code });
+      setResultat({ kind: "stockage_impossible", code: resultat.code });
     } finally {
       setBusy(false);
     }

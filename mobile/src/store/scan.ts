@@ -24,13 +24,28 @@ export type ResumeLocal = ReturnType<typeof resumeFile> & { derniereSynchronisat
 const KEY = "vc.mobile.queue.v1";
 const SYNC_KEY = "vc.mobile.sync.v1";
 
+function estFileItem(value: unknown): value is FileItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<FileItem>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.code_qr === "string" &&
+    typeof item.cours === "string" &&
+    typeof item.at === "string" &&
+    (item.etat === "en_attente" || item.etat === "confirme" || item.etat === "rejete") &&
+    typeof item.essais === "number"
+  );
+}
+
 const asyncStore: FileStore = {
   async load() {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("La file locale est illisible.");
-    return parsed as FileItem[];
+    if (!Array.isArray(parsed) || !parsed.every(estFileItem)) {
+      throw new Error("La file locale est illisible.");
+    }
+    return parsed;
   },
   async save(items) {
     await AsyncStorage.setItem(KEY, JSON.stringify(items));
@@ -85,7 +100,8 @@ export async function enregistrerScan(
   }
 
   if (etat.kind === "confirmee" || etat.kind === "doublon") {
-    await serialiserMutation(async () => {
+    try {
+      await serialiserMutation(async () => {
       const items = await asyncStore.load();
       const coursId = selection?.coursId ?? "";
       const courseId = etat.coursId ?? coursId;
@@ -123,9 +139,13 @@ export async function enregistrerScan(
         });
       }
 
-      await asyncStore.save(unresolved);
-      emitChange();
-    });
+        await asyncStore.save(unresolved);
+        emitChange();
+      });
+    } catch {
+      // La réponse serveur reste autoritaire même si l'historique secondaire
+      // de l'appareil n'a pas pu être actualisé.
+    }
   }
 
   return etat;

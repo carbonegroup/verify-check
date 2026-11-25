@@ -20,7 +20,7 @@ Application Android/iOS dédiée au pointage scolaire QR. Le serveur reste l'aut
 ## Principes de sécurité et de cohérence
 
 - Aucun pointage n'est affiché comme confirmé sur la seule base d'un enregistrement local.
-- La file locale est conservée en cas d'erreur de stockage ou de perte de connexion ; l'application ne doit pas annoncer qu'un scan a été mis en attente si sa persistance a échoué.
+- Si l'écriture locale d'un scan hors ligne échoue, l'application affiche une erreur et ne prétend pas que le scan a été conservé. Si le serveur a déjà confirmé une présence, cette confirmation reste affichée même si sa copie secondaire dans l'historique local échoue.
 - Les réponses d'accès refusé (403), de session expirée (401) et de requête invalide (400/404 non métier) ne sont pas transformées en pointages hors ligne.
 - Un doublon renvoyé par le serveur est traité comme une présence déjà enregistrée, pas comme une nouvelle présence.
 - Les scans sans cours identifié restent en attente et ne sont jamais rejoués sur une séance ultérieure par supposition.

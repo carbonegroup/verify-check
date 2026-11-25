@@ -17,6 +17,7 @@ export type ScanEtat =
   | { kind: "session_expiree" }
   | { kind: "acces_refuse" }
   | { kind: "erreur_requete" }
+  | { kind: "stockage_impossible" }
   | { kind: "erreur_serveur" }
   | { kind: "hors_ligne"; fileId: string }
   | { kind: "deja_en_attente" };
@@ -81,6 +82,7 @@ export function doitMettreEnFile(etat: ScanEtat): boolean {
     etat.kind === "session_expiree" ||
     etat.kind === "acces_refuse" ||
     etat.kind === "erreur_requete" ||
+    etat.kind === "stockage_impossible" ||
     etat.kind === "hors_ligne" ||
     etat.kind === "deja_en_attente"
   ) {

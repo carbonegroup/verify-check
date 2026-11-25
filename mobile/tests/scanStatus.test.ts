@@ -71,6 +71,7 @@ test("doitMettreEnFile : uniquement réessayable, jamais rejet définitif ni con
   assert.ok(!doitMettreEnFile({ kind: "session_expiree" }));
   assert.ok(!doitMettreEnFile({ kind: "acces_refuse" }));
   assert.ok(!doitMettreEnFile({ kind: "erreur_requete" }));
+  assert.ok(!doitMettreEnFile({ kind: "stockage_impossible" }));
   assert.ok(!doitMettreEnFile({ kind: "qr_invalide" }));
   assert.ok(!doitMettreEnFile({ kind: "pas_de_cours", heure: "10:30" }));
   assert.ok(!doitMettreEnFile({ kind: "cours_ambigu", candidates: [] }));
