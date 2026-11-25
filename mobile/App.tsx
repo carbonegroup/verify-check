@@ -67,7 +67,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void actualiserCompteur();
+    void Promise.resolve().then(actualiserCompteur);
     return onFileChange(() => void actualiserCompteur());
   }, [actualiserCompteur]);
 
@@ -100,10 +100,10 @@ export default function App() {
 
   useEffect(() => {
     if (!email) return;
-    void verifierServeurEtSynchroniser();
+    void Promise.resolve().then(verifierServeurEtSynchroniser);
     const interval = setInterval(() => void verifierServeurEtSynchroniser(), 45000);
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void verifierServeurEtSynchroniser();
+      if (state === "active") void Promise.resolve().then(verifierServeurEtSynchroniser);
     });
     return () => {
       clearInterval(interval);
