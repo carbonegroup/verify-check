@@ -954,6 +954,7 @@ export function DeveloperWorkspace({
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Load server diagnostics when the DEV workspace opens.
   useEffect(() => { void loadDiagnostics(); }, [loadDiagnostics]);
 
   return (
