@@ -5,7 +5,10 @@
 
 .shell {
   display: flex;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  overflow-x: clip;
   background: var(--vc-bg);
   color: var(--vc-ink);
 }
@@ -437,8 +440,10 @@
 
 .main {
   flex: 1;
+  width: 100%;
   min-width: 0;
   padding: 20px 20px 32px;
+  overflow-x: auto;
   overflow-y: auto;
 }
 
@@ -483,5 +488,75 @@
   .sidebar,
   .navItem {
     transition: none;
+  }
+}
+
+
+/* Responsive dashboard shell: compact top bar and safe off-canvas navigation. */
+@media (max-width: 900px) {
+  .sidebar {
+    width: min(280px, calc(100vw - 40px));
+    box-shadow: 12px 0 32px rgba(20, 38, 58, 0.12);
+    overscroll-behavior: contain;
+  }
+
+  .topbarInner {
+    padding-inline: 18px;
+  }
+
+  .main {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbarInner {
+    min-height: 56px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .burger {
+    flex: 0 0 40px;
+  }
+
+  .topbarLeft {
+    gap: 8px;
+  }
+
+  .appName {
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .account {
+    gap: 5px;
+    padding: 4px;
+  }
+
+  .accountLabel {
+    display: none;
+  }
+
+  .accountDropdown {
+    width: min(260px, calc(100vw - 24px));
+  }
+
+  .main {
+    padding: 14px 12px 24px;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbarInner {
+    padding-inline: 8px;
+  }
+
+  .appName {
+    font-size: 13px;
+  }
+
+  .main {
+    padding-inline: 10px;
   }
 }
