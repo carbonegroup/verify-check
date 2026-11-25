@@ -37,6 +37,7 @@ type Eleve = {
   photo_url?: string | null;
   scans: number;
   presences: Array<{ course_id: string; scanned_at: string }>;
+  absences: Array<{ course_id: string; motif?: string | null }>;
 };
 type DashboardData = {
   date: string;
@@ -49,6 +50,8 @@ type DashboardData = {
   presents: number;
   scans: number;
   eleves: Eleve[];
+  demo_mode?: boolean;
+  role?: "admin" | "dev";
 };
 
 type Vue = DashboardView;
