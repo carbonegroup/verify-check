@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const { startAt, endAt } = dayWindow(date);
 
-  let classesQuery = supabase.from("classes").select("id, nom").is("archived_at", null).order("nom");
+  let classesQuery = supabase.from("classes").select("id, nom, is_demo").is("archived_at", null).order("nom");
   let coursesQuery = supabase.from("courses")
     .select("id, nom, classe_id, salle, jour_semaine, heure_debut, heure_fin, enseignant")
     .is("archived_at", null).order("heure_debut");
