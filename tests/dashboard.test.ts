@@ -184,3 +184,39 @@ test("buildDashboard : le filtre cours peut cibler un cours hors du jour sélect
   assert.deepEqual(r.cours_semaine.map((c) => c.id), ["co-hist"]);
   assert.deepEqual(r.cours_disponibles.map((c) => c.id), ["co-hist", "co-math", "co-phys"]);
 });
+
+test("buildDashboard: une absence saisie manuellement n'est pas comptée comme présence ni comme scan", () => {
+  const raw = {
+    ...base(),
+    attendance: [{
+      id: "manual-absent",
+      student_id: "st-1",
+      course_id: "co-math",
+      scanned_at: "2026-11-13T08:05:00Z",
+      statut: "absent" as const,
+      source: "manual" as const,
+    }],
+  };
+  const r = buildDashboard(raw, { date: vendredi });
+  assert.equal(r.scans, 0);
+  assert.equal(r.presents, 0);
+  assert.equal(r.eleves.find((e) => e.id === "st-1")?.scans, 0);
+  assert.deepEqual(r.eleves.find((e) => e.id === "st-1")?.presences, []);
+});
+
+test("buildDashboard: un retard manuel compte comme présence, mais pas comme scan", () => {
+  const raw = {
+    ...base(),
+    attendance: [{
+      id: "manual-late",
+      student_id: "st-1",
+      course_id: "co-math",
+      scanned_at: "2026-11-13T08:05:00Z",
+      statut: "retard" as const,
+      source: "manual" as const,
+    }],
+  };
+  const r = buildDashboard(raw, { date: vendredi });
+  assert.equal(r.scans, 0);
+  assert.equal(r.presents, 1);
+});
