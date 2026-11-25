@@ -228,7 +228,7 @@ export default function DashboardClient() {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/auth/context", { credentials: "same-origin" });
+        const response = await fetch("/api/auth/context", { credentials: "same-origin", cache: "no-store" });
         if (!response.ok) return;
         const context = await response.json() as { role?: "admin" | "dev" };
         if (!cancelled && (context.role === "admin" || context.role === "dev")) {
@@ -248,74 +248,49 @@ export default function DashboardClient() {
   const [scolariteReload, setScolariteReload] = useState(0);
   const [comptabiliteReload, setComptabiliteReload] = useState(0);
 
-  const load = useCallback(async () => {
-    const cancelledRef = { current: false };
-    setLoading(true);
+  const dashboardRequestId = useRef(0);
+
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    const requestId = ++dashboardRequestId.current;
+    if (!silent) setLoading(true);
     setError(null);
     const params = new URLSearchParams({ date });
     if (classe) params.set("classe", classe);
     if (cours) params.set("cours", cours);
     if (demoMode) params.set("demo", "1");
     try {
-      const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
+      const res = await fetch(`/api/dashboard?${params.toString()}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
       if (res.status === 401) {
         router.push("/login?next=%2Fdashboard");
         return;
       }
+      if (requestId !== dashboardRequestId.current) return;
       if (!res.ok) {
-        if (!cancelledRef.current) setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
-        if (!cancelledRef.current) setData(null);
+        setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
+        if (!silent) setData(null);
       } else {
         const body = (await res.json()) as DashboardData;
-        if (!cancelledRef.current) setData(body);
-        if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
-        if (!cancelledRef.current) setClasseNom(
-          classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
-        );
+        if (requestId !== dashboardRequestId.current) return;
+        setData(body);
+        if (body.role === "admin" || body.role === "dev") setRole(body.role);
+        setClasseNom(classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : "");
       }
     } catch {
-      if (!cancelledRef.current) setError("Réseau indisponible.");
+      if (requestId === dashboardRequestId.current) {
+        setError("Réseau indisponible.");
+        if (!silent) setData(null);
+      }
     } finally {
-      if (!cancelledRef.current) setLoading(false);
+      if (requestId === dashboardRequestId.current && !silent) setLoading(false);
     }
   }, [date, classe, cours, demoMode, router]);
 
   useEffect(() => {
-    const cancelledRef = { current: false };
-    (async () => {
-      setLoading(true);
-      setError(null);
-      const params = new URLSearchParams({ date });
-      if (classe) params.set("classe", classe);
-      if (cours) params.set("cours", cours);
-      if (demoMode) params.set("demo", "1");
-      try {
-        const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
-        if (res.status === 401) {
-          router.push("/login?next=%2Fdashboard");
-          return;
-        }
-        if (!res.ok) {
-          if (!cancelledRef.current) setError(res.status === 400 ? "Date invalide." : "Erreur serveur — réessaie.");
-          if (!cancelledRef.current) setData(null);
-        } else {
-          const body = (await res.json()) as DashboardData;
-          if (!cancelledRef.current) setData(body);
-          if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
-          if (!cancelledRef.current) setClasseNom(
-            classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
-          );
-        }
-      } catch {
-        if (!cancelledRef.current) setError("Réseau indisponible.");
-      } finally {
-        if (!cancelledRef.current) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelledRef.current = true;
-    };
-  }, [date, classe, cours, demoMode, router]);
+    void load();
+  }, [load]);
 
   // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
   useEffect(() => {
@@ -336,7 +311,7 @@ export default function DashboardClient() {
       if (classe) params.set("classe", classe);
       if (statutScolarite) params.set("statut", statutScolarite);
       try {
-        const res = await fetch(`/api/scolarite?${params.toString()}`, { credentials: "same-origin" });
+        const res = await fetch(`/api/scolarite?${params.toString()}`, { credentials: "same-origin", cache: "no-store" });
         if (res.status === 401) {
           router.push("/login?next=%2Fdashboard");
           return;
@@ -379,7 +354,7 @@ export default function DashboardClient() {
       if (periodeFrom) params.set("from", periodeFrom);
       if (periodeTo) params.set("to", periodeTo);
       try {
-        const res = await fetch(`/api/comptabilite?${params.toString()}`, { credentials: "same-origin" });
+        const res = await fetch(`/api/comptabilite?${params.toString()}`, { credentials: "same-origin", cache: "no-store" });
         if (res.status === 401) {
           router.push("/login?next=%2Fdashboard");
           return;
@@ -413,6 +388,30 @@ export default function DashboardClient() {
     comptabiliteCache.current.delete(`${periodeFrom}|${periodeTo}`);
     setComptabiliteReload((n) => n + 1);
   }, [periodeFrom, periodeTo]);
+
+  // Réconcilie les données avec les autres appareils sans solliciter le réseau
+  // lorsque l'onglet est en arrière-plan. Les caches financiers sont invalidés
+  // même quand leur vue n'est pas ouverte.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+
+      void load({ silent: true });
+      scolariteCache.current.clear();
+      comptabiliteCache.current.clear();
+      if (vue === "scolarite") setScolariteReload((n) => n + 1);
+      if (vue === "comptabilite") setComptabiliteReload((n) => n + 1);
+    };
+
+    const interval = window.setInterval(refresh, 45_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load, vue]);
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({ date });
@@ -474,7 +473,7 @@ export default function DashboardClient() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch("/api/activity", { credentials: "same-origin" });
+        const response = await fetch("/api/activity", { credentials: "same-origin", cache: "no-store" });
         const body = (await response.json()) as { events?: ActivityEvent[]; error?: string };
         if (!response.ok) throw new Error(body.error ?? "activite_indisponible");
         if (!cancelled) {
