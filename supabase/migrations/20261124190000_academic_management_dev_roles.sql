@@ -119,7 +119,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   remaining_devs bigint;
   removing_active_dev boolean;
@@ -145,7 +145,7 @@ begin
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
-$;
+$$;
 revoke all on function private.prevent_last_active_dev() from public, anon, authenticated;
 drop trigger if exists protect_last_active_dev on public.app_user_roles;
 create trigger protect_last_active_dev
