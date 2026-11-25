@@ -108,6 +108,12 @@ jobs:
         run: npx expo export --platform android --output-dir "$RUNNER_TEMP/verifycheck-expo-export" --no-minify
         working-directory: mobile
 
+      - name: Validate scanner PWA JavaScript syntax
+        run: |
+          node --check public/scanner/app.js
+          node --check public/scanner/lib/api.js
+          node --check public/scanner/service-worker.js
+
       - name: Type check web
         run: npm run typecheck
 
