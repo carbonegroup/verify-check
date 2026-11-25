@@ -50,6 +50,19 @@ npm run dev
 
 Ouvrir http://localhost:3000.
 
+## VerifyCheck 2.0 — rôles et gestion académique
+
+La migration `supabase/migrations/20261124190000_academic_management_dev_roles.sql` ajoute la gestion des élèves, cours, saisies/corrections de présence, rôles ADMIN/DEV, journal d'audit et un jeu de test 24/7 réservé au DEV.
+
+Avant tout déploiement de cette version :
+- sauvegarder puis tester la migration sur une base non-production ;
+- appliquer la migration selon le processus de revue du projet ;
+- ajouter `SUPABASE_SERVICE_ROLE_KEY` à l'environnement serveur (jamais dans `NEXT_PUBLIC_*` ou `EXPO_PUBLIC_*`) ;
+- confirmer l'adresse exacte qui recevra le premier compte DEV ;
+- exécuter `npm run admin:bootstrap-dev` avec `BOOTSTRAP_DEV_EMAIL` et `CONFIRM_BOOTSTRAP_DEV_EMAIL` identiques et vérifiés.
+
+La migration n'est pas auto-appliquée au démarrage, et le compte DEV n'est pas créé automatiquement. Voir [docs/ADMIN_ROLES.md](docs/ADMIN_ROLES.md) et [docs/produit-architecture.md](docs/produit-architecture.md). N'utiliser la suppression physique qu'après confirmation explicite : l'historique lié peut être supprimé par les contraintes de cascade existantes.
+
 ## Base de données
 Examiner le schéma de référence `supabase/schema.sql` et les migrations de `supabase/migrations/`. Vérifier les politiques RLS et les rôles avant toute mise en service. Ne pas appliquer de migration distante sans revue et autorisation du mainteneur.
 
