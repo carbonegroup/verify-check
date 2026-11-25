@@ -48,8 +48,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     changes.classe_id = body.classe_id;
   }
   if (body.is_demo !== undefined) {
-    if (auth.user.role !== "dev" || typeof body.is_demo !== "boolean") return NextResponse.json({ error: "operation_interdite" }, { status: 403 });
-    changes.is_demo = body.is_demo;
+    return NextResponse.json({ error: "demo_flag_immutable" }, { status: 403 });
   }
   if (body.archived !== undefined) {
     if (typeof body.archived !== "boolean") return NextResponse.json({ error: "statut_invalide" }, { status: 400 });
