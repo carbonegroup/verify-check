@@ -787,3 +787,42 @@
 @media (max-width: 760px) {
   .scheduleGrid { grid-template-columns: 1fr; }
 }
+
+.alertPanel {
+  margin: 0 0 16px;
+  overflow: hidden;
+  border: 1px solid #e6c7a9;
+  border-radius: 8px;
+  background: #fffaf4;
+}
+.alertPanel .tablePanelHeader {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0ddca;
+}
+.alertCount {
+  color: #995118;
+  font-size: 12px;
+  font-weight: 750;
+}
+.alertList { display: flex; flex-direction: column; }
+.alertItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-top: 1px solid #f4e8dc;
+}
+.alertItem:first-child { border-top: 0; }
+.alertMark {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f6e5d3;
+  color: #995118;
+  font-weight: 800;
+}
+.alertItem strong { display: block; color: #6d3e1a; font-size: 13px; }
+.alertItem small { display: block; margin-top: 3px; color: #86684f; font-size: 11px; line-height: 1.5; }
