@@ -418,18 +418,19 @@ export default function DashboardClient() {
     [data, date]
   );
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
+  const isSelectedToday = date === todayConakry();
   const currentMinute = nowMinutesConakry();
-  const currentCourses = (data?.cours_prevus ?? []).filter((course) => {
+  const currentCourses = isSelectedToday ? (data?.cours_prevus ?? []).filter((course) => {
     const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
     const end = Number(course.heure_fin.slice(0, 2)) * 60 + Number(course.heure_fin.slice(3, 5));
-    return currentMinute >= start && currentMinute < end;
-  });
-  const upcomingCourses = (data?.cours_prevus ?? [])
+    return currentMinute >= start && currentMinute <= end;
+  }) : [];
+  const upcomingCourses = isSelectedToday ? (data?.cours_prevus ?? [])
     .filter((course) => {
       const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
       return start > currentMinute;
     })
-    .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut));
+    .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut)) : [];
 
   useEffect(() => {
     if (vue !== "general" || !data) return;
@@ -606,6 +607,7 @@ export default function DashboardClient() {
                 </article>
               </section>
 
+              {!isSelectedToday && <p className={styles.summaryLine}>Le planning en temps réel est affiché uniquement pour la date du jour ; cette date historique reste consultable dans le registre.</p>}
               <div className={styles.scheduleGrid}>
                 <section className={styles.tablePanel} aria-labelledby="current-courses-title">
                   <div className={styles.tablePanelHeader}>
