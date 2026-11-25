@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     ).order("created_at", { ascending: false }).range((page - 1) * perPage, page * perPage - 1);
     if (params.get("action")) query = query.eq("action", params.get("action")!);
     if (params.get("entity")) query = query.eq("entity_table", params.get("entity")!);
+    if (params.get("actor")) query = query.eq("actor_id", params.get("actor")!);
+    if (params.get("entityId")) query = query.eq("entity_id", params.get("entityId")!);
     if (from) query = query.gte("created_at", `${from}T00:00:00Z`);
     if (to) query = query.lt("created_at", `${to}T23:59:59.999Z`);
     const { data, error, count } = await query;
