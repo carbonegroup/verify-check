@@ -93,7 +93,7 @@ export function HistoriqueScreen() {
 
   useEffect(() => {
     mounted.current = true;
-    void charger();
+    void Promise.resolve().then(charger);
     const unsubscribe = onFileChange(() => void charger(false));
     return () => {
       mounted.current = false;
