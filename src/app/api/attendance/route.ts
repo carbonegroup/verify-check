@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   if (!isIsoDate(date)) return NextResponse.json({ error: "date_invalide" }, { status: 400 });
   const page = Math.max(1, Number(params.get("page") ?? 1));
   const perPage = Math.max(1, Math.min(100, Number(params.get("perPage") ?? 50)));
+  const q = (params.get("q") ?? "").replace(/[,%()]/g, " ").trim().slice(0, 80);
   const { startAt, endAt } = dayWindow(date);
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const includeDemo = auth.user.role === "dev" && params.get("demo") === "1";
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
   query = query.eq("students.is_demo", includeDemo);
   if (params.get("classe")) query = query.eq("students.classe_id", params.get("classe")!);
   if (params.get("cours")) query = query.eq("course_id", params.get("cours")!);
+  if (q) query = query.or(`nom.ilike.%${q}%,code_qr.ilike.%${q}%`, { foreignTable: "students" });
   if (params.get("statut") && STATUSES.has(params.get("statut")!)) query = query.eq("statut", params.get("statut")!);
 
   const { data, error, count } = await query;
