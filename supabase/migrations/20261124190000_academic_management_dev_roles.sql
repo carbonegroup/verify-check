@@ -53,7 +53,11 @@ create table if not exists public.app_user_roles (
 );
 alter table public.app_user_roles enable row level security;
 revoke all on public.app_user_roles from anon, authenticated;
+grant select on public.app_user_roles to authenticated;
 grant all on public.app_user_roles to service_role;
+create policy "users can read own application role" on public.app_user_roles
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
 
 -- Migrate every existing ADMIN from the trusted app_metadata claim. No account
 -- is promoted to DEV by this migration.
