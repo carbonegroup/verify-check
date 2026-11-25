@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, createServerSupabase, setSessionCookies } from "@/lib/auth";
+import { findScheduleConflict } from "@/lib/course-conflicts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -8,23 +9,6 @@ const DAY_NAMES = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"
 function minutes(time: string): number {
   const [hours, mins] = time.split(":").map(Number);
   return hours * 60 + mins;
-}
-
-function conflictMessage(
-  course: { classe_id: string; enseignant?: string | null; salle?: string | null; heure_debut: string; heure_fin: string },
-  other: { id: string; classe_id: string; enseignant?: string | null; salle?: string | null; heure_debut: string; heure_fin: string }
-): string | null {
-  const overlap = minutes(course.heure_debut) < minutes(other.heure_fin) &&
-    minutes(course.heure_fin) > minutes(other.heure_debut);
-  if (!overlap) return null;
-  if (course.classe_id === other.classe_id) return `Conflit de créneau avec ${other.id} (même classe).`;
-  if (course.enseignant && other.enseignant && course.enseignant.trim().toLocaleLowerCase() === other.enseignant.trim().toLocaleLowerCase()) {
-    return `Conflit enseignant avec ${other.id}.`;
-  }
-  if (course.salle && other.salle && course.salle.trim().toLocaleLowerCase() === other.salle.trim().toLocaleLowerCase()) {
-    return `Conflit de salle avec ${other.id}.`;
-  }
-  return null;
 }
 
 async function findConflict(
@@ -37,12 +21,10 @@ async function findConflict(
     .eq("is_demo", course.is_demo)
     .is("archived_at", null);
   if (error) return "vérification_conflits_indisponible";
-  for (const other of data ?? []) {
-    if (other.id === course.id) continue;
-    const conflict = conflictMessage(course, other);
-    if (conflict) return conflict;
-  }
-  return null;
+  return findScheduleConflict(course, (data ?? []) as Array<{
+    id: string; classe_id: string; enseignant: string | null; salle: string | null;
+    heure_debut: string; heure_fin: string;
+  }>);
 }
 
 export async function GET(request: NextRequest) {
