@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import styles from "./Management.module.css";
 
 type ClassOption = { id: string; nom: string; is_demo?: boolean };
@@ -18,6 +18,17 @@ type Course = {
   id: string; nom: string; classe_id: string; salle: string | null; enseignant?: string | null;
   jour_semaine: number; heure_debut: string; heure_fin: string; archived_at?: string | null;
   is_demo?: boolean;
+};
+type AttendanceRecord = {
+  id: string;
+  student_id: string;
+  course_id: string;
+  scanned_at: string;
+  statut?: "present" | "absent" | "retard";
+  source?: "scan" | "manual";
+  motif?: string | null;
+  students?: { id: string; nom: string; prenom?: string | null; classe_id: string };
+  courses?: { id: string; nom: string; classe_id: string; salle: string | null };
 };
 type ApiError = { error?: string; errors?: Array<{ row: number; error: string }> };
 
@@ -237,6 +248,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
     }
   }, [page, q, archived, demoMode]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
   const resetForm = () => {
@@ -431,7 +443,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
           </label>
           <span className={styles.hint}>Colonnes reconnues : nom, prénom, matricule, classe (nom ou ID), e-mail, téléphone.</span>
         </div>
-        <p className={styles.hint}>L'importation est atomique : aucune ligne n'est ajoutée tant qu'une erreur ou un doublon n'a pas été corrigé. Pour conserver les matricules avec des zéros initiaux, formate cette colonne en texte dans Excel avant l'export.</p>
+        <p className={styles.hint}>L’importation est atomique : aucune ligne n’est ajoutée tant qu’une erreur ou un doublon n’a pas été corrigé. Pour conserver les matricules avec des zéros initiaux, formate cette colonne en texte dans Excel avant l’export.</p>
         {csvPreview.length > 0 && (
           <>
             <p className={styles.hint}>{csvFileName} · {csvPreview.length} ligne(s) · {csvPreview.filter((r) => !r.error).length} valide(s) · {csvPreview.filter((r) => r.error).length} erreur(s)</p>
@@ -447,7 +459,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
             </div>
             <div className={styles.actions}>
               <button className={styles.button} type="button" disabled={busy || csvPreview.some((r) => r.error)} onClick={() => void importCsv()}>Importer {csvPreview.length} ligne(s)</button>
-              <button className={styles.buttonSecondary} type="button" onClick={() => setCsvPreview([])}>Effacer l'aperçu</button>
+              <button className={styles.buttonSecondary} type="button" onClick={() => setCsvPreview([])}>Effacer l’aperçu</button>
             </div>
           </>
         )}
@@ -516,6 +528,7 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
       setTotal(result.total);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_inconnue")); }
   }, [page, q, archived, demoMode]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
   const reset = () => {
@@ -607,7 +620,7 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
             {editingId && <button className={styles.buttonSecondary} type="button" onClick={reset}>Annuler</button>}
           </div>
         </form>
-        <p className={styles.hint}>Les chevauchements de classe, d'enseignant et de salle sont vérifiés côté serveur avant l'enregistrement.</p>
+        <p className={styles.hint}>Les chevauchements de classe, d’enseignant et de salle sont vérifiés côté serveur avant l’enregistrement.</p>
       </div>
       {error && <p className={styles.error} role="alert">{errorLabel(error)}</p>}
       {notice && <p className={styles.success} role="status">{notice}</p>}
@@ -652,7 +665,7 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
 export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [studentId, setStudentId] = useState("");
   const [courseId, setCourseId] = useState("");
@@ -662,7 +675,7 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<AttendanceRecord | null>(null);
   const [editStatus, setEditStatus] = useState("present");
   const [editReason, setEditReason] = useState("");
 
@@ -678,11 +691,13 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   }, [demoMode]);
   const loadRecords = useCallback(async () => {
     try {
-      const result = await responseJson<{ attendances: any[] }>(await fetch(`/api/attendance?date=${date}&perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" }));
+      const result = await responseJson<{ attendances: AttendanceRecord[] }>(await fetch(`/api/attendance?date=${date}&perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" }));
       setRecords(result.attendances);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
   }, [date, demoMode]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void loadOptions(); }, [loadOptions]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
   const filteredCourses = courses.filter((course) => course.classe_id === students.find((s) => s.id === studentId)?.classe_id);
@@ -715,7 +730,7 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   return (
     <section className={styles.manager}>
       <div className={styles.panel}>
-        <h2 className={styles.panelTitle}>Saisie manuelle d'une présence</h2>
+        <h2 className={styles.panelTitle}>Saisie manuelle d’une présence</h2>
         <form onSubmit={submit}>
           <div className={styles.formGrid}>
             <label className={styles.field}>Étudiant *
@@ -774,7 +789,7 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
       {error && <p className={styles.error} role="alert">{errorLabel(error)}</p>}
       {notice && <p className={styles.success} role="status">{notice}</p>}
       <div className={styles.toolbar}>
-        <label className={styles.field} style={{ maxWidth: 240 }}>Consulter l'historique
+        <label className={styles.field} style={{ maxWidth: 240 }}>Consulter l’historique
           <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <button className={styles.buttonSecondary} type="button" onClick={() => void loadRecords()}>Actualiser</button>
@@ -826,6 +841,7 @@ export function UsersManager() {
       setUsers(result.users);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_comptes")); }
   }, [q]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
   const invite = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -933,6 +949,7 @@ export function AuditManager() {
       setEvents(result.events); setTotal(result.total);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "journal_indisponible")); }
   }, [page, action, entity]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
   return (
@@ -967,7 +984,7 @@ export function AuditManager() {
                 <td><code>{event.new_data ? JSON.stringify(event.new_data) : event.reason ?? "—"}</code></td>
               </tr>
             ))}
-            {events.length === 0 && <tr><td colSpan={6} className={styles.empty}>Aucun événement d'audit trouvé.</td></tr>}
+            {events.length === 0 && <tr><td colSpan={6} className={styles.empty}>Aucun événement d’audit trouvé.</td></tr>}
           </tbody>
         </table>
       </div>
