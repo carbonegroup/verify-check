@@ -254,8 +254,10 @@
 
 .tableWrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
@@ -640,12 +642,9 @@
     gap: 9px;
   }
 
-  .filters label:nth-child(3) {
-    grid-column: 1 / -1;
-  }
-
   .filters > button {
     width: 100%;
+    grid-column: 1 / -1;
   }
 
   .metricGrid {
@@ -695,15 +694,13 @@
 }
 
 @media (max-width: 420px) {
-  .metricGrid {
-    grid-template-columns: 1fr;
-  }
-
+  .metricGrid,
+  .resume,
   .filters {
     grid-template-columns: 1fr;
   }
 
-  .filters label:nth-child(3) {
+  .filters > button {
     grid-column: auto;
   }
 }
@@ -826,3 +823,118 @@
 }
 .alertItem strong { display: block; color: #6d3e1a; font-size: 13px; }
 .alertItem small { display: block; margin-top: 3px; color: #86684f; font-size: 11px; line-height: 1.5; }
+
+
+/* Keep headings, cards and controls readable in narrow dashboard columns. */
+@media (max-width: 900px) {
+  .pageHeader {
+    align-items: flex-start;
+  }
+
+  .pageHeader > div {
+    min-width: 0;
+  }
+
+  .pageDescription {
+    overflow-wrap: anywhere;
+  }
+
+  .tablePanelHeader {
+    flex-wrap: wrap;
+  }
+
+  .tablePanelTitle {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .scheduleItem > div {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .scheduleItem strong,
+  .scheduleItem small,
+  .alertItem strong,
+  .alertItem small {
+    overflow-wrap: anywhere;
+  }
+
+  .alertItem > div {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .pageHeader {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .pageTitle {
+    font-size: clamp(23px, 7vw, 30px);
+  }
+
+  .pageDescription {
+    font-size: 13px;
+  }
+
+  .filters {
+    gap: 8px;
+  }
+
+  .tablePanelHeader {
+    align-items: flex-start;
+    padding: 11px 12px;
+  }
+
+  .tablePanelTitle {
+    font-size: 16px;
+  }
+
+  .tablePanelHeader > .buttonOutline {
+    margin-left: auto;
+  }
+
+  .scheduleItem {
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .alertItem {
+    padding-inline: 11px;
+  }
+
+  .alertCount {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .tableWrap {
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 420px) {
+  .metricCard {
+    min-height: 88px;
+  }
+
+  .resume {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .tablePanelHeader > .buttonOutline {
+    width: 100%;
+  }
+
+  .scheduleItem {
+    flex-direction: column;
+  }
+
+  .scheduleItem > span {
+    align-self: flex-end;
+  }
+}
