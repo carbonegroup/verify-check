@@ -88,6 +88,120 @@ function parseDelimited(text: string): string[][] {
 
 const DAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
+function xmlText(element: Element): string {
+  const nodes = Array.from(element.getElementsByTagName("*"));
+  return nodes.filter((node) => node.localName === "t").map((node) => node.textContent ?? "").join("");
+}
+
+function normalizeZipPath(path: string): string {
+  const parts: string[] = [];
+  for (const part of path.replace(/^\//, "").split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") parts.pop();
+    else parts.push(part);
+  }
+  return parts.join("/");
+}
+
+async function parseXlsx(file: File): Promise<string[][]> {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("Ce navigateur ne prend pas en charge la décompression XLSX. Exporte le classeur en CSV.");
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const read32 = (offset: number) => view.getUint32(offset, true);
+  const read16 = (offset: number) => view.getUint16(offset, true);
+  let eocd = -1;
+  for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65558); offset -= 1) {
+    if (read32(offset) === 0x06054b50) { eocd = offset; break; }
+  }
+  if (eocd < 0) throw new Error("Fichier XLSX invalide : répertoire ZIP absent.");
+  const totalEntries = read16(eocd + 10);
+  const centralOffset = read32(eocd + 16);
+  if (totalEntries > 1000) throw new Error("Le classeur contient trop de fichiers internes.");
+  const entries = new Map<string, Uint8Array>();
+  let cursor = centralOffset;
+  let totalUncompressed = 0;
+  for (let i = 0; i < totalEntries; i += 1) {
+    if (read32(cursor) !== 0x02014b50) throw new Error("Répertoire XLSX endommagé.");
+    const method = read16(cursor + 10);
+    const compressedSize = read32(cursor + 20);
+    const uncompressedSize = read32(cursor + 24);
+    const nameLength = read16(cursor + 28);
+    const extraLength = read16(cursor + 30);
+    const commentLength = read16(cursor + 32);
+    const localOffset = read32(cursor + 42);
+    const fileName = new TextDecoder().decode(bytes.slice(cursor + 46, cursor + 46 + nameLength));
+    cursor += 46 + nameLength + extraLength + commentLength;
+    if (!fileName || fileName.endsWith("/")) continue;
+    if (uncompressedSize > 10 * 1024 * 1024) throw new Error("Un fichier interne XLSX dépasse 10 Mo.");
+    totalUncompressed += uncompressedSize;
+    if (totalUncompressed > 25 * 1024 * 1024) throw new Error("Le classeur dépasse la limite de décompression (25 Mo).");
+    if (read32(localOffset) !== 0x04034b50) throw new Error("En-tête XLSX invalide.");
+    const localNameLength = read16(localOffset + 26);
+    const localExtraLength = read16(localOffset + 28);
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+    const compressed = bytes.slice(dataOffset, dataOffset + compressedSize);
+    let uncompressed: Uint8Array;
+    if (method === 0) {
+      uncompressed = compressed;
+    } else if (method === 8) {
+      const blob = new Blob([compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength)]);
+      const stream = blob.stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      uncompressed = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else {
+      throw new Error("Méthode de compression XLSX non prise en charge.");
+    }
+    if (uncompressed.length !== uncompressedSize) throw new Error("Taille décompressée XLSX incohérente.");
+    entries.set(normalizeZipPath(fileName), uncompressed);
+  }
+
+  const readXml = (name: string): Document => {
+    const data = entries.get(name);
+    if (!data) throw new Error(`Fichier XLSX manquant : ${name}`);
+    const document = new DOMParser().parseFromString(new TextDecoder().decode(data), "application/xml");
+    if (document.getElementsByTagName("parsererror").length) throw new Error(`XML XLSX invalide : ${name}`);
+    return document;
+  };
+  const workbook = readXml("xl/workbook.xml");
+  const firstSheet = Array.from(workbook.getElementsByTagName("*")).find((node) => node.localName === "sheet");
+  if (!firstSheet) throw new Error("Le classeur ne contient aucune feuille.");
+  const relationId = firstSheet.getAttribute("r:id") ?? firstSheet.getAttribute("id") ?? "";
+  const relationships = readXml("xl/_rels/workbook.xml.rels");
+  const relationship = Array.from(relationships.getElementsByTagName("*")).find(
+    (node) => node.localName === "Relationship" && node.getAttribute("Id") === relationId
+  );
+  const target = relationship?.getAttribute("Target");
+  if (!target) throw new Error("La première feuille XLSX n'est pas accessible.");
+  const sheetPath = normalizeZipPath(target.startsWith("/") ? target : `xl/${target}`);
+  const sheet = readXml(sheetPath);
+  const sharedStrings = entries.has("xl/sharedStrings.xml")
+    ? Array.from(readXml("xl/sharedStrings.xml").getElementsByTagName("*"))
+        .filter((node) => node.localName === "si")
+        .map(xmlText)
+    : [];
+  const rows = Array.from(sheet.getElementsByTagName("*")).filter((node) => node.localName === "row");
+  return rows.map((row) => {
+    const values: string[] = [];
+    const cells = Array.from(row.getElementsByTagName("*")).filter((node) => node.localName === "c");
+    for (const cell of cells) {
+      const reference = cell.getAttribute("r") ?? "";
+      const columnName = reference.match(/^[A-Z]+/)?.[0] ?? "";
+      let column = 0;
+      for (const letter of columnName) column = column * 26 + letter.charCodeAt(0) - 64;
+      column -= 1;
+      if (column < 0 || column > 200) continue;
+      const type = cell.getAttribute("t");
+      const valueNode = Array.from(cell.getElementsByTagName("*")).find((node) => node.localName === "v");
+      let value = valueNode?.textContent ?? "";
+      if (type === "s") value = sharedStrings[Number(value)] ?? "";
+      else if (type === "inlineStr") value = xmlText(cell);
+      values[column] = value;
+    }
+    return values.map((value) => value ?? "");
+  }).filter((row) => row.some((cell) => cell.trim() !== ""));
+}
+
 export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [q, setQ] = useState("");
@@ -196,12 +310,14 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
     setNotice("");
     setError("");
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024 || !file.name.toLowerCase().endsWith(".csv")) {
-      setError("Sélectionne un fichier CSV de moins de 5 Mo. Les fichiers XLSX ne sont pas encore pris en charge.");
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (file.size > 5 * 1024 * 1024 || (extension !== "csv" && extension !== "xlsx")) {
+      setError("Sélectionne un fichier CSV ou XLSX de moins de 5 Mo.");
       return;
     }
-    const text = await file.text();
-    const parsed = parseDelimited(text.replace(/^\uFEFF/, ""));
+    const parsed = extension === "xlsx"
+      ? await parseXlsx(file)
+      : parseDelimited((await file.text()).replace(/^\uFEFF/, ""));
     if (parsed.length < 2) {
       setError("Le fichier CSV est vide ou ne contient pas de lignes de données.");
       return;
@@ -310,12 +426,12 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
       <div className={styles.panel}>
         <h2 className={styles.panelTitle}>Importation CSV</h2>
         <div className={styles.toolbar}>
-          <label className={styles.field}>Fichier CSV (max. 5 Mo)
-            <input className={styles.input} type="file" accept=".csv,text/csv" onChange={(e) => void previewCsv(e.target.files?.[0])} />
+          <label className={styles.field}>Fichier CSV ou XLSX (max. 5 Mo)
+            <input className={styles.input} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => void previewCsv(e.target.files?.[0])} />
           </label>
           <span className={styles.hint}>Colonnes reconnues : nom, prénom, matricule, classe (nom ou ID), e-mail, téléphone.</span>
         </div>
-        <p className={styles.hint}>L'importation est atomique : aucune ligne n'est ajoutée tant qu'une erreur ou un doublon n'a pas été corrigé. XLSX n'est pas encore pris en charge.</p>
+        <p className={styles.hint}>L'importation est atomique : aucune ligne n'est ajoutée tant qu'une erreur ou un doublon n'a pas été corrigé. Pour conserver les matricules avec des zéros initiaux, formate cette colonne en texte dans Excel avant l'export.</p>
         {csvPreview.length > 0 && (
           <>
             <p className={styles.hint}>{csvFileName} · {csvPreview.length} ligne(s) · {csvPreview.filter((r) => !r.error).length} valide(s) · {csvPreview.filter((r) => r.error).length} erreur(s)</p>
