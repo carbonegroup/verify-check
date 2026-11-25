@@ -124,6 +124,8 @@ export async function POST(request: NextRequest) {
     .from("classes")
     .select("nom, is_demo")
     .eq("id", student.classe_id)
+    .eq("is_demo", student.is_demo)
+    .is("archived_at", null)
     .single();
   if (classError || !studentClass) {
     return respondJson({ error: "erreur_base" }, { status: 500 });
