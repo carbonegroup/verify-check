@@ -5,9 +5,13 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const email = (process.env.BOOTSTRAP_DEV_EMAIL ?? "").trim().toLowerCase();
 const confirmation = (process.env.CONFIRM_BOOTSTRAP_DEV_EMAIL ?? "").trim().toLowerCase();
 const fullName = (process.env.BOOTSTRAP_DEV_NAME ?? "Développeur VerifyCheck").trim();
+const redirectTo = process.env.AUTH_ACCOUNT_REDIRECT_URL;
 
 if (!url || !url.startsWith("https://") || !serviceKey) {
   throw new Error("NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis.");
+}
+if (!redirectTo || !redirectTo.startsWith("https://") || !redirectTo.endsWith("/auth/complete")) {
+  throw new Error("AUTH_ACCOUNT_REDIRECT_URL doit être une URL HTTPS qui se termine par /auth/complete.");
 }
 if (!email || email !== confirmation || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   throw new Error("Définir BOOTSTRAP_DEV_EMAIL et CONFIRM_BOOTSTRAP_DEV_EMAIL avec exactement la même adresse vérifiée.");
@@ -36,6 +40,7 @@ let invited = false;
 if (!user) {
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
+    redirectTo,
   });
   if (error || !data.user) {
     throw new Error(`Invitation impossible. Vérifier l'adresse et la configuration SMTP. ${error?.message ?? ""}`);
