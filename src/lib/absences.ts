@@ -21,13 +21,14 @@ export type StatutPresence = "present" | "non-pointe" | "absent";
  * - non-pointe : cours non terminé, pas encore d'absence déclarée.
  */
 export function statutEleve(
-  eleve: { presences: Array<{ course_id: string }> },
+  eleve: { presences: Array<{ course_id: string }>; absences?: Array<{ course_id: string }> },
   cours: { id: string; heure_fin?: string | null },
   date: string,
   now: NowMinutes
 ): StatutPresence {
   const present = eleve.presences.some((p) => p.course_id === cours.id);
   if (present) return "present";
+  if (eleve.absences?.some((a) => a.course_id === cours.id)) return "absent";
   const termine = isCourseFinished(date, cours.heure_fin, now);
   return termine ? "absent" : "non-pointe";
 }
@@ -83,6 +84,7 @@ export type AbsenceEleve = {
   nom: string;
   classe_id: string;
   presences: Array<{ course_id: string }>;
+  absences?: Array<{ course_id: string }>;
 };
 
 export type AbsenceRow = {
@@ -115,10 +117,11 @@ export function buildAbsences(
 
   for (const eleve of input.eleves) {
     const presences = new Set(eleve.presences.map((p) => p.course_id));
+    const manualAbsences = new Set((eleve.absences ?? []).map((a) => a.course_id));
     for (const cours of input.cours) {
       if (cours.classe_id !== eleve.classe_id) continue;
-      if (!isCourseFinished(options.date, cours.heure_fin, options.now)) continue;
       if (presences.has(cours.id)) continue;
+      if (!manualAbsences.has(cours.id) && !isCourseFinished(options.date, cours.heure_fin, options.now)) continue;
       rows.push({
         eleve_id: eleve.id,
         eleve: eleve.nom,
