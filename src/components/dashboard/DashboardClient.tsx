@@ -949,13 +949,13 @@ export default function DashboardClient() {
           )}
 
           {vue === "gestion-eleves" && (
-            <StudentsManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+            <StudentsManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
           )}
           {vue === "gestion-cours" && (
-            <CoursesManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+            <CoursesManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
           )}
           {vue === "presences" && (
-            <AttendanceManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+            <AttendanceManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
           )}
           {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
           {vue === "journal" && data.role === "dev" && <AuditManager />}
