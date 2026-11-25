@@ -61,3 +61,13 @@ L'archivage est l'opération normale et conserve les historiques. La suppression
 7. Vérifier avec un compte ADMIN que les données de test et les fonctions de gestion des comptes restent inaccessibles.
 
 Ne pas déployer les nouvelles routes avant l'application de la migration correspondante.
+
+
+## Espace développeur dans le dashboard
+
+- ADMIN et DEV partagent les vues de suivi et de gestion académique.
+- DEV dispose en plus d'un groupe de navigation séparé : espace développeur, comptes utilisateurs et journal d'audit détaillé.
+- L'espace développeur permet d'ouvrir ou de quitter explicitement le jeu de données de démonstration, puis d'accéder aux outils de gestion des comptes et au journal complet.
+- Les contrôles de configuration de `/api/admin/system` sont réservés à DEV. Ils renvoient uniquement l'environnement et des booléens de configuration ; aucune clé, valeur de secret ou URL de redirection n'est renvoyée au navigateur.
+- Les variables d'environnement restent administrées dans la plateforme de déploiement. L'interface n'offre pas d'édition de secrets.
+- Les filtres de date, classe et cours ne sont rendus que dans les vues académiques qui les utilisent ; les écrans de comptes, d'audit, de sécurité et d'outillage développeur n'affichent pas ce bandeau.
