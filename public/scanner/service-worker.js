@@ -3,7 +3,7 @@
 // Les présences scannées hors ligne sont conservées côté client (IndexedDB,
 // voir lib/api.js) puis synchronisées quand le réseau revient.
 
-const CACHE = "verifycheck-scan-v5";
+const CACHE = "verifycheck-scan-v6";
 
 // Coquille minimale mise en cache à l'installation. La librairie QR
 // (vendor/html5-qrcode.min.js, ≈ 360 Ko) est VOLONTAIREMENT exclue : elle n'est
