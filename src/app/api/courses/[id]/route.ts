@@ -5,10 +5,6 @@ import { findScheduleConflict } from "@/lib/course-conflicts";
 type Context = { params: Promise<{ id: string }> };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const toMinutes = (time: string) => {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
-};
 
 export async function PATCH(request: NextRequest, context: Context) {
   const accessToken = requestAccessToken(request);
@@ -47,17 +43,19 @@ export async function PATCH(request: NextRequest, context: Context) {
   const { data: classroom } = await supabase.from("classes").select("is_demo").eq("id", classeId).is("archived_at", null).maybeSingle();
   if (!classroom || Boolean(classroom.is_demo) !== Boolean(current.is_demo)) return NextResponse.json({ error: "classe_invalide" }, { status: 400 });
 
-  const { data: conflicts, error: conflictError } = await supabase.from("courses")
-    .select("id,classe_id,enseignant,salle,heure_debut,heure_fin")
-    .eq("jour_semaine", day).eq("is_demo", current.is_demo).is("archived_at", null);
-  if (conflictError) return NextResponse.json({ error: "verification_conflits_indisponible" }, { status: 500 });
-  const conflict = findScheduleConflict({
-    id, classe_id: classeId, enseignant, salle, heure_debut: start, heure_fin: end,
-  }, (conflicts ?? []) as Array<{
-    id: string; classe_id: string; enseignant: string | null; salle: string | null;
-    heure_debut: string; heure_fin: string;
-  }>);
-  if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+  if (body.archived !== true) {
+    const { data: conflicts, error: conflictError } = await supabase.from("courses")
+      .select("id,classe_id,enseignant,salle,heure_debut,heure_fin")
+      .eq("jour_semaine", day).eq("is_demo", current.is_demo).is("archived_at", null);
+    if (conflictError) return NextResponse.json({ error: "verification_conflits_indisponible" }, { status: 500 });
+    const conflict = findScheduleConflict({
+      id, classe_id: classeId, enseignant, salle, heure_debut: start, heure_fin: end,
+    }, (conflicts ?? []) as Array<{
+      id: string; classe_id: string; enseignant: string | null; salle: string | null;
+      heure_debut: string; heure_fin: string;
+    }>);
+    if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+  }
 
   changes.nom = nom;
   changes.classe_id = classeId;
