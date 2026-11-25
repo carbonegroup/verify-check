@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, createServerSupabase, setSessionCookies } from "@/lib/auth";
+import { isValidEmailAddress } from "@/lib/validation";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const prenom = body.prenom === undefined || body.prenom === "" ? null : validText(body.prenom, 100) ? body.prenom.trim() : undefined;
   const classeId = typeof body.classe_id === "string" ? body.classe_id : "";
   const codeQr = body.code_qr === undefined || body.code_qr === "" ? `VC-${crypto.randomUUID().toUpperCase()}` : validText(body.code_qr, 64) ? body.code_qr.trim() : "";
-  const email = body.email === undefined || body.email === "" ? null : typeof body.email === "string" && EMAIL.test(body.email.trim()) ? body.email.trim().toLowerCase() : undefined;
+  const email = body.email === undefined || body.email === "" ? null : typeof body.email === "string" && isValidEmailAddress(body.email.trim()) ? body.email.trim().toLowerCase() : undefined;
   const telephone = body.telephone === undefined || body.telephone === "" ? null : validText(body.telephone, 32) ? body.telephone.trim() : undefined;
   const isDemo = auth.user.role === "dev" && body.is_demo === true;
 
