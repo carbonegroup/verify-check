@@ -1,7 +1,7 @@
 -- VerifyCheck — MVP schema (v2, 2026-11)
 -- À exécuter manuellement dans l'éditeur SQL Supabase après validation humaine.
--- Principe : minimisation des données élèves (pas de photo, pas d'email),
--- RLS stricte réservée aux admins, fuseau scolaire Africa/Conakry.
+-- Principe : minimisation des données élèves ; photo et coordonnées restent facultatives.
+-- RLS ADMIN/DEV via registre de rôles, fuseau scolaire Africa/Conakry.
 --
 -- v2 : niveaux (cycles) + option + département universitaire sur `classes`
 --      (système guinéen). Voir supabase/migrations/2026-11-15_*.sql pour la
