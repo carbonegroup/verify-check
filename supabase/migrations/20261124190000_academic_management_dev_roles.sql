@@ -42,8 +42,6 @@ create index if not exists courses_classe_schedule_active_idx
   where archived_at is null;
 create index if not exists attendance_status_scanned_at_idx
   on public.attendance (statut, scanned_at desc);
-create index if not exists audit_logs_created_at_idx
-  on public.audit_logs (created_at desc);
 
 -- Authoritative role registry: unlike JWT app_metadata, this can revoke direct
 -- Data API access immediately when an account is disabled or demoted.
@@ -217,6 +215,8 @@ revoke all on public.audit_logs from anon;
 revoke insert, update, delete on public.audit_logs from authenticated;
 grant select on public.audit_logs to authenticated;
 grant select, insert on public.audit_logs to service_role;
+create index if not exists audit_logs_created_at_idx
+  on public.audit_logs (created_at desc);
 create policy "dev can read audit log" on public.audit_logs
   for select to authenticated
   using ((select private.has_app_role('dev')));
