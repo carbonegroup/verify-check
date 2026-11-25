@@ -15,6 +15,8 @@ export default function AuthCompleteClient() {
   const [pending, setPending] = useState(false);
   const [completed, setCompleted] = useState(false);
 
+  // Read the one-time auth redirect fragment, then remove bearer tokens from the URL.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize this page with the external Supabase redirect.
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const accessToken = params.get("access_token") ?? "";
@@ -89,7 +91,7 @@ export default function AuthCompleteClient() {
         <p role="status">Compte finalisé. Redirection vers le tableau de bord…</p>
       ) : invite ? (
         <>
-          <p className={styles.hint}>Choisis un nouveau mot de passe d'au moins 12 caractères. Le lien n'est utilisable qu'une seule fois.</p>
+          <p className={styles.footer}>Choisis un nouveau mot de passe d'au moins 12 caractères. Le lien n'est utilisable qu'une seule fois.</p>
           <label htmlFor="new-password" className={styles.label}>Nouveau mot de passe</label>
           <input id="new-password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={styles.input} />
           <label htmlFor="confirm-password" className={styles.label}>Confirmer le mot de passe</label>
@@ -100,7 +102,7 @@ export default function AuthCompleteClient() {
       ) : (
         <>
           <p className={styles.error} role="alert">{error || "Vérification du lien…"}</p>
-          <p className={styles.hint}>Retourne à la personne qui gère les comptes pour demander un nouveau lien.</p>
+          <p className={styles.footer}>Retourne à la personne qui gère les comptes pour demander un nouveau lien.</p>
         </>
       )}
     </form>
