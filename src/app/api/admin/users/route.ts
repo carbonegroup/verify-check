@@ -81,9 +81,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const redirectTo = process.env.AUTH_ACCOUNT_REDIRECT_URL;
+    if (!redirectTo || !redirectTo.startsWith("https://") || !redirectTo.endsWith("/auth/complete")) {
+      return NextResponse.json({ error: "url_retour_auth_non_configuree" }, { status: 503 });
+    }
     const admin = createSupabaseAdmin();
     const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName },
+      redirectTo,
     });
     if (inviteError || !invitation.user) {
       return NextResponse.json({ error: inviteError?.message === "User already registered" ? "compte_existant" : "invitation_impossible" }, { status: 409 });
