@@ -216,6 +216,7 @@ async function parseXlsx(file: File): Promise<string[][]> {
 export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [q, setQ] = useState("");
+  const [classFilter, setClassFilter] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [archived, setArchived] = useState(false);
@@ -234,6 +235,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
     try {
       const params = new URLSearchParams({ page: String(page), perPage: "50" });
       if (q.trim()) params.set("q", q.trim());
+      if (classFilter) params.set("classe", classFilter);
       if (archived) params.set("archived", "1");
       if (demoMode) params.set("demo", "1");
       const result = await responseJson<{ students: Student[]; total: number }>(
@@ -246,7 +248,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, q, archived, demoMode]);
+  }, [page, q, classFilter, archived, demoMode]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
@@ -392,6 +394,13 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
           Recherche étudiant
           <input className={styles.input} value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} placeholder="Nom, prénom, matricule ou e-mail" />
         </label>
+        <label className={styles.field} style={{ maxWidth: 230 }}>
+          Classe
+          <select className={styles.select} value={classFilter} onChange={(e) => { setPage(1); setClassFilter(e.target.value); }}>
+            <option value="">Toutes les classes</option>
+            {classes.filter((c) => Boolean(c.is_demo) === demoMode).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </label>
         <label className={styles.field} style={{ maxWidth: 190 }}>
           Affichage
           <select className={styles.select} value={archived ? "archived" : "active"} onChange={(e) => { setPage(1); setArchived(e.target.value === "archived"); }}>
@@ -507,6 +516,8 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
 export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [q, setQ] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [archived, setArchived] = useState(false);
@@ -521,13 +532,15 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
     try {
       const params = new URLSearchParams({ page: String(page), perPage: "50" });
       if (q.trim()) params.set("q", q.trim());
+      if (classFilter) params.set("classe", classFilter);
+      if (dayFilter !== "") params.set("jour", dayFilter);
       if (archived) params.set("archived", "1");
       if (demoMode) params.set("demo", "1");
       const result = await responseJson<{ courses: Course[]; total: number }>(await fetch(`/api/courses?${params}`, { credentials: "same-origin" }));
       setCourses(result.courses);
       setTotal(result.total);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_inconnue")); }
-  }, [page, q, archived, demoMode]);
+  }, [page, q, classFilter, dayFilter, archived, demoMode]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
@@ -576,6 +589,18 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
       <div className={styles.toolbar}>
         <label className={styles.field}>Recherche cours
           <input className={styles.input} value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} placeholder="Nom du cours" />
+        </label>
+        <label className={styles.field} style={{ maxWidth: 220 }}>Classe
+          <select className={styles.select} value={classFilter} onChange={(e) => { setPage(1); setClassFilter(e.target.value); }}>
+            <option value="">Toutes les classes</option>
+            {classes.filter((c) => Boolean(c.is_demo) === demoMode).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </label>
+        <label className={styles.field} style={{ maxWidth: 170 }}>Jour
+          <select className={styles.select} value={dayFilter} onChange={(e) => { setPage(1); setDayFilter(e.target.value); }}>
+            <option value="">Toute la semaine</option>
+            {DAYS.map((day, i) => <option key={day} value={i}>{day}</option>)}
+          </select>
         </label>
         <label className={styles.field} style={{ maxWidth: 190 }}>Affichage
           <select className={styles.select} value={archived ? "archived" : "active"} onChange={(e) => { setPage(1); setArchived(e.target.value === "archived"); }}>
@@ -666,6 +691,10 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [search, setSearch] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [filterCourse, setFilterCourse] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [studentId, setStudentId] = useState("");
   const [courseId, setCourseId] = useState("");
@@ -691,10 +720,16 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   }, [demoMode]);
   const loadRecords = useCallback(async () => {
     try {
-      const result = await responseJson<{ attendances: AttendanceRecord[] }>(await fetch(`/api/attendance?date=${date}&perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" }));
+      const params = new URLSearchParams({ date, perPage: "100" });
+      if (demoMode) params.set("demo", "1");
+      if (search.trim()) params.set("q", search.trim());
+      if (filterClass) params.set("classe", filterClass);
+      if (filterCourse) params.set("cours", filterCourse);
+      if (filterStatus) params.set("statut", filterStatus);
+      const result = await responseJson<{ attendances: AttendanceRecord[] }>(await fetch(`/api/attendance?${params}`, { credentials: "same-origin" }));
       setRecords(result.attendances);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
-  }, [date, demoMode]);
+  }, [date, demoMode, search, filterClass, filterCourse, filterStatus]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void loadOptions(); }, [loadOptions]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
@@ -789,8 +824,28 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
       {error && <p className={styles.error} role="alert">{errorLabel(error)}</p>}
       {notice && <p className={styles.success} role="status">{notice}</p>}
       <div className={styles.toolbar}>
-        <label className={styles.field} style={{ maxWidth: 240 }}>Consulter l’historique
+        <label className={styles.field}>Recherche
+          <input className={styles.input} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nom ou matricule" />
+        </label>
+        <label className={styles.field}>Date
           <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <label className={styles.field}>Classe
+          <select className={styles.select} value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
+            <option value="">Toutes</option>
+            {classes.filter((c) => Boolean(c.is_demo) === demoMode).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </label>
+        <label className={styles.field}>Cours
+          <select className={styles.select} value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}>
+            <option value="">Tous</option>
+            {courses.filter((course) => Boolean(course.is_demo) === demoMode && (!filterClass || course.classe_id === filterClass)).map((course) => <option key={course.id} value={course.id}>{course.nom}</option>)}
+          </select>
+        </label>
+        <label className={styles.field}>Statut
+          <select className={styles.select} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">Tous</option><option value="present">Présent</option><option value="absent">Absent</option><option value="retard">Retard</option>
+          </select>
         </label>
         <button className={styles.buttonSecondary} type="button" onClick={() => void loadRecords()}>Actualiser</button>
       </div>
