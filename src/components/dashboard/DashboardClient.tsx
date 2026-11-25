@@ -505,8 +505,7 @@ export default function DashboardClient() {
     setDate(todayConakry());
     setClasse("");
     setCours("");
-    changementVue("general");
-  }, [changementVue]);
+  }, []);
 
   return (
     <Shell vue={vue} role={role} onViewChange={changementVue}>
