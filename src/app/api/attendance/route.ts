@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, createServerSupabase, setSessionCookies } from "@/lib/auth";
-import { dayWindow, isIsoDate } from "@/lib/dashboard";
+import { dayWindow, isIsoDate, weekdayOfIso } from "@/lib/dashboard";
 import { schoolInstant } from "@/lib/time";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     supabase.from("courses").select("id,classe_id,is_demo").eq("id", courseId).is("archived_at", null).maybeSingle(),
   ]);
   if (studentError || courseError) return NextResponse.json({ error: "erreur_base" }, { status: 500 });
-  if (!student || !course || student.classe_id !== course.classe_id || Boolean(student.is_demo) !== Boolean(course.is_demo)) {
+  if (!student || !course || student.classe_id !== course.classe_id || Boolean(student.is_demo) !== Boolean(course.is_demo) || course.jour_semaine !== weekdayOfIso(date)) {
     return NextResponse.json({ error: "contexte_academique_invalide" }, { status: 400 });
   }
 
