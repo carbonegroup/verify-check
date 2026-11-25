@@ -44,27 +44,23 @@ if (!user) {
   invited = true;
 }
 
-const previousRole = user.app_metadata?.role;
+const previousMetadata = user.app_metadata ?? {};
+const { data: updated, error: metadataError } = await supabase.auth.admin.updateUserById(user.id, {
+  app_metadata: { ...previousMetadata, role: "dev" },
+});
+if (metadataError || !updated.user) {
+  throw new Error(`Le rôle Auth n'a pas pu être mis à jour: ${metadataError?.message ?? "utilisateur absent"}`);
+}
+
 const { error: registryError } = await supabase.from("app_user_roles").upsert({
   user_id: user.id,
   role: "dev",
   is_active: true,
   updated_at: new Date().toISOString(),
 });
-if (registryError) throw new Error(`Le registre app_user_roles n'est pas disponible. Appliquer d'abord la migration: ${registryError.message}`);
-
-const { data: updated, error: metadataError } = await supabase.auth.admin.updateUserById(user.id, {
-  app_metadata: { ...(user.app_metadata ?? {}), role: "dev" },
-  ban_duration: "none",
-});
-if (metadataError) {
-  await supabase.from("app_user_roles").upsert({
-    user_id: user.id,
-    role: previousRole === "dev" ? "dev" : "admin",
-    is_active: Boolean(previousRole === "admin" || previousRole === "dev"),
-    updated_at: new Date().toISOString(),
-  });
-  throw new Error(`Le rôle Auth n'a pas pu être mis à jour: ${metadataError.message}`);
+if (registryError) {
+  await supabase.auth.admin.updateUserById(user.id, { app_metadata: previousMetadata });
+  throw new Error(`Le registre app_user_roles n'est pas disponible. Métadonnées Auth restaurées: ${registryError.message}`);
 }
 
 console.log(JSON.stringify({
