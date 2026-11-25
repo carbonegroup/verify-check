@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     coursesQuery,
     studentsQuery,
     supabase.from("attendance")
-      .select("id, student_id, course_id, scanned_at, statut, source")
+      .select("id, student_id, course_id, scanned_at, statut, source, motif")
       .gte("scanned_at", startAt).lt("scanned_at", endAt),
   ]);
 
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  const response = NextResponse.json({ ...result, demo_mode: includeDemo });
+  const response = NextResponse.json({ ...result, demo_mode: includeDemo, role: auth.user.role });
   if (auth.session) setSessionCookies(response, auth.session);
   return response;
 }
