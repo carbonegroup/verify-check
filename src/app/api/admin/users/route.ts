@@ -2,10 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, setSessionCookies } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { applyRateLimit } from "@/lib/rate-limit";
-
-function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
+import { isValidEmailAddress } from "@/lib/validation";
 
 async function requireDeveloper(request: NextRequest) {
   const auth = await requireAdmin(
@@ -76,7 +73,7 @@ export async function POST(request: NextRequest) {
   const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
   const fullName = typeof value.full_name === "string" ? value.full_name.trim() : "";
   const role = value.role;
-  if (!isEmail(email) || fullName.length < 2 || fullName.length > 100 || (role !== "admin" && role !== "dev")) {
+  if (!isValidEmailAddress(email) || fullName.length < 2 || fullName.length > 100 || (role !== "admin" && role !== "dev")) {
     return NextResponse.json({ error: "champs_invalides" }, { status: 400 });
   }
 
