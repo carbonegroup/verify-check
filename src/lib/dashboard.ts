@@ -83,6 +83,7 @@ export type DashboardResult = {
   effectif: number;
   presents: number;
   scans: number;
+  presences_enregistrees: number;
   eleves: Array<{
     id: string;
     nom: string;
@@ -150,6 +151,7 @@ export function buildDashboard(
     effectif: visibleStudents.length,
     presents: presentCount,
     scans: scanRows.length,
+    presences_enregistrees: presenceRows.length,
     eleves: visibleStudents.map((s) => ({
       id: s.id,
       nom: s.nom,
