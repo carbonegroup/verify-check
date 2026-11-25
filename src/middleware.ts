@@ -3,7 +3,7 @@ import {
   REFRESH_COOKIE,
   SESSION_COOKIE,
   createServerSupabase,
-  isAdminRole,
+  isOperationalRole,
   setSessionCookies,
 } from "@/lib/auth";
 
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user || !isAdminRole(user as { app_metadata?: Record<string, unknown> })) {
+  if (!user || !isOperationalRole(user as { app_metadata?: Record<string, unknown> })) {
     return redirectToLogin(request);
   }
 
