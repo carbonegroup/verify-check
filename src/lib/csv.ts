@@ -11,7 +11,7 @@ import { minutesOf } from "./time.ts";
 export function csvEscape(value: string): string {
   // Prefix formula-like values so spreadsheet applications treat them as text.
   const firstNonWhitespace = value.trimStart().charAt(0);
-  const startsWithControl = value.startsWith("\\t") || value.startsWith("\\r") || value.startsWith("\\n");
+  const startsWithControl = value.startsWith("\t") || value.startsWith("\r") || value.startsWith("\n");
   const safe = startsWithControl || ["=", "+", "-", "@"].includes(firstNonWhitespace)
     ? `'${value}`
     : value;
