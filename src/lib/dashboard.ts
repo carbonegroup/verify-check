@@ -60,6 +60,7 @@ export type AttendanceRow = {
   scanned_at: string;
   statut?: "present" | "absent" | "retard";
   source?: "scan" | "manual";
+  motif?: string | null;
 };
 
 export type DashboardFilters = {
@@ -90,6 +91,7 @@ export type DashboardResult = {
     photo_url?: string | null;
     scans: number;
     presences: Array<{ course_id: string; scanned_at: string }>;
+    absences: Array<{ course_id: string; motif?: string | null }>;
   }>;
 };
 
@@ -158,6 +160,10 @@ export function buildDashboard(
       presences: (presencesByStudent.get(s.id) ?? []).map((row) => ({
         course_id: row.course_id,
         scanned_at: row.scanned_at,
+      })),
+      absences: rows.filter((row) => row.student_id === s.id && row.statut === "absent").map((row) => ({
+        course_id: row.course_id,
+        motif: row.motif ?? null,
       })),
     })),
   };
