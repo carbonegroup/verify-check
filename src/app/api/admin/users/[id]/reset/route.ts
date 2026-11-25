@@ -20,8 +20,12 @@ export async function POST(request: NextRequest, context: Context) {
     const email = data.user?.email;
     if (error || !email) return NextResponse.json({ error: "compte_introuvable" }, { status: 404 });
 
+    const redirectTo = process.env.AUTH_ACCOUNT_REDIRECT_URL;
+    if (!redirectTo || !redirectTo.startsWith("https://") || !redirectTo.endsWith("/auth/complete")) {
+      return NextResponse.json({ error: "url_retour_auth_non_configuree" }, { status: 503 });
+    }
     const publicClient = createServerSupabase();
-    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email);
+    const { error: resetError } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (resetError) return NextResponse.json({ error: "envoi_reinitialisation_echoue" }, { status: 502 });
 
     await admin.from("audit_logs").insert({
