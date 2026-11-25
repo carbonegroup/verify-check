@@ -488,7 +488,7 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
                 <td>
                   <div className={styles.studentIdentity}>
                     <span className={styles.studentInitials} aria-hidden="true">
-                      {((student.prenom?.trim()[0] ?? student.nom.trim()[0]) + (student.nom.trim().split(/\\s+/).at(-1)?.[0] ?? "")).toLocaleUpperCase()}
+                      {((student.prenom?.trim()[0] ?? student.nom.trim()[0]) + (student.nom.trim().split(/\s+/).at(-1)?.[0] ?? "")).toLocaleUpperCase()}
                     </span>
                     <span className={styles.name}>{[student.prenom, student.nom].filter(Boolean).join(" ")}</span>
                   </div>
