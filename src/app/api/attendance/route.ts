@@ -19,11 +19,13 @@ export async function GET(request: NextRequest) {
   const perPage = Math.max(1, Math.min(100, Number(params.get("perPage") ?? 50)));
   const { startAt, endAt } = dayWindow(date);
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
+  const includeDemo = auth.user.role === "dev" && params.get("demo") === "1";
   let query = supabase.from("attendance").select(
-    "id,student_id,course_id,scanned_at,statut,source,motif,updated_by,students!inner(id,nom,prenom,code_qr,classe_id),courses!inner(id,nom,classe_id,salle)",
+    "id,student_id,course_id,scanned_at,statut,source,motif,updated_by,students!inner(id,nom,prenom,code_qr,classe_id,is_demo),courses!inner(id,nom,classe_id,salle)",
     { count: "exact" }
   ).gte("scanned_at", startAt).lt("scanned_at", endAt).order("scanned_at", { ascending: false })
     .range((page - 1) * perPage, page * perPage - 1);
+  query = query.eq("students.is_demo", includeDemo);
   if (params.get("classe")) query = query.eq("students.classe_id", params.get("classe")!);
   if (params.get("cours")) query = query.eq("course_id", params.get("cours")!);
   if (params.get("statut") && STATUSES.has(params.get("statut")!)) query = query.eq("statut", params.get("statut")!);
