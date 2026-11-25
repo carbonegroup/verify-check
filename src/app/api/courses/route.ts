@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     if (!Number.isInteger(day) || day < 0 || day > 6) return NextResponse.json({ error: "jour_invalide" }, { status: 400 });
     query = query.eq("jour_semaine", day);
   }
-  if (q) query = query.ilike("nom", `%${q}%`);
+  if (q) query = query.or(`nom.ilike.%${q}%,enseignant.ilike.%${q}%`);
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: "erreur_base" }, { status: 500 });
