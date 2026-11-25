@@ -2,6 +2,7 @@ name: Build Android APK
 # Build and upload a test-signed APK with the Android Gradle toolchain.
 
 on:
+  push:
     branches:
       - main
       - "fix/**"
