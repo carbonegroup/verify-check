@@ -457,15 +457,18 @@ create table if not exists public.audit_logs (
   created_at timestamptz not null default now()
 );
 alter table public.audit_logs enable row level security;
-revoke all on public.audit_logs from anon;
-revoke insert, update, delete on public.audit_logs from authenticated;
-grant select on public.audit_logs to authenticated;
+revoke all on public.audit_logs from public, anon, authenticated;
+-- ADMIN and DEV may read the activity feed, but only its non-sensitive summary columns.
+-- Detailed old/new payloads remain available exclusively through the DEV server endpoint.
+grant select (id, actor_role, action, entity_table, entity_id, created_at)
+  on public.audit_logs to authenticated;
 grant select, insert on public.audit_logs to service_role;
 create index if not exists audit_logs_created_at_idx
   on public.audit_logs (created_at desc);
-create policy "dev can read audit log" on public.audit_logs
+drop policy if exists "dev can read audit log" on public.audit_logs;
+create policy "operational roles can read activity summary" on public.audit_logs
   for select to authenticated
-  using ((select private.has_app_role('dev')));
+  using ((select private.is_operational_user()));
 
 create or replace function private.audit_row_change()
 returns trigger
