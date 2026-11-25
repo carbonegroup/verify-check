@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
-import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
-import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager } from "./ManagementViews";
+import { getDashboardFilters, isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
+import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager, DeveloperWorkspace } from "./ManagementViews";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -80,6 +80,7 @@ const PAGE_META: Record<Vue, { title: string; description: string }> = {
   "gestion-eleves": { title: "Gestion des élèves", description: "Créer, modifier, archiver et importer les fiches" },
   "gestion-cours": { title: "Gestion des cours", description: "Gérer les cours, enseignants et horaires" },
   presences: { title: "Gestion des présences", description: "Enregistrer et corriger les présences" },
+  developpeur: { title: "Espace développeur", description: "Outils techniques et configuration de VerifyCheck" },
   utilisateurs: { title: "Comptes utilisateurs", description: "Gérer les accès ADMIN et DEV" },
   journal: { title: "Journal d’audit", description: "Consulter les opérations administratives" },
   securite: { title: "Sécurité du compte", description: "Mettre à jour ton mot de passe" },
@@ -430,6 +431,7 @@ export default function DashboardClient() {
     [data, date]
   );
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
+  const viewFilters = getDashboardFilters(vue);
   const isSelectedToday = date === todayConakry();
   const currentMinute = nowMinutesConakry();
   const currentCourses = isSelectedToday ? (data?.cours_prevus ?? []).filter((course) => {
@@ -469,10 +471,19 @@ export default function DashboardClient() {
   const changementVue = useCallback((id: Vue) => {
     if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
     setVue(id);
-    // Réinitialise le filtrage par cours quand on change de vue (évite un cours
-    // filtré mais masqué qui rendrait la vue confuse).
-    setCours("");
+    const nextFilters = getDashboardFilters(id);
+    if (!nextFilters.includes("cours")) setCours("");
+    if (!nextFilters.includes("date")) setDate(todayConakry());
+    if (!nextFilters.includes("classe")) setClasse("");
   }, [data?.role]);
+
+  const toggleDeveloperDemo = useCallback(() => {
+    setDemoMode((enabled) => !enabled);
+    setDate(todayConakry());
+    setClasse("");
+    setCours("");
+    changementVue("general");
+  }, [changementVue]);
 
   return (
     <Shell vue={vue} role={data?.role ?? "admin"} onViewChange={changementVue}>
@@ -480,52 +491,60 @@ export default function DashboardClient() {
         <div>
           <h1 className={styles.pageTitle}>{PAGE_META[vue].title}</h1>
           <p className={styles.pageDescription}>
-            {vue === "general" ? PAGE_META[vue].description : `${PAGE_META[vue].description} · ${dateLabel}`}
+            {viewFilters.includes("date") && vue !== "general"
+              ? `${PAGE_META[vue].description} · ${dateLabel}`
+              : PAGE_META[vue].description}
           </p>
         </div>
       </header>
 
-      {/* Filtres persistants : date, classe et cours restent synchronisés avec l'API. */}
-      {data && !loading && (
+      {/* Filtres contextuels : seules les vues académiques concernées les affichent. */}
+      {data && !loading && viewFilters.length > 0 && (
         <div className={styles.filters}>
-          <label>
-            <span>Date</span>
-            <input
-              type="date"
-              value={date}
-              max={todayConakry()}
-              onChange={(e) => setDate(e.target.value)}
-              aria-label="Date du suivi"
-            />
-          </label>
-          <label>
-            <span>Classe</span>
-            <select
-              value={classe}
-              onChange={(e) => { setClasse(e.target.value); setCours(""); }}
-              aria-label="Filtrer par classe"
-            >
-              <option value="">Toutes les classes</option>
-              {data.classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Cours</span>
-            <select
-              value={cours}
-              onChange={(e) => setCours(e.target.value)}
-              aria-label="Filtrer par cours"
-            >
-              <option value="">Tous les cours</option>
-              {data.cours_disponibles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][c.jour_semaine]} · {c.nom} · {c.heure_debut.slice(0, 5)}
-                </option>
-              ))}
-            </select>
-          </label>
+          {viewFilters.includes("date") && (
+            <label>
+              <span>Date</span>
+              <input
+                type="date"
+                value={date}
+                max={todayConakry()}
+                onChange={(e) => setDate(e.target.value)}
+                aria-label="Date du suivi"
+              />
+            </label>
+          )}
+          {viewFilters.includes("classe") && (
+            <label>
+              <span>Classe</span>
+              <select
+                value={classe}
+                onChange={(e) => { setClasse(e.target.value); setCours(""); }}
+                aria-label="Filtrer par classe"
+              >
+                <option value="">Toutes les classes</option>
+                {data.classes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nom}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {viewFilters.includes("cours") && (
+            <label>
+              <span>Cours</span>
+              <select
+                value={cours}
+                onChange={(e) => setCours(e.target.value)}
+                aria-label="Filtrer par cours"
+              >
+                <option value="">Tous les cours</option>
+                {data.cours_disponibles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][c.jour_semaine]} · {c.nom} · {c.heure_debut.slice(0, 5)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {data.role === "dev" && (
             <label>
               <span>Jeu de données</span>
@@ -736,7 +755,7 @@ export default function DashboardClient() {
               <section className={styles.tablePanel} aria-labelledby="recent-activity-title">
                 <div className={styles.tablePanelHeader}>
                   <h2 id="recent-activity-title" className={styles.tablePanelTitle}>Activité récente</h2>
-                  {data.role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => setVue("journal")}>Journal complet</button>}
+                  {data.role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => changementVue("journal")}>Journal complet</button>}
                 </div>
                 {activityError ? <p className={styles.error}>{activityError}</p> : (
                   <div className={styles.scheduleList}>
@@ -987,6 +1006,13 @@ export default function DashboardClient() {
           )}
           {vue === "presences" && (
             <AttendanceManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "developpeur" && data.role === "dev" && (
+            <DeveloperWorkspace
+              demoMode={demoMode}
+              onNavigate={changementVue}
+              onToggleDemo={toggleDeveloperDemo}
+            />
           )}
           {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
           {vue === "journal" && data.role === "dev" && <AuditManager />}
