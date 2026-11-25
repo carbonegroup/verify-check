@@ -1,11 +1,12 @@
 /**
- * VerifyCheck — navigation mobile à trois destinations.
- * Le scanner est l’écran par défaut ; le serveur détermine le cours après lecture de la carte.
+ * VerifyCheck — navigation mobile dédiée aux opérations de pointage.
+ * Le cours est déterminé automatiquement par le backend au moment du scan.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -18,9 +19,12 @@ import { AccueilScreen } from "./src/screens/AccueilScreen";
 import { ScannerScreen } from "./src/screens/ScannerScreen";
 import { HistoriqueScreen } from "./src/screens/HistoriqueScreen";
 import { logout, session } from "./src/services/auth";
+import { enAttente, enAttenteAvecCours, onFileChange, synchroniserFile } from "./src/store/scan";
+import { verifierDisponibiliteServeur } from "./src/services/api";
 import { theme } from "./src/theme";
 
 type Onglet = "accueil" | "scanner" | "historique";
+type EtatServeur = "connecte" | "indisponible" | "verification";
 
 const ONGLETS: Array<{ id: Onglet; label: string; icon: string }> = [
   { id: "accueil", label: "Accueil", icon: "⌂" },
@@ -32,14 +36,24 @@ export default function App() {
   const [email, setEmail] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
   const [onglet, setOnglet] = useState<Onglet>("scanner");
+  const [etatServeur, setEtatServeur] = useState<EtatServeur>("verification");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [synchronisation, setSynchronisation] = useState(false);
+  const syncInProgress = useRef(false);
+
+  const actualiserCompteur = useCallback(async () => {
+    try {
+      setPendingCount(await enAttente());
+    } catch {
+      // L'historique signalera une éventuelle erreur de lecture locale.
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
     void session()
       .then((stored) => {
-        if (!active) return;
-        const userEmail = stored?.user.email ?? null;
-        setEmail(userEmail);
+        if (active) setEmail(stored?.user.email ?? null);
       })
       .catch(() => {
         if (active) setEmail(null);
@@ -52,6 +66,43 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    void actualiserCompteur();
+    return onFileChange(() => void actualiserCompteur());
+  }, [actualiserCompteur]);
+
+  const verifierServeurEtSynchroniser = useCallback(async () => {
+    if (!email) return;
+    const reachable = await verifierDisponibiliteServeur();
+    setEtatServeur(reachable ? "connecte" : "indisponible");
+    if (!reachable || syncInProgress.current) return;
+
+    syncInProgress.current = true;
+    setSynchronisation(true);
+    try {
+      if (await enAttenteAvecCours() > 0) await synchroniserFile();
+    } catch {
+      // Les éléments qui n'ont pas été confirmés restent dans la file.
+    } finally {
+      syncInProgress.current = false;
+      setSynchronisation(false);
+      void actualiserCompteur();
+    }
+  }, [actualiserCompteur, email]);
+
+  useEffect(() => {
+    if (!email) return;
+    void verifierServeurEtSynchroniser();
+    const interval = setInterval(() => void verifierServeurEtSynchroniser(), 45000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void verifierServeurEtSynchroniser();
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [email, verifierServeurEtSynchroniser]);
+
   const deconnexion = useCallback(async () => {
     try {
       await logout();
@@ -62,19 +113,25 @@ export default function App() {
   }, []);
 
   const sessionExpiree = useCallback(() => {
+    Alert.alert("Session expirée", "Reconnecte-toi pour continuer les pointages.");
     void deconnexion();
   }, [deconnexion]);
 
   const ouvrirMenuCompte = useCallback(() => {
-    Alert.alert("VerifyCheck", email ?? "", [
+    Alert.alert("Compte agent", email ?? "", [
+      {
+        text: "À propos de VerifyCheck",
+        onPress: () => Alert.alert(
+          "VerifyCheck Mobile",
+          "Application de pointage QR. Le cours est déterminé automatiquement par le serveur. Les droits du compte sont contrôlés par le backend."
+        ),
+      },
       { text: "Se déconnecter", style: "destructive", onPress: () => void deconnexion() },
-      { text: "Annuler", style: "cancel" },
+      { text: "Fermer", style: "cancel" },
     ]);
   }, [deconnexion, email]);
 
-  const ouvrirScanner = useCallback(() => {
-    setOnglet("scanner");
-  }, []);
+  const ouvrirScanner = useCallback(() => setOnglet("scanner"), []);
 
   if (chargement) return <View style={s.loading} />;
 
@@ -88,6 +145,13 @@ export default function App() {
       />
     );
   }
+
+  const serveurLabel =
+    etatServeur === "connecte"
+      ? "Serveur accessible"
+      : etatServeur === "indisponible"
+        ? "Serveur inaccessible — file locale conservée"
+        : "Vérification du serveur…";
 
   return (
     <SafeAreaView style={s.root}>
@@ -112,13 +176,24 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      <View style={[s.connectionBar, etatServeur === "indisponible" && s.connectionOffline]}>
+        <View
+          style={[
+            s.connectionDot,
+            etatServeur === "connecte" && s.connectionDotOnline,
+            etatServeur === "indisponible" && s.connectionDotOffline,
+          ]}
+        />
+        <Text style={s.connectionText} numberOfLines={1}>{serveurLabel}</Text>
+        {pendingCount > 0 ? (
+          <Text style={s.pendingBadge}>{pendingCount} en attente</Text>
+        ) : null}
+        {synchronisation ? <Text style={s.syncLabel}>Sync…</Text> : null}
+      </View>
+
       <View style={s.content}>
-        {onglet === "accueil" ? (
-          <AccueilScreen onOpenScanner={ouvrirScanner} />
-        ) : null}
-        {onglet === "scanner" ? (
-          <ScannerScreen onSessionExpiree={sessionExpiree} />
-        ) : null}
+        {onglet === "accueil" ? <AccueilScreen onOpenScanner={ouvrirScanner} /> : null}
+        {onglet === "scanner" ? <ScannerScreen onSessionExpiree={sessionExpiree} /> : null}
         {onglet === "historique" ? <HistoriqueScreen /> : null}
       </View>
 
@@ -129,9 +204,7 @@ export default function App() {
             <TouchableOpacity
               key={item.id}
               style={s.tab}
-              onPress={() => {
-                setOnglet(item.id);
-              }}
+              onPress={() => setOnglet(item.id)}
               accessibilityRole="button"
               accessibilityLabel={item.label}
               accessibilityState={{ selected: active }}
@@ -174,6 +247,21 @@ const s = StyleSheet.create({
   brandSubtitle: { color: "#D7E3F0", fontSize: 9, fontWeight: "700", letterSpacing: 0.9 },
   account: { width: 42, height: 44, alignItems: "center", justifyContent: "center" },
   accountGlyph: { color: theme.white, fontSize: 27, fontWeight: "700" },
+  connectionBar: {
+    minHeight: 31,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+    backgroundColor: "#E8F4EE",
+  },
+  connectionOffline: { backgroundColor: "#FFF3E0" },
+  connectionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.inkSoft },
+  connectionDotOnline: { backgroundColor: theme.success },
+  connectionDotOffline: { backgroundColor: theme.warn },
+  connectionText: { flex: 1, color: theme.inkSoft, fontSize: 10, fontWeight: "600" },
+  pendingBadge: { color: theme.warnInk, fontSize: 10, fontWeight: "800" },
+  syncLabel: { color: theme.accent, fontSize: 10, fontWeight: "800" },
   content: { flex: 1, minHeight: 0 },
   tabs: {
     minHeight: 62,

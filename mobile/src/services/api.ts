@@ -167,3 +167,29 @@ export async function rejouerPointage(item: FileItem): Promise<"confirme" | "dou
     return "reessayer";
   }
 }
+
+/**
+ * Vérifie l'accès au backend, pas seulement la présence d'un réseau Wi-Fi.
+ * Un refus 403 prouve que le serveur répond ; une session 401 ne déclenche
+ * pas une synchronisation automatique avec un jeton invalide.
+ */
+export async function verifierDisponibiliteServeur(): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  try {
+    const token = await accessToken();
+    const response = await fetch(getConfig().apiBaseUrl + "/api/scan/context", {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal: controller.signal,
+    });
+    return response.ok || response.status === 403;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

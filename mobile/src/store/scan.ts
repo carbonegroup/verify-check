@@ -1,6 +1,7 @@
 /**
  * Store du scanner mobile : orchestration du pointage et file hors ligne.
- * La logique de synchronisation pure reste dans lib/queue.ts.
+ * Les écritures locales sont sérialisées afin qu'une synchronisation ne puisse
+ * pas écraser un scan ajouté en parallèle.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,6 +9,8 @@ import {
   dejaEnAttente,
   nouvelleEntree,
   nombreEnAttente,
+  nombreEnAttenteAvecCours,
+  resumeFile,
   synchroniser,
   type FileItem,
   type FileStore,
@@ -16,27 +19,31 @@ import type { ScanEtat } from "../lib/scanStatus";
 import { pointer, rejouerPointage } from "../services/api";
 
 export type LocalItem = FileItem;
+export type ResumeLocal = ReturnType<typeof resumeFile> & { derniereSynchronisation: string | null };
 
 const KEY = "vc.mobile.queue.v1";
+const SYNC_KEY = "vc.mobile.sync.v1";
 
 const asyncStore: FileStore = {
   async load() {
-    try {
-      const raw = await AsyncStorage.getItem(KEY);
-      return raw ? (JSON.parse(raw) as FileItem[]) : [];
-    } catch {
-      return [];
-    }
+    const raw = await AsyncStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("La file locale est illisible.");
+    return parsed as FileItem[];
   },
   async save(items) {
-    try {
-      await AsyncStorage.setItem(KEY, JSON.stringify(items));
-    } catch {
-      // En cas de quota, le pointage serveur reste valable mais peut manquer
-      // dans l’historique local de cet appareil.
-    }
+    await AsyncStorage.setItem(KEY, JSON.stringify(items));
   },
 };
+
+let mutationTail: Promise<void> = Promise.resolve();
+
+function serialiserMutation<T>(work: () => Promise<T>): Promise<T> {
+  const result = mutationTail.then(work, work);
+  mutationTail = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 const uid = () =>
   "m-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
@@ -45,24 +52,26 @@ export async function mettreEnAttente(
   codeQr: string,
   selection?: { coursId: string; coursNom: string; salle?: string }
 ): Promise<ScanEtat> {
-  const items = await asyncStore.load();
-  const coursId = selection?.coursId ?? "";
-  if (dejaEnAttente(items, codeQr, coursId || undefined)) {
-    return { kind: "deja_en_attente" };
-  }
+  return serialiserMutation(async () => {
+    const items = await asyncStore.load();
+    const coursId = selection?.coursId ?? "";
+    if (dejaEnAttente(items, codeQr, coursId || undefined)) {
+      return { kind: "deja_en_attente" };
+    }
 
-  const entry: FileItem = {
-    ...nouvelleEntree(uid(), {
-      code_qr: codeQr,
-      cours: coursId,
-      salle: selection?.salle,
-      at: new Date().toISOString(),
-    }),
-    cours_nom: selection?.coursNom,
-  };
-  await asyncStore.save([...items, entry]);
-  emitChange();
-  return { kind: "hors_ligne", fileId: entry.id };
+    const entry: FileItem = {
+      ...nouvelleEntree(uid(), {
+        code_qr: codeQr,
+        cours: coursId,
+        salle: selection?.salle,
+        at: new Date().toISOString(),
+      }),
+      cours_nom: selection?.coursNom,
+    };
+    await asyncStore.save([...items, entry]);
+    emitChange();
+    return { kind: "hors_ligne", fileId: entry.id };
+  });
 }
 
 export async function enregistrerScan(
@@ -70,66 +79,83 @@ export async function enregistrerScan(
   selection?: { coursId: string; coursNom: string; salle?: string }
 ): Promise<ScanEtat> {
   const etat = await pointer(codeQr, selection);
-  const items = await asyncStore.load();
-  const coursId = selection?.coursId ?? "";
 
   if (etat.kind === "hors_ligne" || etat.kind === "erreur_serveur") {
     return mettreEnAttente(codeQr, selection);
   }
 
-  // L'historique doit conserver aussi les pointages confirmés en ligne.
-  // Un doublon serveur n'est pas un nouveau pointage et n'ajoute donc pas
-  // une seconde ligne au registre local.
   if (etat.kind === "confirmee" || etat.kind === "doublon") {
-    const courseId = etat.coursId ?? coursId;
-    const unresolved = items.map((item) =>
-      item.etat === "en_attente" && !item.cours && item.code_qr === codeQr.toUpperCase()
-        ? {
-            ...item,
+    await serialiserMutation(async () => {
+      const items = await asyncStore.load();
+      const coursId = selection?.coursId ?? "";
+      const courseId = etat.coursId ?? coursId;
+      const unresolved = items.map((item) =>
+        item.etat === "en_attente" && !item.cours && item.code_qr === codeQr.toUpperCase()
+          ? {
+              ...item,
+              cours: courseId,
+              cours_nom: etat.cours ?? selection?.coursNom,
+              eleve: etat.eleve,
+              at: new Date().toISOString(),
+              etat: "confirme" as const,
+              note: "résolu après validation serveur lors d'un nouveau scan",
+            }
+          : item
+      );
+      const alreadyResolved = unresolved.some(
+        (item) =>
+          item.etat === "confirme" &&
+          item.code_qr === codeQr.toUpperCase() &&
+          item.cours === courseId
+      );
+
+      if (!alreadyResolved && etat.kind === "confirmee") {
+        unresolved.push({
+          ...nouvelleEntree(uid(), {
+            code_qr: codeQr,
             cours: courseId,
-            cours_nom: etat.cours ?? selection?.coursNom,
-            eleve: etat.eleve,
+            salle: selection?.salle,
             at: new Date().toISOString(),
-            etat: "confirme" as const,
-            note: "résolu après validation serveur lors d'un nouveau scan",
-          }
-        : item
-    );
-    const alreadyResolved = unresolved.some(
-      (item) => item.etat === "confirme" && item.code_qr === codeQr.toUpperCase() && item.cours === courseId
-    );
-    if (!alreadyResolved && etat.kind === "confirmee") {
-      const entry: FileItem = {
-        ...nouvelleEntree(uid(), {
-          code_qr: codeQr,
-          cours: courseId,
-          salle: selection?.salle,
-          at: new Date().toISOString(),
-        }),
-        etat: "confirme",
-        eleve: etat.eleve,
-        cours_nom: etat.cours ?? selection?.coursNom,
-      };
-      unresolved.push(entry);
-    }
-    await asyncStore.save(unresolved);
-    emitChange();
+          }),
+          etat: "confirme",
+          eleve: etat.eleve,
+          cours_nom: etat.cours ?? selection?.coursNom,
+        });
+      }
+
+      await asyncStore.save(unresolved);
+      emitChange();
+    });
   }
 
   return etat;
 }
 
 export async function synchroniserFile(): Promise<number> {
-  const items = await asyncStore.load();
-  if (nombreEnAttente(items) === 0) return 0;
-  const { items: next, synchronises } = await synchroniser(items, rejouerPointage);
-  await asyncStore.save(next);
-  emitChange();
-  return synchronises;
+  return serialiserMutation(async () => {
+    const items = await asyncStore.load();
+    if (nombreEnAttenteAvecCours(items) === 0) return 0;
+
+    const { items: next, synchronises } = await synchroniser(items, rejouerPointage);
+    await asyncStore.save(next);
+    await AsyncStorage.setItem(SYNC_KEY, new Date().toISOString());
+    emitChange();
+    return synchronises;
+  });
 }
 
 export async function enAttente(): Promise<number> {
   return nombreEnAttente(await asyncStore.load());
+}
+
+export async function enAttenteAvecCours(): Promise<number> {
+  return nombreEnAttenteAvecCours(await asyncStore.load());
+}
+
+export async function resumeLocal(): Promise<ResumeLocal> {
+  const items = await asyncStore.load();
+  const derniereSynchronisation = await AsyncStorage.getItem(SYNC_KEY);
+  return { ...resumeFile(items), derniereSynchronisation };
 }
 
 export async function historique(): Promise<FileItem[]> {
@@ -138,10 +164,12 @@ export async function historique(): Promise<FileItem[]> {
 }
 
 const listeners = new Set<() => void>();
+
 function emitChange() {
-  listeners.forEach((fn) => fn());
+  listeners.forEach((listener) => listener());
 }
-export function onFileChange(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+
+export function onFileChange(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }

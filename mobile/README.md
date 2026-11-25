@@ -1,38 +1,41 @@
 # VerifyCheck — application mobile
 
-Application Android/iOS de pointage scolaire. Le client utilise les endpoints du backend Next.js ; le serveur reste l’autorité pour chaque présence.
+Application Android/iOS dédiée au pointage scolaire QR. Le serveur reste l'autorité pour l'identification de l'élève, le choix du cours et la validation de chaque présence.
 
-## Parcours
+## Parcours agent
 
-- **Connexion agent** : authentification Supabase ; chaque appel API utilise le JWT de la session.
-- **Scanner (écran par défaut)** : l’écran est consacré à la caméra QR. La classe et le cours sont choisis dans une fenêtre ponctuelle accessible depuis les options du compte ; il n’existe plus d’onglet ou d’écran permanent « Contexte ».
-- **Résultat après lecture** : après un scan, la caméra est remplacée par un résultat explicite. Le nom de l’élève et le cours sont affichés uniquement lorsque le serveur les fournit. L’action « Scanner le suivant » réactive la caméra.
-- **Validation honnête** : une présence n’est confirmée qu’après la réponse serveur correspondante. Un doublon, un QR invalide, une séance incorrecte, une erreur serveur et une absence de réseau ont des messages distincts.
-- **File hors ligne** : les pointages impossibles à valider sont conservés en local avec l’état **EN ATTENTE**. La synchronisation rejoue les éléments au serveur ; ils ne deviennent confirmés qu’après validation.
-- **Accueil agent** : résumé des pointages conservés localement sur l’appareil et raccourci vers le scanner.
-- **Historique** : les 20 dernières entrées locales, avec leur date et leur statut. Ce n’est pas un registre global des présences de l’établissement.
+- **Connexion** : authentification Supabase ; chaque appel API utilise le JWT de la session.
+- **Scanner (écran par défaut)** : lecture QR avec la caméra arrière. L'agent n'a pas à sélectionner une classe ou une séance ; le backend identifie le contexte applicable à partir de la carte et des règles horaires.
+- **Confirmation** : une prévisualisation présente les informations disponibles. L'agent confirme explicitement chaque pointage ; seul le retour serveur permet d'afficher CONFIRMÉ.
+- **Scan continu facultatif** : après une confirmation serveur réussie, la caméra se réactive automatiquement. Les doublons, erreurs, ambiguïtés et scans hors ligne ne déclenchent pas la reprise automatique.
+- **Commandes caméra** : flash/torche et zoom numérique lorsque le matériel les prend en charge.
+- **Retour d'action** : vibration courte lors d'une confirmation ou d'un résultat nécessitant l'attention de l'agent.
+- **État du serveur** : une barre supérieure indique si l'API est joignable. Ce contrôle vérifie l'accès au backend, pas simplement la présence d'un réseau Wi-Fi.
+- **File hors ligne** : les tentatives non validées sont conservées localement en EN ATTENTE. La synchronisation automatique reprend les éléments qui disposent déjà d'un cours attribué ; ils ne deviennent confirmés qu'après réponse du serveur.
+- **Scans hors ligne sans cours** : ils ne sont jamais affectés arbitrairement à une séance. L'agent doit rescanner lorsque le serveur est joignable afin que le backend détermine le cours.
+- **Accueil agent** : résumé des pointages conservés localement sur l'appareil et raccourci vers le scanner.
+- **Historique** : les 20 dernières entrées locales, filtrables par élève/QR, cours, date et statut. Ce n'est pas un registre global des présences de l'établissement.
+- **Compte** : accès aux informations de base et déconnexion.
 
-## Fonctionnalités volontairement retirées de l’écran de scan
+## Principes de sécurité et de cohérence
 
-- Carte de séance active affichée en permanence.
-- Compteur de présents et effectif.
-- Saisie manuelle du QR code.
-- Onglet « Contexte » séparé.
-
-Le choix de la séance reste obligatoire ; il est simplement déplacé dans une fenêtre afin de ne pas encombrer la caméra.
+- Aucun pointage n'est affiché comme confirmé sur la seule base d'un enregistrement local.
+- La file locale est conservée en cas d'erreur de stockage ou de perte de connexion ; l'application ne doit pas annoncer qu'un scan a été mis en attente si sa persistance a échoué.
+- Les réponses d'accès refusé (403), de session expirée (401) et de requête invalide (400/404 non métier) ne sont pas transformées en pointages hors ligne.
+- Un doublon renvoyé par le serveur est traité comme une présence déjà enregistrée, pas comme une nouvelle présence.
+- Les scans sans cours identifié restent en attente et ne sont jamais rejoués sur une séance ultérieure par supposition.
 
 ## Structure
 
 ~~~text
 mobile/
-  App.tsx                         Shell, authentification et onglets
+  App.tsx                         Shell, connexion, état serveur et onglets
   src/
     screens/
       LoginScreen.tsx             Connexion
-      AccueilScreen.tsx           Activité locale de l’agent
-      ScannerScreen.tsx           Caméra et résultat de scan
-      HistoriqueScreen.tsx        Historique local + synchronisation
-      SessionPicker.tsx           Sélection temporaire classe/cours
+      AccueilScreen.tsx           Activité locale de l'agent
+      ScannerScreen.tsx           Caméra, prévisualisation et confirmation
+      HistoriqueScreen.tsx        Historique local, filtres et synchronisation
     services/
       api.ts                      Appels API backend
       auth.ts                     Session Supabase
@@ -48,7 +51,7 @@ mobile/
 
 ~~~bash
 cd mobile
-npm install
+npm ci
 npx expo start
 npm run typecheck
 npm test
@@ -63,8 +66,8 @@ Copier mobile/.env.example vers .env, puis définir :
 - EXPO_PUBLIC_SUPABASE_ANON_KEY
 - EXPO_PUBLIC_API_BASE_URL
 
-La clé Supabase service_role ne doit jamais être incluse dans l’application mobile.
+La clé Supabase service_role ne doit jamais être incluse dans l'application mobile.
 
 ## Limites de vérification
 
-Les tests unitaires ne remplacent pas un essai de caméra sur un téléphone réel. Le parcours doit encore être contrôlé sur appareil physique avec un compte agent autorisé et une carte QR réelle.
+Les tests unitaires ne remplacent pas un essai de caméra sur un téléphone réel. Vérifier le flash, le zoom, les vibrations, le scan continu et le comportement hors ligne sur les appareils Android ciblés avant diffusion.

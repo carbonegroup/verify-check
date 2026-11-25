@@ -1,8 +1,6 @@
 /**
- * File d'attente hors ligne du scanner mobile — logique pure (testée sans RN).
- * Le stockage persistant (AsyncStorage) est injecté : ce module ne sait rien
- * de React Native. Chaque entrée a un identifiant unique ; le doublon serveur
- * est un CONFIRMEMENT, un rejet définitif est marqué `rejete`.
+ * File d'attente hors ligne du scanner mobile — logique pure.
+ * Les données en attente ne sont jamais présentées comme des présences validées.
  */
 
 export type FileItem = {
@@ -10,11 +8,9 @@ export type FileItem = {
   code_qr: string;
   cours: string;
   salle?: string;
-  /** Heure locale ISO du scan (au moment du geste agent). */
   at: string;
   etat: "en_attente" | "confirme" | "rejete";
   note?: string;
-  /** Informations disponibles uniquement après une réponse réelle du serveur. */
   eleve?: string;
   cours_nom?: string;
   essais: number;
@@ -25,10 +21,6 @@ export type FileStore = {
   save(items: FileItem[]): Promise<void>;
 };
 
-/** Rejets métier définitifs (jamais réessayables).
- * Aligné sur le contrat serveur (maintenance cycle 1) : seul `qr_invalide`
- * est définitif — un pointage rejeté pour timing (pas_de_cours, salle…)
- * reste EN ATTENTE et est rejoué à la synchronisation, jamais supprimé. */
 const REJETS_DEFINITIFS = new Set(["qr_invalide"]);
 
 export function nouvelleEntree(
@@ -46,18 +38,16 @@ export function nouvelleEntree(
   };
 }
 
-/** Anti-doublon local : ce code est-il déjà EN ATTENTE pour ce cours ? */
 export function dejaEnAttente(items: FileItem[], codeQr: string, cours?: string): boolean {
   const code = codeQr.toUpperCase();
   return items.some(
-    (i) =>
-      i.etat === "en_attente" &&
-      i.code_qr === code &&
-      (!cours || !i.cours || i.cours === cours)
+    (item) =>
+      item.etat === "en_attente" &&
+      item.code_qr === code &&
+      (!cours || !item.cours || item.cours === cours)
   );
 }
 
-/** Charge, puis applique une transformation pure sur la file et la persiste. */
 export async function mettreAJour(
   store: FileStore,
   transform: (items: FileItem[]) => FileItem[]
@@ -67,22 +57,31 @@ export async function mettreAJour(
   return items;
 }
 
-/** Compte des pointages EN ATTENTE (badge réseau de l'UI). */
 export function nombreEnAttente(items: FileItem[]): number {
-  return items.filter((i) => i.etat === "en_attente").length;
+  return items.filter((item) => item.etat === "en_attente").length;
+}
+
+export function nombreEnAttenteAvecCours(items: FileItem[]): number {
+  return items.filter((item) => item.etat === "en_attente" && Boolean(item.cours)).length;
+}
+
+export function resumeFile(items: FileItem[]) {
+  return {
+    total: items.length,
+    enAttente: nombreEnAttente(items),
+    synchronisables: nombreEnAttenteAvecCours(items),
+    confirmes: items.filter((item) => item.etat === "confirme").length,
+    rejetes: items.filter((item) => item.etat === "rejete").length,
+    derniereActivite: items.reduce<string | null>(
+      (latest, item) => (!latest || item.at > latest ? item.at : latest),
+      null
+    ),
+  };
 }
 
 /**
- * Synchronise la file : rejoue chaque pointage EN ATTENTE via `replay`.
- * Règles précises (alignées sur le contrat serveur) :
- * - `confirme` (201) ou `doublon` serveur → CONFIRMÉ (badge vert) ;
- * - rejet définitif → REJETÉ (seul `qr_invalide` est définitif,
- *   les rejets de timing restent EN ATTENTE et sont rejoués) ;
- * - erreur réseau/perte → reste EN ATTENTE, essais+1, on s'arrête pas
- *   brutalement : on traite séquentiellement et on s'arrête seulement
- *   si la réseau tombe complètement (pas de réponse serveur).
- * - La file est JAMAIS nettoyée arbitrairement : chaque entrée conservée
- *   jusqu'à ce qu'elle soit effectivement traitée par le serveur.
+ * Rejoue séquentiellement les éléments qui possèdent déjà un cours attribué.
+ * Les scans sans cours restent en attente : aucun cours ne leur est inventé.
  */
 export async function synchroniser(
   items: FileItem[],
@@ -91,18 +90,13 @@ export async function synchroniser(
   let synchronises = 0;
   let blocked = false;
   const out: FileItem[] = [];
-  // On traite TOUTES les items, même s'il y en a beaucoup.
-  // On s'arrête seulement si le replay rejoue `reessayer` ET que c'est la
-  // première erreur (pour éviter les boucles infinies en cas de réseau mort).
-  let firstReessayer = true;
+
   for (const item of items) {
-    // Une entrée sans cours a été capturée hors ligne : ne jamais la rejouer
-    // dans un autre créneau et risquer d'attribuer la présence au mauvais cours.
-    // Elle sera résolue par un nouveau scan lorsque le réseau sera disponible.
     if (item.etat !== "en_attente" || !item.cours || blocked) {
       out.push(item);
       continue;
     }
+
     const result = await replay(item);
     if (result === "confirme" || result === "doublon") {
       out.push({
@@ -111,26 +105,17 @@ export async function synchroniser(
         note: result === "doublon" ? "doublon confirmé par le serveur" : "",
       });
       synchronises++;
-      firstReessayer = true; // reset after success
     } else if (result === "rejete_definitif") {
       out.push({ ...item, etat: "rejete" });
-      firstReessayer = true;
     } else {
-      // reessayer : le pointage reste EN ATTENTE
       out.push({ ...item, essais: item.essais + 1 });
-      // On ne bloque PAS la file : on continue avec le prochain item.
-      // On ne set blocked que si c'est le premier reessayer consécutif
-      // (protection contre les boucles infinies si le réseau est mort).
-      if (firstReessayer) {
-        blocked = true;
-        firstReessayer = false;
-      }
+      blocked = true;
     }
   }
+
   return { items: out, synchronises };
 }
 
-/** Le rejet métier renvoyé par le serveur est-il définitif ? */
 export function estRejetDefinitif(erreur?: string): boolean {
   return REJETS_DEFINITIFS.has(erreur ?? "");
 }
