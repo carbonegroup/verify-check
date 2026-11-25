@@ -77,10 +77,18 @@ export default function App() {
     setEtatServeur(reachable ? "connecte" : "indisponible");
     if (!reachable || syncInProgress.current) return;
 
+    let pendingWithCourse = 0;
+    try {
+      pendingWithCourse = await enAttenteAvecCours();
+    } catch {
+      return;
+    }
+    if (pendingWithCourse === 0) return;
+
     syncInProgress.current = true;
     setSynchronisation(true);
     try {
-      if (await enAttenteAvecCours() > 0) await synchroniserFile();
+      await synchroniserFile();
     } catch {
       // Les éléments qui n'ont pas été confirmés restent dans la file.
     } finally {

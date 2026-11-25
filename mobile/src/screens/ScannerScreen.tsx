@@ -352,7 +352,12 @@ export function ScannerScreen({ onSessionExpiree }: { onSessionExpiree: () => vo
           )}
 
           {resultat.kind === "confirmee" && scanContinu ? (
-            <Text style={s.autoNext}>Caméra relancée automatiquement…</Text>
+            <>
+              <Text style={s.autoNext}>Caméra relancée automatiquement…</Text>
+              <TouchableOpacity style={s.secondary} onPress={() => changerModeContinu(false)}>
+                <Text style={s.secondaryText}>Arrêter le scan continu</Text>
+              </TouchableOpacity>
+            </>
           ) : null}
         </View>
       </View>
