@@ -52,6 +52,17 @@ type DashboardData = {
   presents: number;
   scans: number;
   presences_enregistrees: number;
+  alerts: Array<{
+    id: string;
+    type: "schedule_conflict";
+    conflict: "class" | "teacher" | "room";
+    course_id: string;
+    course_name: string;
+    other_course_id: string;
+    other_course_name: string;
+    jour_semaine: number;
+    message: string;
+  }>;
   eleves: Eleve[];
   demo_mode?: boolean;
   role?: "admin" | "dev";
@@ -608,6 +619,26 @@ export default function DashboardClient() {
                 </article>
               </section>
 
+              {data.alerts.length > 0 && (
+                <section className={styles.alertPanel} aria-labelledby="schedule-alerts-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="schedule-alerts-title" className={styles.tablePanelTitle}>Alertes de planning</h2>
+                    <span className={styles.alertCount}>{data.alerts.length} conflit(s) détecté(s)</span>
+                  </div>
+                  <div className={styles.alertList}>
+                    {data.alerts.slice(0, 8).map((alert) => (
+                      <div className={styles.alertItem} key={alert.id}>
+                        <span className={styles.alertMark} aria-hidden="true">!</span>
+                        <div>
+                          <strong>{alert.course_name} · {alert.other_course_name}</strong>
+                          <small>{["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"][alert.jour_semaine]} · {alert.conflict === "class" ? "Même classe" : alert.conflict === "teacher" ? "Même enseignant" : "Même salle"} · {alert.message}</small>
+                        </div>
+                      </div>
+                    ))}
+                    {data.alerts.length > 8 && <p className={styles.summaryLine}>8 premiers conflits affichés sur {data.alerts.length}. Consulte la gestion des cours pour les autres.</p>}
+                  </div>
+                </section>
+              )}
               {!isSelectedToday && <p className={styles.summaryLine}>Le planning en temps réel est affiché uniquement pour la date du jour ; cette date historique reste consultable dans le registre.</p>}
               <div className={styles.scheduleGrid}>
                 <section className={styles.tablePanel} aria-labelledby="current-courses-title">
