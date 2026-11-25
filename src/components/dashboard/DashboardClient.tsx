@@ -7,7 +7,7 @@ import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type Statut
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
 import { getDashboardFilters, isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
-import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager, DeveloperWorkspace } from "./ManagementViews";
+import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager, DeveloperWorkspace, DemoDataManager, DeveloperSettings } from "./ManagementViews";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -82,7 +82,9 @@ const PAGE_META: Record<Vue, { title: string; description: string }> = {
   presences: { title: "Gestion des présences", description: "Enregistrer et corriger les présences" },
   developpeur: { title: "Espace développeur", description: "Outils techniques et configuration de VerifyCheck" },
   utilisateurs: { title: "Comptes utilisateurs", description: "Gérer les accès ADMIN et DEV" },
-  journal: { title: "Journal d’audit", description: "Consulter les opérations administratives" },
+  journal: { title: "Journal d’audit détaillé", description: "Consulter les traces et les changements détaillés" },
+  "jeux-test": { title: "Jeux de test", description: "Gérer l’environnement de démonstration isolé" },
+  parametres: { title: "Paramètres de l’application", description: "Consulter l’état de configuration des services" },
   securite: { title: "Sécurité du compte", description: "Mettre à jour ton mot de passe" },
   scolarite: { title: "Scolarité", description: "Suivi des frais de scolarité" },
   comptabilite: { title: "Comptabilité", description: "Recettes, dépenses et soldes de l’établissement" },
@@ -204,6 +206,7 @@ export default function DashboardClient() {
   const [classe, setClasse] = useState<string>("");
   const [cours, setCours] = useState<string>("");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [role, setRole] = useState<"admin" | "dev">("admin");
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityError, setActivityError] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -222,6 +225,22 @@ export default function DashboardClient() {
 
   // Connectivité faible : on mémorise en mémoire les réponses financières déjà
   // obtenues pour ne pas les retélécharger à chaque va-et-vient entre vues.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/auth/context", { credentials: "same-origin" });
+        if (!response.ok) return;
+        const context = await response.json() as { role?: "admin" | "dev" };
+        if (!cancelled && (context.role === "admin" || context.role === "dev")) {
+          setRole(context.role);
+        }
+      } catch {
+        // The dashboard request remains the fallback source for the current role.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const scolariteCache = useRef(new Map<string, ScolariteData>());
   const comptabiliteCache = useRef(new Map<string, ComptabiliteData>());
   const [scolariteReload, setScolariteReload] = useState(0);
@@ -247,6 +266,7 @@ export default function DashboardClient() {
       } else {
         const body = (await res.json()) as DashboardData;
         if (!cancelledRef.current) setData(body);
+        if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
         if (!cancelledRef.current) setClasseNom(
           classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
         );
@@ -279,6 +299,7 @@ export default function DashboardClient() {
         } else {
           const body = (await res.json()) as DashboardData;
           if (!cancelledRef.current) setData(body);
+        if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
           if (!cancelledRef.current) setClasseNom(
             classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
           );
@@ -469,13 +490,13 @@ export default function DashboardClient() {
   }, [vue, data]);
 
   const changementVue = useCallback((id: Vue) => {
-    if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
+    if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && role !== "dev")) return;
     setVue(id);
     const nextFilters = getDashboardFilters(id);
     if (!nextFilters.includes("cours")) setCours("");
     if (!nextFilters.includes("date")) setDate(todayConakry());
     if (!nextFilters.includes("classe")) setClasse("");
-  }, [data?.role]);
+  }, [role]);
 
   const toggleDeveloperDemo = useCallback(() => {
     setDemoMode((enabled) => !enabled);
@@ -486,7 +507,7 @@ export default function DashboardClient() {
   }, [changementVue]);
 
   return (
-    <Shell vue={vue} role={data?.role ?? "admin"} onViewChange={changementVue}>
+    <Shell vue={vue} role={role} onViewChange={changementVue}>
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>{PAGE_META[vue].title}</h1>
@@ -545,7 +566,7 @@ export default function DashboardClient() {
               </select>
             </label>
           )}
-          {data.role === "dev" && (
+          {role === "dev" && (
             <label>
               <span>Jeu de données</span>
               <select
@@ -755,7 +776,7 @@ export default function DashboardClient() {
               <section className={styles.tablePanel} aria-labelledby="recent-activity-title">
                 <div className={styles.tablePanelHeader}>
                   <h2 id="recent-activity-title" className={styles.tablePanelTitle}>Activité récente</h2>
-                  {data.role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => changementVue("journal")}>Journal complet</button>}
+                  {role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => changementVue("journal")}>Journal complet</button>}
                 </div>
                 {activityError ? <p className={styles.error}>{activityError}</p> : (
                   <div className={styles.scheduleList}>
@@ -1007,15 +1028,15 @@ export default function DashboardClient() {
           {vue === "presences" && (
             <AttendanceManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
           )}
-          {vue === "developpeur" && data.role === "dev" && (
-            <DeveloperWorkspace
-              demoMode={demoMode}
-              onNavigate={changementVue}
-              onToggleDemo={toggleDeveloperDemo}
-            />
+          {vue === "developpeur" && role === "dev" && (
+            <DeveloperWorkspace onNavigate={changementVue} />
           )}
-          {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
-          {vue === "journal" && data.role === "dev" && <AuditManager />}
+          {vue === "utilisateurs" && role === "dev" && <UsersManager />}
+          {vue === "jeux-test" && role === "dev" && (
+            <DemoDataManager demoMode={demoMode} onToggleDemo={toggleDeveloperDemo} />
+          )}
+          {vue === "journal" && role === "dev" && <AuditManager />}
+          {vue === "parametres" && role === "dev" && <DeveloperSettings />
           {vue === "securite" && <PasswordManager />}
 
           {/* ---------------------------------------------- SCOLARITÉ */}
