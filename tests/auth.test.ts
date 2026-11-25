@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test";
 
-import { isAdminRole } from "../src/lib/auth.ts";
+import { isAdminRole, isDevRole, isOperationalRole } from "../src/lib/auth.ts";
 
 test("isAdminRole lit le rôle uniquement dans app_metadata", () => {
   assert.ok(isAdminRole({ app_metadata: { role: "admin" } }));
@@ -18,4 +18,17 @@ test("isAdminRole lit le rôle uniquement dans app_metadata", () => {
 test("isAdminRole rejette un rôle non admin dans app_metadata", () => {
   assert.ok(!isAdminRole({ app_metadata: { role: "teacher" } }));
   assert.ok(!isAdminRole({ app_metadata: { role: "" } }));
+});
+
+test("les rôles opérationnels acceptent ADMIN et DEV sans confiance en user_metadata", () => {
+  assert.ok(isOperationalRole({ app_metadata: { role: "admin" } }));
+  assert.ok(isOperationalRole({ app_metadata: { role: "dev" } }));
+  assert.ok(!isOperationalRole({ app_metadata: { role: "teacher" } }));
+  assert.ok(!isOperationalRole({ user_metadata: { role: "dev" } } as never));
+});
+
+test("isDevRole réserve les privilèges de développement à app_metadata", () => {
+  assert.ok(isDevRole({ app_metadata: { role: "dev" } }));
+  assert.ok(!isDevRole({ app_metadata: { role: "admin" } }));
+  assert.ok(!isDevRole({ user_metadata: { role: "dev" } } as never));
 });
