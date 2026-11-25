@@ -132,8 +132,10 @@ export async function POST(request: NextRequest) {
   // 2) Cours actifs de la classe au moment du scan (heure locale Conakry)
   const { data: courses, error: coursesError } = await supabase
     .from("courses")
-    .select("id, nom, salle, jour_semaine, heure_debut, heure_fin")
+    .select("id, nom, salle, is_demo, jour_semaine, heure_debut, heure_fin")
     .eq("classe_id", student.classe_id)
+    .eq("is_demo", student.is_demo)
+    .is("archived_at", null)
     .eq("jour_semaine", now.jourSemaine);
   if (coursesError) {
     return respondJson({ error: "erreur_base" }, { status: 500 });
