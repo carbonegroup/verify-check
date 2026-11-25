@@ -7,7 +7,7 @@ import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type Statut
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
 import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
-import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager } from "./ManagementViews";
+import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager, PasswordManager } from "./ManagementViews";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -71,6 +71,7 @@ const PAGE_META: Record<Vue, { title: string; description: string }> = {
   presences: { title: "Gestion des présences", description: "Enregistrer et corriger les présences" },
   utilisateurs: { title: "Comptes utilisateurs", description: "Gérer les accès ADMIN et DEV" },
   journal: { title: "Journal d’audit", description: "Consulter les opérations administratives" },
+  securite: { title: "Sécurité du compte", description: "Mettre à jour ton mot de passe" },
   scolarite: { title: "Scolarité", description: "Suivi des frais de scolarité" },
   comptabilite: { title: "Comptabilité", description: "Recettes, dépenses et soldes de l’établissement" },
 };
@@ -958,6 +959,7 @@ export default function DashboardClient() {
           )}
           {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
           {vue === "journal" && data.role === "dev" && <AuditManager />}
+          {vue === "securite" && <PasswordManager />}
 
           {/* ---------------------------------------------- SCOLARITÉ */}
           {vue === "scolarite" && (
