@@ -143,16 +143,25 @@ export async function requireAdmin(
   if (!user) {
     return { ok: false, status: 401, error: "session_invalide" };
   }
-  const roleUser = user as { app_metadata?: Record<string, unknown> };
-  if (!isOperationalRole(roleUser)) {
+  const effectiveToken = session?.access_token ?? accessToken;
+  const roleClient = createServerSupabase(effectiveToken);
+  const { data: roleRow, error: roleError } = await roleClient
+    .from("app_user_roles")
+    .select("role, is_active")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (roleError || !roleRow || roleRow.is_active !== true ||
+      (roleRow.role !== "admin" && roleRow.role !== "dev")) {
     return { ok: false, status: 403, error: "role_admin_requis" };
   }
+
   return {
     ok: true,
     user: {
       id: user.id,
       email: user.email ?? null,
-      role: roleUser.app_metadata?.role as OperationalRole,
+      role: roleRow.role,
     },
     session,
   };
