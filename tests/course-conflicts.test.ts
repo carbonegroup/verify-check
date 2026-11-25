@@ -28,14 +28,14 @@ test("rejects overlapping slots for the same class", () => {
 
 test("rejects overlapping slots for the same teacher in different classes", () => {
   assert.equal(
-    findScheduleConflict(candidate({ enseignant: "  FATOU CAMARA " }), existing),
+    findScheduleConflict(candidate({ enseignant: "  FATOU CAMARA ", heure_debut: "09:15", heure_fin: "09:45" }), existing),
     "Conflit enseignant avec teacher."
   );
 });
 
 test("rejects overlapping slots for the same room in different classes", () => {
   assert.equal(
-    findScheduleConflict(candidate({ salle: " d05 " }), existing),
+    findScheduleConflict(candidate({ salle: " d05 ", heure_debut: "11:15", heure_fin: "11:45" }), existing),
     "Conflit de salle avec room."
   );
 });
