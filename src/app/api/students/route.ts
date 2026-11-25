@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     .select("id, nom, prenom, code_qr, classe_id, email, telephone, photo_url, archived_at, is_demo, created_at", { count: "exact" })
     .order("nom")
     .range((page - 1) * perPage, page * perPage - 1);
-  if (!includeDemo) query = query.eq("is_demo", false);
+  query = query.eq("is_demo", includeDemo);
   query = archived ? query.not("archived_at", "is", null) : query.is("archived_at", null);
   if (params.get("classe")) query = query.eq("classe_id", params.get("classe")!);
   if (q) query = query.or(`nom.ilike.%${q}%,prenom.ilike.%${q}%,code_qr.ilike.%${q}%,email.ilike.%${q}%`);
