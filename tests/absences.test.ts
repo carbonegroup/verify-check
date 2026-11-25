@@ -162,3 +162,19 @@ test("STATUT_LABEL contient les 3 statuts", () => {
   assert.equal(STATUT_LABEL["non-pointe"], "NON POINTÉ");
   assert.equal(STATUT_LABEL.absent, "ABSENT");
 });
+
+test("statutEleve: une absence manuelle est immédiatement ABSENT même si le cours n'est pas terminé", () => {
+  const eleve = { presences: [], absences: [{ course_id: "co-math" }] };
+  const cours = { id: "co-math", heure_fin: "12:00" };
+  assert.equal(statutEleve(eleve, cours, date, { jour: date, minutes: minutes(8, 0) }), "absent");
+});
+
+test("buildAbsences: une absence manuelle est visible avant la fin du cours", () => {
+  const rows = buildAbsences({
+    classes,
+    cours,
+    eleves: [{ id: "st-1", nom: "Alpha Barry", classe_id: "cl-1", presences: [], absences: [{ course_id: "co-math" }] }],
+  }, { date, now: { jour: date, minutes: minutes(8, 0) } });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].cours_id, "co-math");
+});
