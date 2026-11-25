@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     .select("id,nom,classe_id,salle,jour_semaine,heure_debut,heure_fin,enseignant,archived_at,is_demo,classes(id,nom)", { count: "exact" })
     .order("jour_semaine").order("heure_debut")
     .range((page - 1) * perPage, page * perPage - 1);
-  if (!includeDemo) query = query.eq("is_demo", false);
+  query = query.eq("is_demo", includeDemo);
   query = archived ? query.not("archived_at", "is", null) : query.is("archived_at", null);
   if (params.get("classe")) query = query.eq("classe_id", params.get("classe")!);
   if (params.get("jour") !== null && params.get("jour") !== "") {
