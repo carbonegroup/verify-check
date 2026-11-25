@@ -1030,6 +1030,10 @@ export function AuditManager() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [action, setAction] = useState("");
   const [entity, setEntity] = useState("");
+  const [actor, setActor] = useState("");
+  const [entityId, setEntityId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
@@ -1039,10 +1043,14 @@ export function AuditManager() {
       const params = new URLSearchParams({ page: String(page), perPage: "50" });
       if (action) params.set("action", action);
       if (entity) params.set("entity", entity);
+      if (actor.trim()) params.set("actor", actor.trim());
+      if (entityId.trim()) params.set("entityId", entityId.trim());
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
       const result = await responseJson<{ events: AuditEvent[]; total: number }>(await fetch(`/api/admin/audit?${params}`, { credentials: "same-origin" }));
       setEvents(result.events); setTotal(result.total);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "journal_indisponible")); }
-  }, [page, action, entity]);
+  }, [page, action, entity, actor, entityId, from, to]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void load(); }, [load]);
 
@@ -1060,6 +1068,18 @@ export function AuditManager() {
             <option value="">Toutes</option>
             {["students", "courses", "classes", "attendance", "auth.users"].map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
+        </label>
+        <label className={styles.field}>ID acteur
+          <input className={styles.input} value={actor} onChange={(e) => { setPage(1); setActor(e.target.value); }} placeholder="UUID utilisateur" />
+        </label>
+        <label className={styles.field}>ID entité
+          <input className={styles.input} value={entityId} onChange={(e) => { setPage(1); setEntityId(e.target.value); }} placeholder="UUID élément" />
+        </label>
+        <label className={styles.field}>Du
+          <input className={styles.input} type="date" value={from} onChange={(e) => { setPage(1); setFrom(e.target.value); }} />
+        </label>
+        <label className={styles.field}>Au
+          <input className={styles.input} type="date" value={to} onChange={(e) => { setPage(1); setTo(e.target.value); }} />
         </label>
         <button className={styles.buttonSecondary} type="button" onClick={() => void load()}>Actualiser</button>
       </div>
