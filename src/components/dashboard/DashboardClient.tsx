@@ -1030,16 +1030,7 @@ export default function DashboardClient() {
           {vue === "presences" && (
             <AttendanceManager key={demoMode ? "demo" : "real"} demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
           )}
-          {vue === "developpeur" && role === "dev" && (
-            <DeveloperWorkspace onNavigate={changementVue} />
-          )}
-          {vue === "utilisateurs" && role === "dev" && <UsersManager />}
-          {vue === "jeux-test" && role === "dev" && (
-            <DemoDataManager demoMode={demoMode} onToggleDemo={toggleDeveloperDemo} />
-          )}
-          {vue === "journal" && role === "dev" && <AuditManager />}
-          {vue === "parametres" && role === "dev" && <DeveloperSettings />}
-          {vue === "securite" && <PasswordManager />}
+
 
           {/* ---------------------------------------------- SCOLARITÉ */}
           {vue === "scolarite" && (
@@ -1287,6 +1278,21 @@ export default function DashboardClient() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {role === "dev" && isDeveloperView(vue) && (
+        <div className={styles.content}>
+          {vue === "developpeur" && <DeveloperWorkspace onNavigate={changementVue} />}
+          {vue === "utilisateurs" && <UsersManager /> }
+          {vue === "jeux-test" && <DemoDataManager demoMode={demoMode} onToggleDemo={toggleDeveloperDemo} />}
+          {vue === "journal" && <AuditManager />}
+          {vue === "parametres" && <DeveloperSettings />}
+        </div>
+      )}
+      {vue === "securite" && (
+        <div className={styles.content}>
+          <PasswordManager />
         </div>
       )}
     </Shell>
