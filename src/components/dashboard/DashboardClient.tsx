@@ -451,7 +451,7 @@ export default function DashboardClient() {
       }
     })();
     return () => { cancelled = true; };
-  }, [vue, data?.date, data?.role]);
+  }, [vue, data]);
 
   const changementVue = useCallback((id: Vue) => {
     if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
