@@ -711,14 +711,18 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [editStatus, setEditStatus] = useState("present");
   const [editReason, setEditReason] = useState("");
 
+  useEffect(() => {
+    setStudentId("");
+    setCourseId("");
+    setStudents([]);
+    setCourses([]);
+    setStudentSearch("");
+  }, [demoMode]);
+
   const loadOptions = useCallback(async () => {
     try {
-      const [studentResult, courseResult] = await Promise.all([
-        responseJson<{ students: Student[] }>(await fetch(`/api/students?perPage=50${demoMode ? "&demo=1" : ""}${studentSearch.trim() ? `&q=${encodeURIComponent(studentSearch.trim())}` : ""}`, { credentials: "same-origin" })),
-        responseJson<{ courses: Course[] }>(await fetch(`/api/courses?perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" })),
-      ]);
+      const studentResult = await responseJson<{ students: Student[] }>(await fetch(`/api/students?perPage=50${demoMode ? "&demo=1" : ""}${studentSearch.trim() ? `&q=${encodeURIComponent(studentSearch.trim())}` : ""}`, { credentials: "same-origin" }));
       setStudents(studentResult.students);
-      setCourses(courseResult.courses);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
   }, [demoMode, studentSearch]);
   const loadRecords = useCallback(async () => {
@@ -742,6 +746,21 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   }, [loadOptions]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => { void loadRecords(); }, [loadRecords]);
+
+  const loadCoursesForStudent = async (selectedStudentId: string) => {
+    const selected = students.find((student) => student.id === selectedStudentId);
+    setCourses([]);
+    setCourseId("");
+    if (!selected) return;
+    try {
+      const params = new URLSearchParams({ perPage: "100", classe: selected.classe_id });
+      if (demoMode) params.set("demo", "1");
+      const result = await responseJson<{ courses: Course[] }>(await fetch(`/api/courses?${params}`, { credentials: "same-origin" }));
+      setCourses(result.courses.filter((course) => Boolean(course.is_demo) === demoMode));
+    } catch (err) {
+      setError(errorLabel(err instanceof Error ? err.message : "erreur_base"));
+    }
+  };
 
   const filteredCourses = courses.filter((course) => course.classe_id === students.find((s) => s.id === studentId)?.classe_id);
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -780,7 +799,7 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
               <input className={styles.input} value={studentSearch} onChange={(e) => { setStudentSearch(e.target.value); setStudentId(""); setCourseId(""); }} placeholder="Nom, prénom ou matricule" />
             </label>
             <label className={styles.field}>Étudiant *
-              <select className={styles.select} required value={studentId} onChange={(e) => { setStudentId(e.target.value); setCourseId(""); }}>
+              <select className={styles.select} required value={studentId} onChange={(e) => { setStudentId(e.target.value); void loadCoursesForStudent(e.target.value); }}>
                 <option value="">Sélectionner un étudiant</option>
                 {students.filter((student) => Boolean(student.is_demo) === demoMode).map((student) => <option key={student.id} value={student.id}>{student.prenom ? student.prenom + " " : ""}{student.nom} — {classes.find((c) => c.id === student.classe_id)?.nom ?? "—"}</option>)}
               </select>
