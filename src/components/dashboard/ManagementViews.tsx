@@ -711,6 +711,8 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [editStatus, setEditStatus] = useState("present");
   const [editReason, setEditReason] = useState("");
 
+  // Reset all locally selected records when switching between real and demo datasets.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- The selected records belong to the previous dataset.
   useEffect(() => {
     setStudentId("");
     setCourseId("");
