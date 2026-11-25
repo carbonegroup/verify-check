@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const [{ data: student, error: studentError }, { data: course, error: courseError }] = await Promise.all([
-    supabase.from("students").select("id,classe_id,is_demo").eq("id", studentId).is("archived_at", null).maybeSingle(),
+    supabase.from("students").select("id,classe_id,is_demo,jour_semaine").eq("id", studentId).is("archived_at", null).maybeSingle(),
     supabase.from("courses").select("id,classe_id,is_demo").eq("id", courseId).is("archived_at", null).maybeSingle(),
   ]);
   if (studentError || courseError) return NextResponse.json({ error: "erreur_base" }, { status: 500 });
