@@ -53,6 +53,7 @@ function errorLabel(value: string): string {
     presence_deja_enregistree: "Une présence existe déjà pour cet élève et ce cours.",
     statut_et_justification_requis: "Le statut et une justification sont obligatoires.",
     verification_conflits_indisponible: "La vérification des conflits est indisponible.",
+    conflit_horaire_concurrent: "Un autre cours vient d'occuper ce créneau. Actualise le planning et choisis un horaire libre.",
     configuration_admin_indisponible: "La clé d'administration Supabase n'est pas configurée côté serveur.",
     dernier_dev_protege: "Impossible de désactiver ou rétrograder le dernier compte DEV actif.",
     modification_propre_compte_interdite: "Tu ne peux pas désactiver ou rétrograder ton propre compte.",
