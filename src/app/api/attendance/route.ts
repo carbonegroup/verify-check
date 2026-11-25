@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServerSupabase(auth.session?.access_token ?? accessToken);
   const [{ data: student, error: studentError }, { data: course, error: courseError }] = await Promise.all([
-    supabase.from("students").select("id,classe_id,is_demo,jour_semaine").eq("id", studentId).is("archived_at", null).maybeSingle(),
-    supabase.from("courses").select("id,classe_id,is_demo").eq("id", courseId).is("archived_at", null).maybeSingle(),
+    supabase.from("students").select("id,classe_id,is_demo").eq("id", studentId).is("archived_at", null).maybeSingle(),
+    supabase.from("courses").select("id,classe_id,is_demo,jour_semaine").eq("id", courseId).is("archived_at", null).maybeSingle(),
   ]);
   if (studentError || courseError) return NextResponse.json({ error: "erreur_base" }, { status: 500 });
   if (!student || !course || student.classe_id !== course.classe_id || Boolean(student.is_demo) !== Boolean(course.is_demo) || course.jour_semaine !== weekdayOfIso(date)) {
