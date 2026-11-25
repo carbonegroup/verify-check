@@ -382,4 +382,70 @@ begin
 end;
 $$;
 
+
+-- Enforce schedule integrity at the database boundary, including concurrent writes.
+-- The advisory transaction lock serializes course-slot writes before checking overlap.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.courses'::regclass
+      and conname = 'courses_time_order_check'
+  ) then
+    alter table public.courses
+      add constraint courses_time_order_check
+      check (heure_debut < heure_fin) not valid;
+  end if;
+end;
+$$;
+
+create or replace function private.prevent_course_schedule_conflicts()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.archived_at is not null then
+    return new;
+  end if;
+
+  perform pg_advisory_xact_lock(74002, 20261124);
+
+  if exists (
+    select 1
+    from public.courses as c
+    where c.id is distinct from new.id
+      and c.is_demo = new.is_demo
+      and c.archived_at is null
+      and c.jour_semaine = new.jour_semaine
+      and new.heure_debut < c.heure_fin
+      and new.heure_fin > c.heure_debut
+      and (
+        c.classe_id = new.classe_id
+        or (
+          nullif(lower(btrim(coalesce(new.enseignant, ''))), '') is not null
+          and lower(btrim(coalesce(c.enseignant, ''))) = lower(btrim(new.enseignant))
+        )
+        or (
+          nullif(lower(btrim(coalesce(new.salle, ''))), '') is not null
+          and lower(btrim(coalesce(c.salle, ''))) = lower(btrim(new.salle))
+        )
+      )
+  ) then
+    raise exception 'course_schedule_conflict'
+      using errcode = '23P01';
+  end if;
+
+  return new;
+end;
+$$;
+revoke all on function private.prevent_course_schedule_conflicts() from public, anon, authenticated;
+drop trigger if exists prevent_course_schedule_conflicts on public.courses;
+create trigger prevent_course_schedule_conflicts
+  before insert or update of classe_id, enseignant, salle, jour_semaine,
+    heure_debut, heure_fin, archived_at, is_demo
+  on public.courses
+  for each row execute function private.prevent_course_schedule_conflicts();
+
 commit;
