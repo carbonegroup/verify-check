@@ -223,8 +223,7 @@ export default function DashboardClient() {
   const [comptabiliteError, setComptabiliteError] = useState<string | null>(null);
   const [comptabiliteLoading, setComptabiliteLoading] = useState(false);
 
-  // Connectivité faible : on mémorise en mémoire les réponses financières déjà
-  // obtenues pour ne pas les retélécharger à chaque va-et-vient entre vues.
+  // Resolve the authoritative role independently from academic dashboard data.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -241,6 +240,9 @@ export default function DashboardClient() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Connectivité faible : on mémorise en mémoire les réponses financières déjà
+  // obtenues pour ne pas les retélécharger à chaque va-et-vient entre vues.
   const scolariteCache = useRef(new Map<string, ScolariteData>());
   const comptabiliteCache = useRef(new Map<string, ComptabiliteData>());
   const [scolariteReload, setScolariteReload] = useState(0);
@@ -299,7 +301,7 @@ export default function DashboardClient() {
         } else {
           const body = (await res.json()) as DashboardData;
           if (!cancelledRef.current) setData(body);
-        if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
+          if (!cancelledRef.current && (body.role === "admin" || body.role === "dev")) setRole(body.role);
           if (!cancelledRef.current) setClasseNom(
             classe ? (body.classes.find((c) => c.id === classe)?.nom ?? "") : ""
           );
