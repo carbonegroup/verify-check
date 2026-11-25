@@ -16,7 +16,6 @@ export default function AuthCompleteClient() {
   const [completed, setCompleted] = useState(false);
 
   // Read the one-time auth redirect fragment, then remove bearer tokens from the URL.
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize this page with the external Supabase redirect.
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const accessToken = params.get("access_token") ?? "";
@@ -26,15 +25,16 @@ export default function AuthCompleteClient() {
 
     // Remove bearer tokens from the address bar immediately; keep them only in memory.
     window.history.replaceState({}, document.title, window.location.pathname);
-    if (linkError) {
-      setError("Ce lien est invalide ou a expiré. Demande une nouvelle invitation ou réinitialisation.");
-      return;
-    }
-    if (!accessToken || !refreshToken || (type !== "invite" && type !== "recovery")) {
-      setError("Aucun lien d'invitation ou de récupération valide n'a été détecté.");
-      return;
-    }
-    setInvite({ accessToken, refreshToken, type });
+    const timer = window.setTimeout(() => {
+      if (linkError) {
+        setError("Ce lien est invalide ou a expiré. Demande une nouvelle invitation ou réinitialisation.");
+      } else if (!accessToken || !refreshToken || (type !== "invite" && type !== "recovery")) {
+        setError("Aucun lien d'invitation ou de récupération valide n'a été détecté.");
+      } else {
+        setInvite({ accessToken, refreshToken, type });
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -91,7 +91,7 @@ export default function AuthCompleteClient() {
         <p role="status">Compte finalisé. Redirection vers le tableau de bord…</p>
       ) : invite ? (
         <>
-          <p className={styles.footer}>Choisis un nouveau mot de passe d'au moins 12 caractères. Le lien n'est utilisable qu'une seule fois.</p>
+          <p className={styles.footer}>Choisis un nouveau mot de passe d’au moins 12 caractères. Le lien n’est utilisable qu’une seule fois.</p>
           <label htmlFor="new-password" className={styles.label}>Nouveau mot de passe</label>
           <input id="new-password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={styles.input} />
           <label htmlFor="confirm-password" className={styles.label}>Confirmer le mot de passe</label>
