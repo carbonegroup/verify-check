@@ -19,7 +19,6 @@ const VUES: { id: Vue; label: string }[] = [
   { id: "presences", label: "Saisie des présences" },
   { id: "utilisateurs", label: "Comptes utilisateurs" },
   { id: "journal", label: "Journal d'audit" },
-  { id: "securite", label: "Sécurité du compte" },
   { id: "scolarite", label: "Scolarité" },
   { id: "comptabilite", label: "Comptabilité" },
 ];
@@ -131,6 +130,7 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
   // The desktop sidebar is always visible; this state only controls the
   // off-canvas navigation on narrow viewports.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const toggleSidebar = useCallback(() => setSidebarOpen((open) => !open), []);
 
   const deconnexion = useCallback(async () => {
@@ -149,6 +149,7 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
     if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && role !== "dev")) return;
     onViewChange(id);
     setSidebarOpen(false);
+    setAccountMenuOpen(false);
   }, [onViewChange, role]);
 
   return (
@@ -243,10 +244,53 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
             </div>
 
             <div className={styles.topbarRight}>
-              <div className={styles.account}>
-                <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
-                <span>{role === "dev" ? "Développeur" : "Administration"}</span>
-                <span className={styles.accountChevron} aria-hidden="true">⌄</span>
+              <div className={styles.accountMenu}>
+                <button
+                  type="button"
+                  className={styles.account}
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  onClick={() => setAccountMenuOpen((open) => !open)}
+                >
+                  <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
+                  <span>{role === "dev" ? "Développeur" : "Administration"}</span>
+                  <span className={styles.accountChevron} aria-hidden="true">{accountMenuOpen ? "⌃" : "⌄"}</span>
+                </button>
+                {accountMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.menuDismiss}
+                      aria-label="Fermer le menu du compte"
+                      onClick={() => setAccountMenuOpen(false)}
+                    />
+                    <div className={styles.accountDropdown} role="menu" aria-label="Menu du compte">
+                      <div className={styles.accountMenuHeading}>
+                        <strong>Mon compte</strong>
+                        <span>{role === "dev" ? "Compte développeur" : "Compte administrateur"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={styles.accountMenuItem}
+                        onClick={() => choisirVue("securite")}
+                      >
+                        <span className={styles.menuItemIcon} aria-hidden="true">♙</span>
+                        <span><strong>Gérer mon compte</strong><small>Mot de passe et sécurité</small></span>
+                      </button>
+                      <div className={styles.accountMenuDivider} />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={styles.accountMenuItem}
+                        onClick={() => { setAccountMenuOpen(false); void deconnexion(); }}
+                      >
+                        <span className={styles.menuItemIcon} aria-hidden="true">↪</span>
+                        <span><strong>Se déconnecter</strong><small>Quitter cette session</small></span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
