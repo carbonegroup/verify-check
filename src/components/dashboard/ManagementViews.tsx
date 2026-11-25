@@ -1093,3 +1093,77 @@ export function AuditManager() {
     </section>
   );
 }
+
+export function PasswordManager() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    if (newPassword.length < 12) {
+      setError("Le nouveau mot de passe doit contenir au moins 12 caractères.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("La confirmation ne correspond pas au nouveau mot de passe.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await responseJson(await fetch("/api/auth/password", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      }));
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setNotice("Mot de passe modifié. Utilise le nouveau mot de passe lors de ta prochaine connexion.");
+    } catch (err) {
+      const value = err instanceof Error ? err.message : "modification_mot_de_passe_impossible";
+      setError(value === "mot_de_passe_actuel_incorrect"
+        ? "Le mot de passe actuel est incorrect."
+        : errorLabel(value));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className={styles.manager}>
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Sécurité du compte</h2>
+        <p className={styles.hint}>Change ton mot de passe sans intervention d’un développeur. Le mot de passe actuel est vérifié avant la modification.</p>
+        <form onSubmit={submit}>
+          <div className={styles.formGrid}>
+            <label className={styles.field}>Mot de passe actuel *
+              <input className={styles.input} type="password" autoComplete="current-password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            </label>
+            <label className={styles.field}>Nouveau mot de passe *
+              <input className={styles.input} type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </label>
+            <label className={styles.field}>Confirmer le nouveau mot de passe *
+              <input className={styles.input} type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            </label>
+          </div>
+          <div className={styles.actions} style={{ marginTop: 12 }}>
+            <button className={styles.button} type="submit" disabled={busy || !currentPassword || !newPassword || !confirmPassword}>{busy ? "Modification…" : "Modifier le mot de passe"}</button>
+          </div>
+        </form>
+      </div>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {notice && <p className={styles.success} role="status">{notice}</p>}
+    </section>
+  );
+}
