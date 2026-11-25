@@ -711,15 +711,6 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   const [editStatus, setEditStatus] = useState("present");
   const [editReason, setEditReason] = useState("");
 
-  // Reset all locally selected records when switching between real and demo datasets.
-  useEffect(() => {
-    setStudentId("");
-    setCourseId("");
-    setStudents([]);
-    setCourses([]);
-    setStudentSearch("");
-  }, [demoMode]);
-
   const loadOptions = useCallback(async () => {
     try {
       const studentResult = await responseJson<{ students: Student[] }>(await fetch(`/api/students?perPage=50${demoMode ? "&demo=1" : ""}${studentSearch.trim() ? `&q=${encodeURIComponent(studentSearch.trim())}` : ""}`, { credentials: "same-origin" }));
@@ -740,7 +731,6 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
   }, [date, page, demoMode, search, filterClass, filterCourse, filterStatus]);
   // Debounce the server-side student search; course options are refreshed at the same time.
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadOptions(); }, 300);
     return () => window.clearTimeout(timer);
