@@ -124,6 +124,19 @@ Optimisations pour un usage léger à Conakry (réseau 2G/3G intermittent) :
 - **Dashboard** : les vues financières (Scolarité, Comptabilité) gardent leur
   réponse en mémoire (pas de re-téléchargement au changement d'onglet) et
   offrent un bouton **Réessayer** en cas d'échec réseau, sans recharger la page.
+- **Synchronisation périodique du dashboard** : les données sont rechargées toutes
+  les 45 secondes lorsque l'onglet est visible, ainsi qu'au retour au premier plan.
+  Les caches Scolarité et Comptabilité sont invalidés à chaque cycle ; la vue
+  financière ouverte recharge ses données. Il s'agit d'une actualisation périodique,
+  pas d'un flux push instantané.
+- **Scanner PWA** : lorsque l'écran de scan est actif et le réseau disponible, le
+  contexte de pointage, les pointages en attente et le compteur sont revérifiés
+  toutes les 45 secondes. La vérification reprend aussi au retour en ligne ou au
+  premier plan. Si le cours n'est plus actif, l'agent doit sélectionner le contexte
+  actuel avant de reprendre le scan.
+- **Application mobile** : la file hors ligne est déjà synchronisée au maximum
+  toutes les 45 secondes lorsque le serveur est joignable, puis au retour de
+  l'application au premier plan.
 - **QR des cartes** : réponse PNG cachée côté navigateur (`private, max-age=86400`)
   — le QR d'un code est déterministe, utile pour réimprimer une planche.
 - Aucun fichier audio/image lourd : feedback sonore généré (WebAudio), polices
