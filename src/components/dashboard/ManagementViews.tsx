@@ -598,7 +598,7 @@ export function CoursesManager({ demoMode, classes, onChanged }: SharedProps) {
     <section className={styles.manager}>
       <div className={styles.toolbar}>
         <label className={styles.field}>Recherche cours
-          <input className={styles.input} value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} placeholder="Nom du cours" />
+          <input className={styles.input} value={q} onChange={(e) => { setPage(1); setQ(e.target.value); }} placeholder="Nom du cours ou enseignant" />
         </label>
         <label className={styles.field} style={{ maxWidth: 220 }}>Classe
           <select className={styles.select} value={classFilter} onChange={(e) => { setPage(1); setClassFilter(e.target.value); }}>
@@ -765,7 +765,11 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
     }
   };
 
-  const filteredCourses = courses.filter((course) => course.classe_id === students.find((s) => s.id === studentId)?.classe_id);
+  const selectedWeekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  const filteredCourses = courses.filter((course) =>
+    course.classe_id === students.find((s) => s.id === studentId)?.classe_id &&
+    course.jour_semaine === selectedWeekday
+  );
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); setBusy(true); setError(""); setNotice("");
     try {
