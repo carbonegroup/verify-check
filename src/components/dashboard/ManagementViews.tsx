@@ -485,7 +485,14 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
           <tbody>
             {students.map((student) => (
               <tr key={student.id}>
-                <td><span className={styles.name}>{[student.prenom, student.nom].filter(Boolean).join(" ")}</span></td>
+                <td>
+                  <div className={styles.studentIdentity}>
+                    <span className={styles.studentInitials} aria-hidden="true">
+                      {((student.prenom?.trim()[0] ?? student.nom.trim()[0]) + (student.nom.trim().split(/\\s+/).at(-1)?.[0] ?? "")).toLocaleUpperCase()}
+                    </span>
+                    <span className={styles.name}>{[student.prenom, student.nom].filter(Boolean).join(" ")}</span>
+                  </div>
+                </td>
                 <td>{student.code_qr}</td>
                 <td>{classes.find((c) => c.id === student.classe_id)?.nom ?? "—"}</td>
                 <td>{student.email || student.telephone || "—"}</td>
