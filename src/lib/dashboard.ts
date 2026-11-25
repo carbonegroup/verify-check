@@ -5,6 +5,7 @@
  */
 
 import { SCHOOL_TIME_ZONE } from "./time.ts";
+import { findScheduleConflictDetail } from "./course-conflicts.ts";
 
 /**
  * Vrai uniquement pour une date calendaire réelle `YYYY-MM-DD`.
@@ -45,6 +46,7 @@ export type CourseRow = {
   jour_semaine: number;
   heure_debut: string;
   heure_fin: string;
+  enseignant?: string | null;
 };
 export type StudentRow = {
   id: string;
@@ -70,6 +72,18 @@ export type DashboardFilters = {
   eleve?: string;
 };
 
+export type DashboardAlert = {
+  id: string;
+  type: "schedule_conflict";
+  conflict: "class" | "teacher" | "room";
+  course_id: string;
+  course_name: string;
+  other_course_id: string;
+  other_course_name: string;
+  jour_semaine: number;
+  message: string;
+};
+
 export type DashboardResult = {
   date: string;
   fuseau: string;
@@ -84,6 +98,7 @@ export type DashboardResult = {
   presents: number;
   scans: number;
   presences_enregistrees: number;
+  alerts: DashboardAlert[];
   eleves: Array<{
     id: string;
     nom: string;
@@ -112,6 +127,37 @@ export function buildDashboard(
     .filter((c) => !filters.classe || c.classe_id === filters.classe)
     .sort((a, b) => a.jour_semaine - b.jour_semaine || a.heure_debut.localeCompare(b.heure_debut));
   const filteredWeeklyCourses = weeklyCourses.filter((c) => !filters.cours || c.id === filters.cours);
+  const allCoursesByDay = new Map<number, CourseRow[]>();
+  for (const course of raw.courses) {
+    const list = allCoursesByDay.get(course.jour_semaine) ?? [];
+    list.push(course);
+    allCoursesByDay.set(course.jour_semaine, list);
+  }
+  const alertCandidates = raw.courses.filter((course) =>
+    (!filters.classe || course.classe_id === filters.classe) &&
+    (!filters.cours || course.id === filters.cours)
+  );
+  const alerts: DashboardAlert[] = [];
+  const seenConflictPairs = new Set<string>();
+  for (const course of alertCandidates) {
+    const detail = findScheduleConflictDetail(course, allCoursesByDay.get(course.jour_semaine) ?? []);
+    if (!detail || !detail.other.id) continue;
+    const pair = [course.id, detail.other.id].sort();
+    const pairKey = pair.join("|");
+    if (seenConflictPairs.has(pairKey)) continue;
+    seenConflictPairs.add(pairKey);
+    alerts.push({
+      id: pairKey,
+      type: "schedule_conflict",
+      conflict: detail.kind,
+      course_id: course.id,
+      course_name: course.nom,
+      other_course_id: detail.other.id,
+      other_course_name: raw.courses.find((candidate) => candidate.id === detail.other.id)?.nom ?? detail.other.id,
+      jour_semaine: course.jour_semaine,
+      message: detail.message,
+    });
+  }
   const availableCourses = weeklyCourses.filter((c) => c.jour_semaine === weekday);
   const plannedCourses = availableCourses.filter(
     (c) => !filters.cours || c.id === filters.cours
@@ -152,6 +198,7 @@ export function buildDashboard(
     presents: presentCount,
     scans: scanRows.length,
     presences_enregistrees: presenceRows.length,
+    alerts,
     eleves: visibleStudents.map((s) => ({
       id: s.id,
       nom: s.nom,
