@@ -40,6 +40,7 @@ type Eleve = {
   presences: Array<{ course_id: string; scanned_at: string }>;
   absences: Array<{ course_id: string; motif?: string | null }>;
 };
+type ActivityEvent = { id: string; actor_role: string | null; action: string; entity_table: string; entity_id: string | null; created_at: string };
 type DashboardData = {
   date: string;
   jour_semaine: number;
@@ -190,6 +191,8 @@ export default function DashboardClient() {
   const [classe, setClasse] = useState<string>("");
   const [cours, setCours] = useState<string>("");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [activityError, setActivityError] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [classeNom, setClasseNom] = useState<string>("");
@@ -428,6 +431,28 @@ export default function DashboardClient() {
     })
     .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut));
 
+  useEffect(() => {
+    if (vue !== "general" || !data) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/activity", { credentials: "same-origin" });
+        const body = (await response.json()) as { events?: ActivityEvent[]; error?: string };
+        if (!response.ok) throw new Error(body.error ?? "activite_indisponible");
+        if (!cancelled) {
+          setActivity(body.events ?? []);
+          setActivityError("");
+        }
+      } catch {
+        if (!cancelled) {
+          setActivity([]);
+          setActivityError("Journal d’activité indisponible. Vérifie que la migration VerifyCheck 2.0 est appliquée.");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [vue, data?.date, data?.role]);
+
   const changementVue = useCallback((id: Vue) => {
     if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
     setVue(id);
@@ -581,6 +606,39 @@ export default function DashboardClient() {
                 </article>
               </section>
 
+              <div className={styles.scheduleGrid}>
+                <section className={styles.tablePanel} aria-labelledby="current-courses-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="current-courses-title" className={styles.tablePanelTitle}>Cours en cours</h2>
+                    <span className={styles.metricDetail}>{currentCourses.length} session(s)</span>
+                  </div>
+                  <div className={styles.scheduleList}>
+                    {currentCourses.map((course) => (
+                      <div className={styles.scheduleItem} key={course.id}>
+                        <div><strong>{course.nom}</strong><small>{classeLabel(course.classe_id)} · {course.salle ?? "Salle non renseignée"}</small></div>
+                        <span>{course.heure_debut.slice(0, 5)}–{course.heure_fin.slice(0, 5)}</span>
+                      </div>
+                    ))}
+                    {currentCourses.length === 0 && <p className={styles.empty}>Aucun cours en cours à cette heure.</p>}
+                  </div>
+                </section>
+                <section className={styles.tablePanel} aria-labelledby="upcoming-courses-title">
+                  <div className={styles.tablePanelHeader}>
+                    <h2 id="upcoming-courses-title" className={styles.tablePanelTitle}>Prochains cours</h2>
+                    <span className={styles.metricDetail}>{upcomingCourses.length} à venir</span>
+                  </div>
+                  <div className={styles.scheduleList}>
+                    {upcomingCourses.slice(0, 5).map((course) => (
+                      <div className={styles.scheduleItem} key={course.id}>
+                        <div><strong>{course.nom}</strong><small>{classeLabel(course.classe_id)} · {course.salle ?? "Salle non renseignée"}</small></div>
+                        <span>{course.heure_debut.slice(0, 5)}</span>
+                      </div>
+                    ))}
+                    {upcomingCourses.length === 0 && <p className={styles.empty}>Aucun cours à venir aujourd’hui.</p>}
+                  </div>
+                </section>
+              </div>
+
               <section className={styles.tablePanel} aria-labelledby="attendance-register-title">
                 <div className={styles.tablePanelHeader}>
                   <h2 id="attendance-register-title" className={styles.tablePanelTitle}>
@@ -639,6 +697,27 @@ export default function DashboardClient() {
                     </tbody>
                   </table>
                 </div>
+              </section>
+
+              <section className={styles.tablePanel} aria-labelledby="recent-activity-title">
+                <div className={styles.tablePanelHeader}>
+                  <h2 id="recent-activity-title" className={styles.tablePanelTitle}>Activité récente</h2>
+                  {data.role === "dev" && <button className={styles.buttonOutline} type="button" onClick={() => setVue("journal")}>Journal complet</button>}
+                </div>
+                {activityError ? <p className={styles.error}>{activityError}</p> : (
+                  <div className={styles.scheduleList}>
+                    {activity.map((event) => (
+                      <div className={styles.scheduleItem} key={event.id}>
+                        <div>
+                          <strong>{event.action} · {event.entity_table}</strong>
+                          <small>{event.actor_role ?? "Système"} · {event.entity_id ?? "Élément sans identifiant"}</small>
+                        </div>
+                        <span>{new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(event.created_at))}</span>
+                      </div>
+                    ))}
+                    {activity.length === 0 && <p className={styles.empty}>Aucune opération récente.</p>}
+                  </div>
+                )}
               </section>
 
               <div className={styles.actionsRow}>
