@@ -251,7 +251,6 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
     }
   }, [page, q, classFilter, archived, demoMode]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 250);
     return () => window.clearTimeout(timer);
