@@ -77,6 +77,19 @@
   overflow-y: auto;
 }
 
+.navSection {
+  margin: 0 0 14px;
+}
+
+.navHeading {
+  padding: 8px 12px 6px;
+  color: var(--vc-ink-faint);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .navItem {
   display: flex;
   align-items: center;
@@ -251,13 +264,34 @@
   flex: 0 0 auto;
 }
 
+.accountMenu {
+  position: relative;
+}
+
 .account {
   display: flex;
   align-items: center;
   gap: 9px;
   color: #263b55;
+  font: inherit;
   font-size: 13px;
   font-weight: 650;
+  border: 0;
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.account:hover,
+.account[aria-expanded="true"] {
+  background: var(--vc-surface-soft);
+}
+
+.account:focus-visible,
+.accountMenuItem:focus-visible {
+  outline: 2px solid var(--vc-focus);
+  outline-offset: 2px;
 }
 
 .avatar {
@@ -276,6 +310,95 @@
   color: #64758a;
   font-size: 17px;
   line-height: 1;
+}
+
+.menuDismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.accountDropdown {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 260px;
+  padding: 8px;
+  border: 1px solid var(--vc-line);
+  border-radius: 12px;
+  background: var(--vc-surface);
+  box-shadow: 0 14px 38px rgba(20, 38, 58, 0.16);
+}
+
+.accountMenuHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 11px 12px;
+}
+
+.accountMenuHeading strong {
+  color: var(--vc-ink);
+  font-size: 13px;
+}
+
+.accountMenuHeading span,
+.accountMenuItem small {
+  color: var(--vc-ink-faint);
+  font-size: 11px;
+  font-weight: 450;
+}
+
+.accountMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--vc-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.accountMenuItem:hover {
+  background: var(--vc-surface-soft);
+}
+
+.accountMenuItem > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.accountMenuItem strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.menuItemIcon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: #edf3fa;
+  color: #173f70;
+  font-size: 16px;
+}
+
+.accountMenuDivider {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--vc-line);
 }
 
 .chip {

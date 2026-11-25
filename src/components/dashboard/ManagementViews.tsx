@@ -920,6 +920,112 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   );
 }
 
+type DeveloperDiagnostics = {
+  environment: string;
+  checks: Array<{ id: string; label: string; configured: boolean; required: boolean }>;
+};
+
+export function DeveloperWorkspace({
+  demoMode,
+  onNavigate,
+  onToggleDemo,
+}: {
+  demoMode: boolean;
+  onNavigate: (view: "utilisateurs" | "journal") => void;
+  onToggleDemo: () => void;
+}) {
+  const [diagnostics, setDiagnostics] = useState<DeveloperDiagnostics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadDiagnostics = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await responseJson<DeveloperDiagnostics>(
+        await fetch("/api/admin/system", { credentials: "same-origin" })
+      );
+      setDiagnostics(result);
+    } catch (err) {
+      setError(errorLabel(err instanceof Error ? err.message : "diagnostic_indisponible"));
+      setDiagnostics(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Load server diagnostics when the DEV workspace opens.
+  useEffect(() => { void loadDiagnostics(); }, [loadDiagnostics]);
+
+  return (
+    <section className={styles.manager} aria-label="Espace développeur">
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Outils d’administration technique</h2>
+        <p className={styles.hint}>
+          Le rôle DEV hérite de tous les droits ADMIN et ajoute la gestion des accès
+          et l’accès au journal d’audit détaillé.
+        </p>
+        <div className={styles.actions} style={{ marginTop: 14 }}>
+          <button className={styles.button} type="button" onClick={() => onNavigate("utilisateurs")}>
+            Gérer les comptes
+          </button>
+          <button className={styles.buttonSecondary} type="button" onClick={() => onNavigate("journal")}>
+            Ouvrir le journal d’audit
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Jeu de données de test</h2>
+        <p className={styles.hint}>
+          Les données de démonstration sont isolées des données réelles et ne sont
+          accessibles qu’au rôle DEV. L’ouverture du jeu de test bascule le tableau
+          de bord vers cet environnement sans modifier les données de production.
+        </p>
+        <div className={styles.actions} style={{ marginTop: 14 }}>
+          <span className={styles.status}>{demoMode ? "MODE TEST ACTIF" : "DONNÉES RÉELLES"}</span>
+          <button className={demoMode ? styles.buttonSecondary : styles.button} type="button" onClick={onToggleDemo}>
+            {demoMode ? "Quitter le mode test" : "Ouvrir le jeu de données"}
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.panel}>
+        <div className={styles.actions} style={{ justifyContent: "space-between" }}>
+          <h2 className={styles.panelTitle} style={{ marginBottom: 0 }}>Paramètres et configuration</h2>
+          <button className={styles.buttonSecondary} type="button" onClick={() => void loadDiagnostics()} disabled={loading}>
+            Actualiser
+          </button>
+        </div>
+        <p className={styles.hint} style={{ marginTop: 8 }}>
+          État des variables nécessaires au fonctionnement de l’application. Seuls
+          les statuts sont affichés : aucune clé, valeur secrète ou URL de redirection
+          n’est renvoyée au navigateur.
+        </p>
+        {loading && <p className={styles.hint} style={{ marginTop: 12 }}>Vérification de la configuration…</p>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        {diagnostics && (
+          <>
+            <p className={styles.hint} style={{ marginTop: 12 }}>
+              Environnement : <strong>{diagnostics.environment}</strong>
+            </p>
+            <ul className={styles.diagnosticList}>
+              {diagnostics.checks.map((check) => (
+                <li className={styles.diagnosticItem} key={check.id}>
+                  <span>{check.label}</span>
+                  <span className={check.configured ? styles.status : styles.statusWarning}>
+                    {check.configured ? "CONFIGURÉ" : check.required ? "MANQUANT" : "FACULTATIF"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 type ManagedUser = { id: string; email: string; full_name: string; role: "admin" | "dev"; active: boolean; created_at: string; last_sign_in_at: string | null };
 
 export function UsersManager() {

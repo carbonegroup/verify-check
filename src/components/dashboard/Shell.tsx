@@ -1,27 +1,47 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import styles from "./Shell.module.css";
 import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
 
 type Vue = DashboardView;
 
-const VUES: { id: Vue; label: string }[] = [
-  { id: "general", label: "Générale" },
-  { id: "absences", label: "Absences" },
-  { id: "classes", label: "Classes" },
-  { id: "cours", label: "Cours" },
-  { id: "eleves", label: "Élèves" },
-  { id: "cartes", label: "Cartes QR" },
-  { id: "gestion-eleves", label: "Gestion des élèves" },
-  { id: "gestion-cours", label: "Gestion des cours" },
-  { id: "presences", label: "Saisie des présences" },
-  { id: "utilisateurs", label: "Comptes utilisateurs" },
-  { id: "journal", label: "Journal d'audit" },
-  { id: "securite", label: "Sécurité du compte" },
-  { id: "scolarite", label: "Scolarité" },
-  { id: "comptabilite", label: "Comptabilité" },
+const NAV_SECTIONS: {
+  label: string;
+  developerOnly?: boolean;
+  items: { id: Vue; label: string }[];
+}[] = [
+  {
+    label: "Suivi",
+    items: [
+      { id: "general", label: "Vue générale" },
+      { id: "absences", label: "Absences" },
+      { id: "classes", label: "Classes" },
+      { id: "cours", label: "Cours" },
+      { id: "eleves", label: "Élèves" },
+      { id: "cartes", label: "Cartes QR" },
+    ],
+  },
+  {
+    label: "Gestion académique",
+    items: [
+      { id: "gestion-eleves", label: "Gestion des élèves" },
+      { id: "gestion-cours", label: "Gestion des cours" },
+      { id: "presences", label: "Saisie des présences" },
+      { id: "scolarite", label: "Scolarité" },
+      { id: "comptabilite", label: "Comptabilité" },
+    ],
+  },
+  {
+    label: "Développement",
+    developerOnly: true,
+    items: [
+      { id: "developpeur", label: "Espace développeur" },
+      { id: "utilisateurs", label: "Comptes utilisateurs" },
+      { id: "journal", label: "Journal d'audit" },
+    ],
+  },
 ];
 
 function Icon({ id }: { id: Vue }) {
@@ -96,6 +116,12 @@ function Icon({ id }: { id: Vue }) {
         <path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" />
       </svg>
     ),
+    developpeur: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="m8 10-2 2 2 2m4 0h4M8 7h8" />
+      </svg>
+    ),
     securite: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="4" y="11" width="16" height="10" rx="2" />
@@ -131,7 +157,61 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
   // The desktop sidebar is always visible; this state only controls the
   // off-canvas navigation on narrow viewports.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const toggleSidebar = useCallback(() => setSidebarOpen((open) => !open), []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    accountMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
+  }, [accountMenuOpen]);
+
+  const fermerMenuCompte = useCallback((restoreFocus = true) => {
+    setAccountMenuOpen(false);
+    if (restoreFocus) accountTriggerRef.current?.focus();
+  }, []);
+
+  const gererClavierMenuCompte = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+    );
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+      case "ArrowDown":
+        nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+        break;
+      case "ArrowUp":
+        nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = items.length - 1;
+        break;
+      case "Escape":
+        event.preventDefault();
+        fermerMenuCompte();
+        return;
+      case "Tab":
+        // Return focus to the trigger before the browser performs normal tab order.
+        // The transparent outside-click button is removed and never enters that order.
+        fermerMenuCompte();
+        return;
+      default:
+        return;
+    }
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      items[nextIndex]?.focus();
+    }
+  }, [fermerMenuCompte]);
 
   const deconnexion = useCallback(async () => {
     try {
@@ -149,6 +229,7 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
     if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && role !== "dev")) return;
     onViewChange(id);
     setSidebarOpen(false);
+    setAccountMenuOpen(false);
   }, [onViewChange, role]);
 
   return (
@@ -167,20 +248,28 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
         </div>
 
         <div className={styles.nav}>
-          {VUES.filter((v) => !isDeveloperView(v.id) || role === "dev").map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className={`${styles.navItem} ${vue === v.id ? styles.active : ""} ${!isDashboardViewEnabled(v.id) ? styles.disabled : ""}`}
-              onClick={() => choisirVue(v.id)}
-              disabled={!isDashboardViewEnabled(v.id)}
-              title={!isDashboardViewEnabled(v.id) ? "Section indisponible" : undefined}
-              aria-current={vue === v.id ? "page" : undefined}
-            >
-              <Icon id={v.id} />
-              <span>{v.label}</span>
-            </button>
-          ))}
+          {NAV_SECTIONS.map((section) => {
+            if (section.developerOnly && role !== "dev") return null;
+            return (
+              <section key={section.label} className={styles.navSection} aria-label={section.label}>
+                <div className={styles.navHeading}>{section.label}</div>
+                {section.items.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`${styles.navItem} ${vue === v.id ? styles.active : ""} ${!isDashboardViewEnabled(v.id) ? styles.disabled : ""}`}
+                    onClick={() => choisirVue(v.id)}
+                    disabled={!isDashboardViewEnabled(v.id)}
+                    title={!isDashboardViewEnabled(v.id) ? "Section indisponible" : undefined}
+                    aria-current={vue === v.id ? "page" : undefined}
+                  >
+                    <Icon id={v.id} />
+                    <span>{v.label}</span>
+                  </button>
+                ))}
+              </section>
+            );
+          })}
         </div>
 
         <div className={styles.sidebarFoot}>
@@ -195,13 +284,6 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
               <small>Conakry, Guinée</small>
             </span>
           </div>
-          <button
-            type="button"
-            className={styles.buttonOutline}
-            onClick={deconnexion}
-          >
-            Se déconnecter
-          </button>
         </div>
       </nav>
 
@@ -243,10 +325,66 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
             </div>
 
             <div className={styles.topbarRight}>
-              <div className={styles.account}>
-                <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
-                <span>{role === "dev" ? "Développeur" : "Administration"}</span>
-                <span className={styles.accountChevron} aria-hidden="true">⌄</span>
+              <div className={styles.accountMenu}>
+                <button
+                  ref={accountTriggerRef}
+                  type="button"
+                  className={styles.account}
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  aria-controls="verifycheck-account-menu"
+                  onClick={() => setAccountMenuOpen((open) => !open)}
+                >
+                  <span className={styles.avatar}>{role === "dev" ? "DV" : "AD"}</span>
+                  <span>{role === "dev" ? "Développeur" : "Administration"}</span>
+                  <span className={styles.accountChevron} aria-hidden="true">{accountMenuOpen ? "⌃" : "⌄"}</span>
+                </button>
+                {accountMenuOpen && (
+                  <>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className={styles.menuDismiss}
+                      aria-label="Fermer le menu du compte"
+                      onClick={() => fermerMenuCompte()}
+                    />
+                    <div
+                      ref={accountMenuRef}
+                      id="verifycheck-account-menu"
+                      className={styles.accountDropdown}
+                      role="menu"
+                      aria-label="Menu du compte"
+                      onKeyDown={gererClavierMenuCompte}
+                    >
+                      <div className={styles.accountMenuHeading}>
+                        <strong>Mon compte</strong>
+                        <span>{role === "dev" ? "Compte développeur" : "Compte administrateur"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={styles.accountMenuItem}
+                        onClick={() => {
+                          choisirVue("securite");
+                          accountTriggerRef.current?.focus();
+                        }}
+                      >
+                        <span className={styles.menuItemIcon} aria-hidden="true">♙</span>
+                        <span><strong>Gérer mon compte</strong><small>Mot de passe et sécurité</small></span>
+                      </button>
+                      <div className={styles.accountMenuDivider} />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={styles.accountMenuItem}
+                        onClick={() => { fermerMenuCompte(false); void deconnexion(); }}
+                      >
+                        <span className={styles.menuItemIcon} aria-hidden="true">↪</span>
+                        <span><strong>Se déconnecter</strong><small>Quitter cette session</small></span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

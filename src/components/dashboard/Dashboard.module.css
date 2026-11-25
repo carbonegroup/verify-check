@@ -35,7 +35,7 @@
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(175px, 1fr) minmax(175px, 1fr) minmax(190px, 1.1fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   align-items: end;
   margin: 0 0 18px;

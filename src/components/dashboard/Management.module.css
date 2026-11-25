@@ -194,3 +194,34 @@
   font-weight: 800;
   letter-spacing: .02em;
 }
+
+.diagnosticList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid #e7edf4;
+}
+.diagnosticItem {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e7edf4;
+  color: #263b55;
+  font-size: 13px;
+}
+.statusWarning {
+  display: inline-flex;
+  padding: 4px 7px;
+  border: 1px solid #e8c9a4;
+  border-radius: 5px;
+  background: #fff8ee;
+  color: #8a5718;
+  font-size: 11px;
+  font-weight: 750;
+}
