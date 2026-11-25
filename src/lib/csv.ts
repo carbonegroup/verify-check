@@ -9,7 +9,9 @@ import { isCourseFinished } from "./absences.ts";
 import { minutesOf } from "./time.ts";
 
 export function csvEscape(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
+  // Prefix formula-like values so spreadsheet applications treat them as text.
+  const safe = /^[\\u0000-\\u0020]*[=+\\-@]/.test(value) ? `'${value}` : value;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export type CsvClassRow = { id: string; nom: string };
