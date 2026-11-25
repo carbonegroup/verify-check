@@ -150,7 +150,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
               </svg>
             </span>
             <span className={styles.schoolCopy}>
-              <strong>Établissement</strong>
+              <strong>UCAO</strong>
               <small>Conakry, Guinée</small>
             </span>
           </div>
@@ -198,7 +198,7 @@ export default function Shell({ vue, onViewChange, children }: ShellProps) {
             </button>
 
             <div className={styles.topbarLeft}>
-              <div className={styles.appName}>VerifyCheck <strong>· Direction</strong></div>
+              <div className={styles.appName}>UCAO <strong>· VerifyCheck — Direction</strong></div>
             </div>
 
             <div className={styles.topbarRight}>
