@@ -65,9 +65,11 @@ Ne pas déployer les nouvelles routes avant l'application de la migration corres
 
 ## Espace développeur dans le dashboard
 
-- ADMIN et DEV partagent les vues de suivi et de gestion académique.
-- DEV dispose en plus d'un groupe de navigation séparé : espace développeur, comptes utilisateurs et journal d'audit détaillé.
-- L'espace développeur permet d'ouvrir ou de quitter explicitement le jeu de données de démonstration, puis d'accéder aux outils de gestion des comptes et au journal complet.
-- Les contrôles de configuration de `/api/admin/system` sont réservés à DEV. Ils renvoient uniquement l'environnement et des booléens de configuration ; aucune clé, valeur de secret ou URL de redirection n'est renvoyée au navigateur.
-- Les variables d'environnement restent administrées dans la plateforme de déploiement. L'interface n'offre pas d'édition de secrets.
-- Les filtres de date, classe et cours ne sont rendus que dans les vues académiques qui les utilisent ; les écrans de comptes, d'audit, de sécurité et d'outillage développeur n'affichent pas ce bandeau.
+- ADMIN et DEV partagent les vues de suivi et de gestion académique. Le menu affiche séparément le groupe technique DEV uniquement lorsque le rôle effectif renvoyé par `app_user_roles` est `dev`.
+- Le groupe DEV expose des pages dédiées : espace développeur, comptes et rôles, jeux de test, journal d'audit détaillé et paramètres de l'application.
+- La page Comptes et rôles permet les invitations, l'attribution des rôles, l'activation/désactivation et les demandes de réinitialisation. Le serveur et la base protègent le dernier DEV actif.
+- La page Jeux de test bascule explicitement entre les données réelles et le jeu de démonstration isolé ; les données de test ne sont pas visibles aux comptes ADMIN.
+- La page Journal d'audit détaillé permet de filtrer et lire les anciennes/nouvelles valeurs, alors que le tableau de bord commun n'affiche que le résumé d'activité.
+- La page Paramètres de l'application est actuellement en lecture seule : `/api/admin/system` indique l'environnement et les états de configuration sans renvoyer de clé, valeur secrète ou URL de redirection. L'édition des secrets reste dans Vercel/Supabase.
+- Le client récupère le rôle effectif via `/api/auth/context`, indépendamment du chargement des données académiques, afin qu'une erreur de données ne fasse pas disparaître le menu DEV.
+- Les filtres de date, classe et cours ne sont rendus que dans les vues académiques qui les utilisent ; les écrans de comptes, d'audit, de jeux de test, de paramètres et de sécurité n'affichent pas ce bandeau.
