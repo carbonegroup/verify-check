@@ -279,13 +279,13 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select r.role
   from public.app_user_roles as r
   where r.user_id = (select auth.uid())
     and r.is_active is true
   limit 1
-$;
+$$;
 
 create or replace function private.has_app_role(required_role text)
 returns boolean
@@ -293,9 +293,9 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select coalesce((select private.current_app_role()) = required_role, false)
-$;
+$$;
 
 create or replace function private.is_operational_user()
 returns boolean
@@ -303,9 +303,9 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select coalesce((select private.current_app_role()) in ('admin', 'dev'), false)
-$;
+$$;
 
 revoke all on function private.current_app_role() from public, anon;
 revoke all on function private.has_app_role(text) from public, anon;
@@ -321,7 +321,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   remaining_devs bigint;
   removing_active_dev boolean;
@@ -347,7 +347,7 @@ begin
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
-$;
+$$;
 revoke all on function private.prevent_last_active_dev() from public, anon, authenticated;
 drop trigger if exists protect_last_active_dev on public.app_user_roles;
 create trigger protect_last_active_dev
@@ -472,7 +472,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   old_row jsonb;
   new_row jsonb;
@@ -506,7 +506,7 @@ begin
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
-$;
+$$;
 revoke all on function private.audit_row_change() from public, anon, authenticated;
 
 drop trigger if exists audit_classes_changes on public.classes;
@@ -525,7 +525,7 @@ create trigger audit_attendance_changes after insert or update or delete on publ
 -- Seed a clearly marked, DEV-only demo class, three fake students and one
 -- 24-hour course for every weekday. These rows are excluded from ADMIN RLS and
 -- normal dashboard queries; they never masquerade as real academic records.
-do $
+do $$
 declare
   demo_class_id uuid;
   demo_code_prefix text;
@@ -582,7 +582,7 @@ begin
     );
   end loop;
 end;
-$;
+$$;
 
 
 -- Enforce schedule integrity at the database boundary, including concurrent writes.
