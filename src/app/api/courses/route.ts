@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
     nom, classe_id: classeId, jour_semaine: day, heure_debut: heureDebut, heure_fin: heureFin,
     salle, enseignant, is_demo: isDemo,
   }).select("id,nom,classe_id,salle,jour_semaine,heure_debut,heure_fin,enseignant,is_demo,archived_at").single();
+  if (error?.code === "23P01") return NextResponse.json({ error: "conflit_horaire_concurrent" }, { status: 409 });
   if (error) return NextResponse.json({ error: "creation_impossible" }, { status: 500 });
   const response = NextResponse.json({ course: data }, { status: 201 });
   if (auth.session) setSessionCookies(response, auth.session);
