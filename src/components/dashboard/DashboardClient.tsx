@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { buildAbsences, formatPresenceAt, STATUT_LABEL, statutEleve, type StatutPresence } from "@/lib/absences";
 import { formatGnf } from "@/lib/scolarite";
 import { studentPhotoSrc } from "@/lib/student-photo-url";
-import { isDashboardViewEnabled, type DashboardView } from "@/lib/dashboard-navigation";
+import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/lib/dashboard-navigation";
+import { StudentsManager, CoursesManager, AttendanceManager, UsersManager, AuditManager } from "./ManagementViews";
 import styles from "./Dashboard.module.css";
 import Shell from "./Shell";
 
@@ -19,7 +20,7 @@ import Shell from "./Shell";
 
 const TIME_ZONE = "Africa/Conakry";
 
-type Classe = { id: string; nom: string };
+type Classe = { id: string; nom: string; is_demo?: boolean };
 type Cours = {
   id: string;
   nom: string;
@@ -49,6 +50,7 @@ type DashboardData = {
   effectif: number;
   presents: number;
   scans: number;
+  presences_enregistrees: number;
   eleves: Eleve[];
   demo_mode?: boolean;
   role?: "admin" | "dev";
@@ -63,6 +65,11 @@ const PAGE_META: Record<Vue, { title: string; description: string }> = {
   cours: { title: "Cours", description: "Planning et pointages des cours" },
   eleves: { title: "Élèves", description: "Suivi individuel des présences" },
   cartes: { title: "Cartes QR", description: "Cartes d’identification à imprimer" },
+  "gestion-eleves": { title: "Gestion des élèves", description: "Créer, modifier, archiver et importer les fiches" },
+  "gestion-cours": { title: "Gestion des cours", description: "Gérer les cours, enseignants et horaires" },
+  presences: { title: "Gestion des présences", description: "Enregistrer et corriger les présences" },
+  utilisateurs: { title: "Comptes utilisateurs", description: "Gérer les accès ADMIN et DEV" },
+  journal: { title: "Journal d’audit", description: "Consulter les opérations administratives" },
   scolarite: { title: "Scolarité", description: "Suivi des frais de scolarité" },
   comptabilite: { title: "Comptabilité", description: "Recettes, dépenses et soldes de l’établissement" },
 };
@@ -179,6 +186,7 @@ export default function DashboardClient() {
   const router = useRouter();
   const [vue, setVue] = useState<Vue>("general");
   const [date, setDate] = useState(todayConakry());
+  const [demoMode, setDemoMode] = useState(false);
   const [classe, setClasse] = useState<string>("");
   const [cours, setCours] = useState<string>("");
   const [data, setData] = useState<DashboardData | null>(null);
@@ -210,6 +218,7 @@ export default function DashboardClient() {
     const params = new URLSearchParams({ date });
     if (classe) params.set("classe", classe);
     if (cours) params.set("cours", cours);
+    if (demoMode) params.set("demo", "1");
     try {
       const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
       if (res.status === 401) {
@@ -231,7 +240,7 @@ export default function DashboardClient() {
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
-  }, [date, classe, cours, router]);
+  }, [date, classe, cours, demoMode, router]);
 
   useEffect(() => {
     const cancelledRef = { current: false };
@@ -241,6 +250,7 @@ export default function DashboardClient() {
       const params = new URLSearchParams({ date });
       if (classe) params.set("classe", classe);
       if (cours) params.set("cours", cours);
+      if (demoMode) params.set("demo", "1");
       try {
         const res = await fetch(`/api/dashboard?${params.toString()}`, { credentials: "same-origin" });
         if (res.status === 401) {
@@ -266,7 +276,7 @@ export default function DashboardClient() {
     return () => {
       cancelledRef.current = true;
     };
-  }, [date, classe, cours, router]);
+  }, [date, classe, cours, demoMode, router]);
 
   // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
   useEffect(() => {
@@ -405,17 +415,29 @@ export default function DashboardClient() {
     [data, date]
   );
   const dateLabel = dateLabelFormatter.format(new Date(`${date}T12:00:00Z`));
+  const currentMinute = nowMinutesConakry();
+  const currentCourses = (data?.cours_prevus ?? []).filter((course) => {
+    const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
+    const end = Number(course.heure_fin.slice(0, 2)) * 60 + Number(course.heure_fin.slice(3, 5));
+    return currentMinute >= start && currentMinute < end;
+  });
+  const upcomingCourses = (data?.cours_prevus ?? [])
+    .filter((course) => {
+      const start = Number(course.heure_debut.slice(0, 2)) * 60 + Number(course.heure_debut.slice(3, 5));
+      return start > currentMinute;
+    })
+    .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut));
 
   const changementVue = useCallback((id: Vue) => {
-    if (!isDashboardViewEnabled(id)) return;
+    if (!isDashboardViewEnabled(id) || (isDeveloperView(id) && data?.role !== "dev")) return;
     setVue(id);
     // Réinitialise le filtrage par cours quand on change de vue (évite un cours
     // filtré mais masqué qui rendrait la vue confuse).
     setCours("");
-  }, []);
+  }, [data?.role]);
 
   return (
-    <Shell vue={vue} onViewChange={changementVue}>
+    <Shell vue={vue} role={data?.role ?? "admin"} onViewChange={changementVue}>
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>{PAGE_META[vue].title}</h1>
@@ -466,6 +488,19 @@ export default function DashboardClient() {
               ))}
             </select>
           </label>
+          {data.role === "dev" && (
+            <label>
+              <span>Jeu de données</span>
+              <select
+                value={demoMode ? "demo" : "production"}
+                onChange={(e) => { setDemoMode(e.target.value === "demo"); setClasse(""); setCours(""); }}
+                aria-label="Mode des données"
+              >
+                <option value="production">Données réelles</option>
+                <option value="demo">Données de test (DEV)</option>
+              </select>
+            </label>
+          )}
           <button
             type="button"
             className={styles.button}
@@ -496,62 +531,52 @@ export default function DashboardClient() {
                 <article className={`${styles.metricCard} ${styles.metricEffectif}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Effectif</span>
-                    <strong className={styles.kpi}>{data.effectif}</strong>
-                    <span className={styles.metricDetail}>élèves inscrits</span>
+                    <span className={styles.metricLabel}>Cours en cours</span>
+                    <strong className={styles.kpi}>{currentCourses.length}</strong>
+                    <span className={styles.metricDetail}>selon l'heure locale de Conakry</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricPresence}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m5 12 4 4L19 6" />
-                      <circle cx="12" cy="12" r="10" />
+                      <path d="M4 5h16M4 12h16M4 19h9" /><path d="m16 17 2 2 4-4" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Présents</span>
-                    <strong className={styles.kpi}>{data.presents}</strong>
-                    <span className={styles.metricDetail}>
-                      {data.effectif > 0 ? `${((data.presents / data.effectif) * 100).toFixed(1)} % de l’effectif` : "Aucun élève inscrit"}
-                    </span>
+                    <span className={styles.metricLabel}>Prochains cours</span>
+                    <strong className={styles.kpi}>{upcomingCourses.length}</strong>
+                    <span className={styles.metricDetail}>{upcomingCourses[0] ? `Prochain : ${upcomingCourses[0].heure_debut.slice(0, 5)}` : "Aucun autre cours aujourd'hui"}</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricScans}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="7" height="7" />
-                      <rect x="14" y="3" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" />
-                      <path d="M14 14h3v3h-3zM20 14v2m-3 3h2m2 0v2m-7-1v1" />
+                      <path d="m5 12 4 4L19 6" /><circle cx="12" cy="12" r="10" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Scans</span>
-                    <strong className={styles.kpi}>{data.scans}</strong>
-                    <span className={styles.metricDetail}>aujourd’hui</span>
+                    <span className={styles.metricLabel}>Présences enregistrées</span>
+                    <strong className={styles.kpi}>{data.presences_enregistrees}</strong>
+                    <span className={styles.metricDetail}>{data.scans} scan(s) serveur confirmé(s)</span>
                   </div>
                 </article>
 
                 <article className={`${styles.metricCard} ${styles.metricCourses}`}>
                   <span className={styles.metricIcon} aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="17" rx="2" />
-                      <path d="M16 2v4M8 2v4M3 10h18" />
-                      <path d="M8 14h2m4 0h2m-8 3h2" />
+                      <circle cx="12" cy="12" r="9" /><path d="M8 8l8 8m0-8-8 8" />
                     </svg>
                   </span>
                   <div className={styles.metricBody}>
-                    <span className={styles.metricLabel}>Cours prévus</span>
-                    <strong className={styles.kpi}>{data.cours_prevus.length}</strong>
-                    <span className={styles.metricDetail}>ce jour</span>
+                    <span className={styles.metricLabel}>Absences</span>
+                    <strong className={styles.kpi}>{absences.length}</strong>
+                    <span className={styles.metricDetail}>cours terminé ou saisie manuelle</span>
                   </div>
                 </article>
               </section>
@@ -840,6 +865,18 @@ export default function DashboardClient() {
           {vue === "cartes" && (
             <CartesQR eleves={eleveParClasse} classeLabel={classeLabel} classeNom={classeNom} />
           )}
+
+          {vue === "gestion-eleves" && (
+            <StudentsManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "gestion-cours" && (
+            <CoursesManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "presences" && (
+            <AttendanceManager demoMode={demoMode} classes={data.classes} onChanged={() => void load()} />
+          )}
+          {vue === "utilisateurs" && data.role === "dev" && <UsersManager />}
+          {vue === "journal" && data.role === "dev" && <AuditManager />}
 
           {/* ---------------------------------------------- SCOLARITÉ */}
           {vue === "scolarite" && (
