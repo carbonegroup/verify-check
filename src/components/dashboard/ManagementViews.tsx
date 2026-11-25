@@ -251,7 +251,10 @@ export function StudentsManager({ demoMode, classes, onChanged }: SharedProps) {
   }, [page, q, classFilter, archived, demoMode]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const resetForm = () => {
     setEditingId("");
@@ -735,8 +738,10 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
     const timer = window.setTimeout(() => { void loadOptions(); }, 300);
     return () => window.clearTimeout(timer);
   }, [loadOptions]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronise the view with server-owned data.
-  useEffect(() => { void loadRecords(); }, [loadRecords]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadRecords(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [loadRecords]);
 
   const loadCoursesForStudent = async (selectedStudentId: string) => {
     const selected = students.find((student) => student.id === selectedStudentId);
