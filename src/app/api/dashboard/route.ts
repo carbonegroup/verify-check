@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
 
   const studentsRes =
     studentsWithPhotoRes.error && isMissingStudentPhotoUrlColumn(studentsWithPhotoRes.error)
-      ? await supabase.from("students").select("id, nom, code_qr, classe_id")
-          .is("archived_at", null).eq("is_demo", false).order("nom")
+      ? await (includeDemo
+          ? supabase.from("students").select("id, nom, code_qr, classe_id").is("archived_at", null).order("nom")
+          : supabase.from("students").select("id, nom, code_qr, classe_id").is("archived_at", null).eq("is_demo", false).order("nom"))
       : studentsWithPhotoRes;
 
   if (classesRes.error || coursesRes.error || studentsRes.error || attendanceRes.error) {
