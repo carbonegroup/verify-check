@@ -678,10 +678,10 @@ export function AttendanceManager({ demoMode, classes, onChanged }: SharedProps)
   }, [demoMode]);
   const loadRecords = useCallback(async () => {
     try {
-      const result = await responseJson<{ attendances: any[] }>(await fetch(`/api/attendance?date=${date}&perPage=100`, { credentials: "same-origin" }));
+      const result = await responseJson<{ attendances: any[] }>(await fetch(`/api/attendance?date=${date}&perPage=100${demoMode ? "&demo=1" : ""}`, { credentials: "same-origin" }));
       setRecords(result.attendances);
     } catch (err) { setError(errorLabel(err instanceof Error ? err.message : "erreur_base")); }
-  }, [date]);
+  }, [date, demoMode]);
   useEffect(() => { void loadOptions(); }, [loadOptions]);
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
