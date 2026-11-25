@@ -39,6 +39,8 @@ test("les filtres globaux sont limités aux vues qui les utilisent", () => {
   assert.deepEqual(getDashboardFilters("cartes"), ["classe"]);
   assert.deepEqual(getDashboardFilters("utilisateurs"), []);
   assert.deepEqual(getDashboardFilters("journal"), []);
+  assert.deepEqual(getDashboardFilters("jeux-test"), []);
+  assert.deepEqual(getDashboardFilters("parametres"), []);
   assert.deepEqual(getDashboardFilters("securite"), []);
   assert.deepEqual(getDashboardFilters("developpeur"), []);
 });
@@ -47,6 +49,8 @@ test("les écrans développeur ne sont pas des écrans ADMIN", () => {
   assert.equal(isDeveloperView("developpeur"), true);
   assert.equal(isDeveloperView("utilisateurs"), true);
   assert.equal(isDeveloperView("journal"), true);
+  assert.equal(isDeveloperView("jeux-test"), true);
+  assert.equal(isDeveloperView("parametres"), true);
   assert.equal(isDeveloperView("general"), false);
   assert.equal(isDeveloperView("securite"), false);
 });

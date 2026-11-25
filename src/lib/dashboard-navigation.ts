@@ -11,6 +11,8 @@ export type DashboardView =
   | "developpeur"
   | "utilisateurs"
   | "journal"
+  | "jeux-test"
+  | "parametres"
   | "securite"
   | "scolarite"
   | "comptabilite";
@@ -40,5 +42,5 @@ export function getDashboardFilters(view: DashboardView): readonly DashboardFilt
 }
 
 export function isDeveloperView(view: DashboardView): boolean {
-  return view === "developpeur" || view === "utilisateurs" || view === "journal";
+  return view === "developpeur" || view === "utilisateurs" || view === "journal" || view === "jeux-test" || view === "parametres";
 }

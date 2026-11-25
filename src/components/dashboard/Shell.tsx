@@ -34,12 +34,14 @@ const NAV_SECTIONS: {
     ],
   },
   {
-    label: "Développement",
+    label: "Administration technique DEV",
     developerOnly: true,
     items: [
       { id: "developpeur", label: "Espace développeur" },
-      { id: "utilisateurs", label: "Comptes utilisateurs" },
-      { id: "journal", label: "Journal d'audit" },
+      { id: "utilisateurs", label: "Comptes et rôles" },
+      { id: "jeux-test", label: "Jeux de test" },
+      { id: "journal", label: "Journal d’audit détaillé" },
+      { id: "parametres", label: "Paramètres de l’application" },
     ],
   },
 ];
@@ -120,6 +122,17 @@ function Icon({ id }: { id: Vue }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="18" height="16" rx="2" />
         <path d="m8 10-2 2 2 2m4 0h4M8 7h8" />
+      </svg>
+    ),
+    "jeux-test": (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" />
+        <path d="M8 15h8" />
+      </svg>
+    ),
+    parametres: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M1 14h6m2-6h6m2 8h6" />
       </svg>
     ),
     securite: (

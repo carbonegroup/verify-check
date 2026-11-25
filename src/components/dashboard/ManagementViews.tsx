@@ -925,15 +925,88 @@ type DeveloperDiagnostics = {
   checks: Array<{ id: string; label: string; configured: boolean; required: boolean }>;
 };
 
+type DeveloperSection = "utilisateurs" | "journal" | "jeux-test" | "parametres";
+
 export function DeveloperWorkspace({
-  demoMode,
   onNavigate,
+}: {
+  onNavigate: (view: DeveloperSection) => void;
+}) {
+  return (
+    <section className={styles.manager} aria-label="Vue d’ensemble DEV">
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Administration technique</h2>
+        <p className={styles.hint}>
+          Le compte DEV conserve toutes les fonctions ADMIN — suivi, gestion des élèves,
+          classes, cours et présences — et ajoute les outils techniques réservés au développeur.
+        </p>
+      </div>
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Fonctionnalités supplémentaires DEV</h2>
+        <div className={styles.manager}>
+          <div>
+            <strong>Comptes et rôles</strong>
+            <p className={styles.hint}>Inviter des utilisateurs, attribuer ADMIN ou DEV, activer/désactiver les comptes et envoyer une réinitialisation de mot de passe. Le dernier DEV actif est protégé.</p>
+            <button className={styles.button} type="button" onClick={() => onNavigate("utilisateurs")}>Ouvrir la gestion des comptes</button>
+          </div>
+          <div>
+            <strong>Jeux de test et démonstration</strong>
+            <p className={styles.hint}>Basculer entre les données réelles et le jeu de démonstration isolé, sans mélanger les deux environnements.</p>
+            <button className={styles.buttonSecondary} type="button" onClick={() => onNavigate("jeux-test")}>Gérer les jeux de test</button>
+          </div>
+          <div>
+            <strong>Journal d’audit détaillé</strong>
+            <p className={styles.hint}>Consulter les changements, leurs auteurs, les anciennes et nouvelles valeurs, et filtrer les événements.</p>
+            <button className={styles.buttonSecondary} type="button" onClick={() => onNavigate("journal")}>Ouvrir le journal détaillé</button>
+          </div>
+          <div>
+            <strong>Paramètres de l’application</strong>
+            <p className={styles.hint}>Consulter l’environnement et l’état de configuration des services côté serveur. Les secrets ne sont jamais exposés dans le navigateur.</p>
+            <button className={styles.buttonSecondary} type="button" onClick={() => onNavigate("parametres")}>Consulter les paramètres</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function DemoDataManager({
+  demoMode,
   onToggleDemo,
 }: {
   demoMode: boolean;
-  onNavigate: (view: "utilisateurs" | "journal") => void;
   onToggleDemo: () => void;
 }) {
+  return (
+    <section className={styles.manager} aria-label="Jeux de test et démonstration">
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Environnement de démonstration</h2>
+        <p className={styles.hint}>
+          Les données de test sont séparées des données réelles par le champ
+          <code> is_demo </code>. Elles ne sont visibles que par DEV et ne sont jamais
+          fusionnées aux dossiers académiques de production.
+        </p>
+        <div className={styles.actions} style={{ marginTop: 14 }}>
+          <span className={styles.status}>{demoMode ? "JEU DE TEST ACTIF" : "DONNÉES RÉELLES ACTIVES"}</span>
+          <button className={demoMode ? styles.buttonSecondary : styles.button} type="button" onClick={onToggleDemo}>
+            {demoMode ? "Quitter le jeu de test" : "Activer le jeu de test"}
+          </button>
+        </div>
+      </div>
+      <div className={styles.panel}>
+        <h2 className={styles.panelTitle}>Règles de sécurité du jeu de test</h2>
+        <ul>
+          <li>Les enregistrements de démonstration sont identifiés explicitement comme données de test.</li>
+          <li>Les comptes ADMIN ne peuvent pas consulter ces enregistrements.</li>
+          <li>Changer d’environnement ne modifie ni ne supprime les données réelles.</li>
+          <li>Les actions de création et de modification restent soumises aux mêmes contrôles d’accès serveur.</li>
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function DeveloperSettings() {
   const [diagnostics, setDiagnostics] = useState<DeveloperDiagnostics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -954,55 +1027,24 @@ export function DeveloperWorkspace({
     }
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- Load server diagnostics when the DEV workspace opens.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Load server diagnostics when the DEV settings view opens.
   useEffect(() => { void loadDiagnostics(); }, [loadDiagnostics]);
 
   return (
-    <section className={styles.manager} aria-label="Espace développeur">
-      <div className={styles.panel}>
-        <h2 className={styles.panelTitle}>Outils d’administration technique</h2>
-        <p className={styles.hint}>
-          Le rôle DEV hérite de tous les droits ADMIN et ajoute la gestion des accès
-          et l’accès au journal d’audit détaillé.
-        </p>
-        <div className={styles.actions} style={{ marginTop: 14 }}>
-          <button className={styles.button} type="button" onClick={() => onNavigate("utilisateurs")}>
-            Gérer les comptes
-          </button>
-          <button className={styles.buttonSecondary} type="button" onClick={() => onNavigate("journal")}>
-            Ouvrir le journal d’audit
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.panel}>
-        <h2 className={styles.panelTitle}>Jeu de données de test</h2>
-        <p className={styles.hint}>
-          Les données de démonstration sont isolées des données réelles et ne sont
-          accessibles qu’au rôle DEV. L’ouverture du jeu de test bascule le tableau
-          de bord vers cet environnement sans modifier les données de production.
-        </p>
-        <div className={styles.actions} style={{ marginTop: 14 }}>
-          <span className={styles.status}>{demoMode ? "MODE TEST ACTIF" : "DONNÉES RÉELLES"}</span>
-          <button className={demoMode ? styles.buttonSecondary : styles.button} type="button" onClick={onToggleDemo}>
-            {demoMode ? "Quitter le mode test" : "Ouvrir le jeu de données"}
-          </button>
-        </div>
-      </div>
-
+    <section className={styles.manager} aria-label="Paramètres de l’application">
       <div className={styles.panel}>
         <div className={styles.actions} style={{ justifyContent: "space-between" }}>
-          <h2 className={styles.panelTitle} style={{ marginBottom: 0 }}>Paramètres et configuration</h2>
+          <h2 className={styles.panelTitle} style={{ marginBottom: 0 }}>État de configuration</h2>
           <button className={styles.buttonSecondary} type="button" onClick={() => void loadDiagnostics()} disabled={loading}>
             Actualiser
           </button>
         </div>
         <p className={styles.hint} style={{ marginTop: 8 }}>
-          État des variables nécessaires au fonctionnement de l’application. Seuls
-          les statuts sont affichés : aucune clé, valeur secrète ou URL de redirection
-          n’est renvoyée au navigateur.
+          Cette section est actuellement en consultation : elle vérifie les prérequis
+          serveur et indique les éléments configurés. Les secrets et leurs valeurs ne sont
+          jamais affichés ni modifiables depuis le navigateur ; leur gestion reste dans Vercel et Supabase.
         </p>
-        {loading && <p className={styles.hint} style={{ marginTop: 12 }}>Vérification de la configuration…</p>}
+        {loading && <p className={styles.hint} role="status" style={{ marginTop: 12 }}>Vérification de la configuration…</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         {diagnostics && (
           <>
