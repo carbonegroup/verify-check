@@ -7,20 +7,41 @@ import { isDashboardViewEnabled, isDeveloperView, type DashboardView } from "@/l
 
 type Vue = DashboardView;
 
-const VUES: { id: Vue; label: string }[] = [
-  { id: "general", label: "Générale" },
-  { id: "absences", label: "Absences" },
-  { id: "classes", label: "Classes" },
-  { id: "cours", label: "Cours" },
-  { id: "eleves", label: "Élèves" },
-  { id: "cartes", label: "Cartes QR" },
-  { id: "gestion-eleves", label: "Gestion des élèves" },
-  { id: "gestion-cours", label: "Gestion des cours" },
-  { id: "presences", label: "Saisie des présences" },
-  { id: "utilisateurs", label: "Comptes utilisateurs" },
-  { id: "journal", label: "Journal d'audit" },
-  { id: "scolarite", label: "Scolarité" },
-  { id: "comptabilite", label: "Comptabilité" },
+const NAV_SECTIONS: {
+  label: string;
+  developerOnly?: boolean;
+  items: { id: Vue; label: string }[];
+}[] = [
+  {
+    label: "Suivi",
+    items: [
+      { id: "general", label: "Vue générale" },
+      { id: "absences", label: "Absences" },
+      { id: "classes", label: "Classes" },
+      { id: "cours", label: "Cours" },
+      { id: "eleves", label: "Élèves" },
+      { id: "cartes", label: "Cartes QR" },
+    ],
+  },
+  {
+    label: "Gestion académique",
+    items: [
+      { id: "gestion-eleves", label: "Gestion des élèves" },
+      { id: "gestion-cours", label: "Gestion des cours" },
+      { id: "presences", label: "Saisie des présences" },
+      { id: "scolarite", label: "Scolarité" },
+      { id: "comptabilite", label: "Comptabilité" },
+    ],
+  },
+  {
+    label: "Développement",
+    developerOnly: true,
+    items: [
+      { id: "developpeur", label: "Espace développeur" },
+      { id: "utilisateurs", label: "Comptes utilisateurs" },
+      { id: "journal", label: "Journal d'audit" },
+    ],
+  },
 ];
 
 function Icon({ id }: { id: Vue }) {
@@ -93,6 +114,12 @@ function Icon({ id }: { id: Vue }) {
     journal: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+    developpeur: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="m8 10-2 2 2 2m4 0h4M8 7h8" />
       </svg>
     ),
     securite: (
@@ -168,20 +195,28 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
         </div>
 
         <div className={styles.nav}>
-          {VUES.filter((v) => !isDeveloperView(v.id) || role === "dev").map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className={`${styles.navItem} ${vue === v.id ? styles.active : ""} ${!isDashboardViewEnabled(v.id) ? styles.disabled : ""}`}
-              onClick={() => choisirVue(v.id)}
-              disabled={!isDashboardViewEnabled(v.id)}
-              title={!isDashboardViewEnabled(v.id) ? "Section indisponible" : undefined}
-              aria-current={vue === v.id ? "page" : undefined}
-            >
-              <Icon id={v.id} />
-              <span>{v.label}</span>
-            </button>
-          ))}
+          {NAV_SECTIONS.map((section) => {
+            if (section.developerOnly && role !== "dev") return null;
+            return (
+              <section key={section.label} className={styles.navSection} aria-label={section.label}>
+                <div className={styles.navHeading}>{section.label}</div>
+                {section.items.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`${styles.navItem} ${vue === v.id ? styles.active : ""} ${!isDashboardViewEnabled(v.id) ? styles.disabled : ""}`}
+                    onClick={() => choisirVue(v.id)}
+                    disabled={!isDashboardViewEnabled(v.id)}
+                    title={!isDashboardViewEnabled(v.id) ? "Section indisponible" : undefined}
+                    aria-current={vue === v.id ? "page" : undefined}
+                  >
+                    <Icon id={v.id} />
+                    <span>{v.label}</span>
+                  </button>
+                ))}
+              </section>
+            );
+          })}
         </div>
 
         <div className={styles.sidebarFoot}>
@@ -196,13 +231,6 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
               <small>Conakry, Guinée</small>
             </span>
           </div>
-          <button
-            type="button"
-            className={styles.buttonOutline}
-            onClick={deconnexion}
-          >
-            Se déconnecter
-          </button>
         </div>
       </nav>
 
