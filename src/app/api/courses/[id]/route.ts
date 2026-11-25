@@ -5,6 +5,7 @@ import { findScheduleConflict } from "@/lib/course-conflicts";
 type Context = { params: Promise<{ id: string }> };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const toMinutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 
 export async function PATCH(request: NextRequest, context: Context) {
   const accessToken = requestAccessToken(request);
