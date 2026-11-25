@@ -358,7 +358,7 @@ export default function Shell({ vue, role, onViewChange, children }: ShellProps)
                     >
                       <div className={styles.accountMenuHeading}>
                         <strong>Mon compte</strong>
-                        <span>{role === "dev" ? "Compte développeur" : "Compte administrateur"}</span>
+                        <span>{role === "dev" ? "Compte DEV" : "Compte ADMIN"}</span>
                       </div>
                       <button
                         type="button"
