@@ -289,7 +289,10 @@ export default function DashboardClient() {
   }, [date, classe, cours, demoMode, router]);
 
   useEffect(() => {
-    void load();
+    const timeout = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [load]);
 
   // Service scolarité : chargé à la demande (vue Scolarité), avec cache mémoire.
