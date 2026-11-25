@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, createServerSupabase, setSessionCookies } from "@/lib/auth";
+import { findScheduleConflict } from "@/lib/course-conflicts";
 
 type Context = { params: Promise<{ id: string }> };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -50,16 +51,13 @@ export async function PATCH(request: NextRequest, context: Context) {
     .select("id,classe_id,enseignant,salle,heure_debut,heure_fin")
     .eq("jour_semaine", day).eq("is_demo", current.is_demo).is("archived_at", null);
   if (conflictError) return NextResponse.json({ error: "verification_conflits_indisponible" }, { status: 500 });
-  for (const other of conflicts ?? []) {
-    if (other.id === id) continue;
-    const overlap = toMinutes(start) < toMinutes(other.heure_fin) && toMinutes(end) > toMinutes(other.heure_debut);
-    if (!overlap) continue;
-    if (other.classe_id === classeId ||
-        (enseignant && other.enseignant && enseignant.toLocaleLowerCase() === other.enseignant.toLocaleLowerCase()) ||
-        (salle && other.salle && salle.toLocaleLowerCase() === other.salle.toLocaleLowerCase())) {
-      return NextResponse.json({ error: `conflit_horaire_avec_${other.id}` }, { status: 409 });
-    }
-  }
+  const conflict = findScheduleConflict({
+    id, classe_id: classeId, enseignant, salle, heure_debut: start, heure_fin: end,
+  }, (conflicts ?? []) as Array<{
+    id: string; classe_id: string; enseignant: string | null; salle: string | null;
+    heure_debut: string; heure_fin: string;
+  }>);
+  if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
 
   changes.nom = nom;
   changes.classe_id = classeId;
