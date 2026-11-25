@@ -220,3 +220,31 @@ test("buildDashboard: un retard manuel compte comme présence, mais pas comme sc
   assert.equal(r.scans, 0);
   assert.equal(r.presents, 1);
 });
+
+test("buildDashboard: remonte un conflit horaire existant une seule fois", () => {
+  const conflicting: CourseRow = {
+    id: "co-math-extra",
+    nom: "Algèbre",
+    classe_id: "cl-1",
+    salle: "B13",
+    jour_semaine: 5,
+    heure_debut: "08:30",
+    heure_fin: "09:30",
+    enseignant: "Mme Barry",
+  };
+  const original: CourseRow = {
+    ...courses[0],
+    enseignant: "Mme Barry",
+  };
+  const raw = { ...base(), courses: [original, ...courses.slice(1), conflicting] };
+  const result = buildDashboard(raw, { date: vendredi });
+  assert.equal(result.alerts.length, 1);
+  assert.equal(result.alerts[0].type, "schedule_conflict");
+  assert.equal(result.alerts[0].conflict, "class");
+  assert.ok(result.alerts[0].message.includes("co-math-extra"));
+});
+
+test("buildDashboard: n'invente aucune alerte sans chevauchement", () => {
+  const result = buildDashboard(base(), { date: vendredi });
+  assert.deepEqual(result.alerts, []);
+});
