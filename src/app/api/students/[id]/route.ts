@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE, requestAccessToken, requireAdmin, createServerSupabase, setSessionCookies } from "@/lib/auth";
+import { isValidEmailAddress } from "@/lib/validation";
 
 type Context = { params: Promise<{ id: string }> };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function PATCH(request: NextRequest, context: Context) {
   const accessToken = requestAccessToken(request);
@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     changes.prenom = typeof body.prenom === "string" ? body.prenom.trim() || null : null;
   }
   if (body.email !== undefined) {
-    if (body.email !== null && body.email !== "" && (typeof body.email !== "string" || !EMAIL.test(body.email.trim()))) return NextResponse.json({ error: "email_invalide" }, { status: 400 });
+    if (body.email !== null && body.email !== "" && (typeof body.email !== "string" || !isValidEmailAddress(body.email.trim()))) return NextResponse.json({ error: "email_invalide" }, { status: 400 });
     changes.email = typeof body.email === "string" && body.email.trim() ? body.email.trim().toLowerCase() : null;
   }
   if (body.telephone !== undefined) {
