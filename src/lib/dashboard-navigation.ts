@@ -10,6 +10,7 @@ export type DashboardView =
   | "presences"
   | "utilisateurs"
   | "journal"
+  | "securite"
   | "scolarite"
   | "comptabilite";
 
