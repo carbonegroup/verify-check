@@ -90,19 +90,21 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = invitation.user.id;
+    const previousMetadata = invitation.user.app_metadata ?? {};
+    const { error: metadataError } = await admin.auth.admin.updateUserById(userId, {
+      app_metadata: { ...previousMetadata, role },
+    });
+    if (metadataError) {
+      return NextResponse.json({ error: "role_auth_non_enregistre" }, { status: 500 });
+    }
+
     const { error: roleError } = await admin.from("app_user_roles").upsert({
       user_id: userId, role, is_active: true, updated_at: new Date().toISOString(),
     });
     if (roleError) {
+      // No privileged row has been committed, so reverting metadata fails closed.
+      await admin.auth.admin.updateUserById(userId, { app_metadata: previousMetadata });
       return NextResponse.json({ error: "role_non_enregistre_compte_invite_sans_acces" }, { status: 500 });
-    }
-
-    const { error: metadataError } = await admin.auth.admin.updateUserById(userId, {
-      app_metadata: { ...(invitation.user.app_metadata ?? {}), role },
-    });
-    if (metadataError) {
-      await admin.from("app_user_roles").delete().eq("user_id", userId);
-      return NextResponse.json({ error: "role_auth_non_enregistre" }, { status: 500 });
     }
 
     await admin.from("audit_logs").insert({
