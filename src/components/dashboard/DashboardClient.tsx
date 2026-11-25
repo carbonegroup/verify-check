@@ -537,7 +537,7 @@ export default function DashboardClient() {
                   <div className={styles.metricBody}>
                     <span className={styles.metricLabel}>Cours en cours</span>
                     <strong className={styles.kpi}>{currentCourses.length}</strong>
-                    <span className={styles.metricDetail}>selon l'heure locale de Conakry</span>
+                    <span className={styles.metricDetail}>selon l’heure locale de Conakry</span>
                   </div>
                 </article>
 
