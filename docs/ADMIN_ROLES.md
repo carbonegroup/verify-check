@@ -14,6 +14,9 @@
 Les routes de gestion des utilisateurs et le bootstrap initial utilisent la clé privilégiée Supabase. Définir dans les environnements **serveur uniquement** (Vercel Production/Preview et environnement local):
 
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `AUTH_ACCOUNT_REDIRECT_URL`, par exemple `https://app.example.edu/auth/complete`
+
+Ajouter l'URL HTTPS exacte dans **Supabase Auth → URL Configuration → Redirect URLs**. Vérifier que les modèles d'e-mail d'invitation et de réinitialisation respectent le `redirectTo` reçu (notamment s'ils utilisent une URL `SiteURL` codée en dur). Le même redirect est utilisé par l'interface publique de finalisation pour définir le mot de passe.
 
 Ne jamais préfixer cette variable par `NEXT_PUBLIC_`, `EXPO_PUBLIC_`, ni la placer dans l'application mobile, un fichier commité ou un log.
 
@@ -30,7 +33,7 @@ BOOTSTRAP_DEV_NAME='Développeur UCAO' \
 node scripts/bootstrap-dev-user.mjs
 ```
 
-Le script est idempotent sur l'adresse exacte: il retrouve le compte Auth ou envoie une invitation, inscrit le rôle dans `app_user_roles`, puis dans `app_metadata.role`. Aucun mot de passe temporaire n'est écrit, affiché ou commité. L'invitation dépend de la configuration SMTP Supabase. Si un compte existe déjà, le titulaire doit renouveler sa session après le changement de rôle.
+Le script utilise également `AUTH_ACCOUNT_REDIRECT_URL` pour rediriger l'invitation vers le formulaire public de définition du premier mot de passe. Le script est idempotent sur l'adresse exacte: il retrouve le compte Auth ou envoie une invitation, inscrit le rôle dans `app_user_roles`, puis dans `app_metadata.role`. Aucun mot de passe temporaire n'est écrit, affiché ou commité. L'invitation dépend de la configuration SMTP Supabase. Si un compte existe déjà, le titulaire doit renouveler sa session après le changement de rôle.
 
 ## Jeu d'essai disponible toute la journée
 
