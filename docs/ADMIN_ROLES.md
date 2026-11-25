@@ -22,7 +22,7 @@ Ne jamais préfixer cette variable par `NEXT_PUBLIC_`, `EXPO_PUBLIC_`, ni la pla
 
 ## Initialiser le premier compte DEV
 
-Le compte historique prévu `dev@ucao.edu0` n'a pas été trouvé dans Auth et son domaine n'a pas été confirmé. Ne pas corriger le zéro en silence et ne pas créer un alias arbitraire. Confirmer auprès du propriétaire de la boîte l'adresse exacte qui recevra l'invitation.
+Avant le premier bootstrap, confirmer auprès du propriétaire l'adresse exacte de la boîte qui recevra l'invitation. Ne jamais corriger une adresse supposée à partir d'une faute de frappe ni créer un alias arbitraire. Le script synchronise le rôle dans `app_user_roles` et `app_metadata.role`; il peut aussi être relancé pour resynchroniser ces deux sources après une modification contrôlée du registre.
 
 Après application de la migration, avec Node.js et les variables serveur disponibles:
 
