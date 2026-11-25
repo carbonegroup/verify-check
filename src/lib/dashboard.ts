@@ -58,6 +58,8 @@ export type AttendanceRow = {
   student_id: string;
   course_id: string;
   scanned_at: string;
+  statut?: "present" | "absent" | "retard";
+  source?: "scan" | "manual";
 };
 
 export type DashboardFilters = {
@@ -121,9 +123,11 @@ export function buildDashboard(
   const rows = raw.attendance.filter(
     (a) => plannedCourseIds.has(a.course_id) && visibleStudentIds.has(a.student_id)
   );
+  const presenceRows = rows.filter((row) => row.statut !== "absent");
+  const scanRows = rows.filter((row) => row.source === undefined || row.source === "scan");
 
   const presencesByStudent = new Map<string, AttendanceRow[]>();
-  for (const row of rows) {
+  for (const row of presenceRows) {
     const list = presencesByStudent.get(row.student_id) ?? [];
     list.push(row);
     presencesByStudent.set(row.student_id, list);
@@ -143,14 +147,14 @@ export function buildDashboard(
     cours_disponibles: weeklyCourses,
     effectif: visibleStudents.length,
     presents: presentCount,
-    scans: rows.length,
+    scans: scanRows.length,
     eleves: visibleStudents.map((s) => ({
       id: s.id,
       nom: s.nom,
       code_qr: s.code_qr,
       classe_id: s.classe_id,
       photo_url: s.photo_url,
-      scans: (presencesByStudent.get(s.id) ?? []).length,
+      scans: scanRows.filter((row) => row.student_id === s.id).length,
       presences: (presencesByStudent.get(s.id) ?? []).map((row) => ({
         course_id: row.course_id,
         scanned_at: row.scanned_at,
