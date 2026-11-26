@@ -13,13 +13,32 @@ export async function GET(request: NextRequest) {
   const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+  // Rate limiting : 60 requêtes/minute par IP pour la consultation d'étudiants.
+  const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:students" });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   const params = request.nextUrl.searchParams;
   const includeDemo = auth.user.role === "dev" && params.get("demo") === "1";
   const archived = params.get("archived") === "1";
   const page = Math.max(1, Number(params.get("page") ?? 1));
   const perPage = Math.max(1, Math.min(100, Number(params.get("perPage") ?? 25)));
-  const q = (params.get("q") ?? "").replace(/[,%()]/g, " ").trim().slice(0, 80);
-  let query = createServerSupabase(auth.session?.access_token ?? accessToken)
+  const qRaw = params.get("q") ?? "";
+  // Validation stricte du paramètre q: seules les alphanumeriques (a-z, A-Z, 0-9)
+  // et les espaces sont autorisees. Aucun caractere special (guillemets, points,
+  // virgules, caractères SQL) n'est accepte, ce qui empche toute injection SQL
+  # dans la clause ilike. Les noms comportant des accents ou des hyphens peuvent
+  # etre recherches avec leur version approximative (e.g. "O'Brien" -> "Obrien").
+  if (!/^[a-zA-Z0-9\s]+$/.test(qRaw)) {
+    return NextResponse.json({ error: "parametre_invalide" }, { status: 400 });
+  }
+  const q = qRaw.trim().slice(0, 80);
+  if (!q) {
+    let query = createServerSupabase(auth.session?.access_token ?? accessToken)
     .from("students")
     .select("id, nom, prenom, code_qr, classe_id, email, telephone, photo_url, archived_at, is_demo, created_at", { count: "exact" })
     .order("nom")

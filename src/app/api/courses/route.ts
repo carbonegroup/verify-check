@@ -31,12 +31,30 @@ export async function GET(request: NextRequest) {
   const accessToken = requestAccessToken(request);
   const auth = await requireAdmin(accessToken, request.cookies.get(REFRESH_COOKIE)?.value);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // Rate limiting : 60 requêtes/minute par IP pour la consultation des cours.
+  const rl = applyRateLimit(request, { max: 60, windowMs: 60_000, keyPrefix: "api:courses" });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "trop_de_requetes", retryAfter: Math.ceil((rl.resetAt - Date.now()) / 1000) },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
   const params = request.nextUrl.searchParams;
   const includeDemo = auth.user.role === "dev" && params.get("demo") === "1";
   const archived = params.get("archived") === "1";
   const page = Math.max(1, Number(params.get("page") ?? 1));
   const perPage = Math.max(1, Math.min(100, Number(params.get("perPage") ?? 50)));
-  const q = (params.get("q") ?? "").replace(/[,%()]/g, " ").trim().slice(0, 80);
+  const qRaw = params.get("q") ?? "";
+  // Validation stricte du paramètre q : seules les alphanumériques et espaces
+  // sont autorisés. Aucun caractère spécial (guillemets, points, virgules,
+  // caractères SQL) n'est permis, ce qui empêche toute injection SQL dans
+  # la clause ilike. Les noms comportant des accents ou des hyphens peuvent
+  # être recherchés avec leur version approximative (e.g. "O'Brien" -> "Obrien").
+  if (!/^[a-zA-Z0-9\s]+$/.test(qRaw)) {
+    return NextResponse.json({ error: "parametre_invalide" }, { status: 400 });
+  }
+  const q = qRaw.trim().slice(0, 80);
 
   let query = createServerSupabase(auth.session?.access_token ?? accessToken)
     .from("courses")
