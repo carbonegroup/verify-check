@@ -1,8 +1,8 @@
-# VerifyCheck
+# UNIVIA
 
 **Pointage scolaire par QR code — Conakry, Guinée**
 
-VerifyCheck permet à un établissement d'enregistrer les présences par cours à partir des cartes QR des élèves et de consulter les résultats dans un espace réservé à la direction.
+UNIVIA permet à un établissement d'enregistrer les présences par cours à partir des cartes QR des élèves et de consulter les résultats dans un espace réservé à la direction.
 
 ## Applications
 - **Dashboard web** : Next.js App Router, TypeScript.
@@ -50,7 +50,7 @@ npm run dev
 
 Ouvrir http://localhost:3000.
 
-## VerifyCheck 2.0 — rôles et gestion académique
+## UNIVIA 2.0 — rôles et gestion académique
 
 La migration `supabase/migrations/20261124190000_academic_management_dev_roles.sql` ajoute la gestion des élèves, cours, saisies/corrections de présence, rôles ADMIN/DEV, journal d'audit et un jeu de test 24/7 réservé au DEV.
 
