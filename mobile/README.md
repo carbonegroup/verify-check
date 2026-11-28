@@ -1,4 +1,4 @@
-# VerifyCheck — application mobile
+# UNIVIA — application mobile
 
 Application Android/iOS dédiée au pointage scolaire QR. Le serveur reste l'autorité pour l'identification de l'élève, le choix du cours et la validation de chaque présence.
 
