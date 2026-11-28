@@ -1,4 +1,4 @@
-# Design brief — VerifyCheck (refonte 2026-11)
+# Design brief — UNIVIA (refonte 2026-11)
 
 ## Contexte produit
 
@@ -95,7 +95,7 @@ contraste de lecture QR). Identité portée par la structure de registre
 
 ## Révision visuelle — référence de l'utilisateur (23 novembre 2026)
 
-La première maquette fournie, **« VerifyCheck Attendance Dashboard and Mobile Scanner »**, devient la référence visuelle prioritaire pour le dashboard et le scanner Android. Cette décision remplace la palette papier/vert précédente pour ces deux surfaces. La seconde maquette violette de vérification d'identité ne fait pas partie du produit et doit être ignorée.
+La première maquette fournie, **« UNIVIA Attendance Dashboard and Mobile Scanner »**, devient la référence visuelle prioritaire pour le dashboard et le scanner Android. Cette décision remplace la palette papier/vert précédente pour ces deux surfaces. La seconde maquette violette de vérification d'identité ne fait pas partie du produit et doit être ignorée.
 
 ### Direction à reproduire
 
@@ -104,7 +104,7 @@ La première maquette fournie, **« VerifyCheck Attendance Dashboard and Mobile 
 - Vert pour les présences confirmées, orange pour les états en attente ou les scans, rouge pour les absences et erreurs.
 - Sidebar fixe d'environ 220 px sur desktop, en-tête supérieur blanc, titre de page, barre de filtres sur une ligne.
 - Vue générale : quatre indicateurs (effectif, présents, scans, cours prévus), puis un registre tabulaire avec classe, cours, salle, horaire, présents et absents.
-- Scanner Android : en-tête VerifyCheck bleu marine, caméra prioritaire avec repères de cadrage et navigation inférieure Accueil / Scanner / Historique. Aucun choix préalable de classe ou de cours, aucun résumé de séance ni compteur de présents. Après lecture, le serveur identifie l'élève et détermine le cours actif à partir de sa classe, sans encore enregistrer la présence. Si un seul cours correspond, la fiche de l'élève s'affiche avec le cours proposé ; si plusieurs cours sont actifs, l'agent choisit parmi les candidats affichés après le scan. L'agent confirme ensuite le pointage. Le résultat final remplace la fiche avec le statut serveur et l'action « Scanner le suivant ».
+- Scanner Android : en-tête UNIVIA bleu marine, caméra prioritaire avec repères de cadrage et navigation inférieure Accueil / Scanner / Historique. Aucun choix préalable de classe ou de cours, aucun résumé de séance ni compteur de présents. Après lecture, le serveur identifie l'élève et détermine le cours actif à partir de sa classe, sans encore enregistrer la présence. Si un seul cours correspond, la fiche de l'élève s'affiche avec le cours proposé ; si plusieurs cours sont actifs, l'agent choisit parmi les candidats affichés après le scan. L'agent confirme ensuite le pointage. Le résultat final remplace la fiche avec le statut serveur et l'action « Scanner le suivant ».
 - Sur les écrans étroits, conserver l'ordre des tâches, permettre le défilement et éviter tout débordement horizontal hors tableaux défilants.
 
 ### Contrat fonctionnel inchangé
