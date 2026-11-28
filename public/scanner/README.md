@@ -1,4 +1,4 @@
-# VerifyCheck — Scanner PWA
+# UNIVIA — Scanner PWA
 
 Application mobile-first de pointage (agents de salle), servie depuis `/scanner/`.
 
