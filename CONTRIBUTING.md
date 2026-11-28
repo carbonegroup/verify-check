@@ -1,4 +1,4 @@
-# Contribuer à VerifyCheck
+# Contribuer à UNIVIA
 
 ## Flux de contribution
 1. Mettre à jour `main` et créer une branche dédiée : `feat/*`, `fix/*`, `docs/*` ou `chore/*`.
