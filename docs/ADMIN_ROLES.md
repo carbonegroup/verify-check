@@ -1,4 +1,4 @@
-# Rôles ADMIN / DEV et jeu de test VerifyCheck
+# Rôles ADMIN / DEV et jeu de test UNIVIA
 
 ## Modèle d'autorisation
 
@@ -37,7 +37,7 @@ Le script utilise également `AUTH_ACCOUNT_REDIRECT_URL` pour rediriger l'invita
 
 ## Jeu d'essai disponible toute la journée
 
-La migration crée une classe clairement marquée `[TEST UNIQUEMENT] VerifyCheck — disponibilité 24/7`, trois étudiants fictifs et sept cours quotidiens de 00:00 à 23:59 (un par jour de semaine). Ces lignes ont `is_demo = true`.
+La migration crée une classe clairement marquée `[TEST UNIQUEMENT] UNIVIA — disponibilité 24/7`, trois étudiants fictifs et sept cours quotidiens de 00:00 à 23:59 (un par jour de semaine). Ces lignes ont `is_demo = true`.
 
 - Seul DEV peut voir et scanner ces données.
 - Les requêtes normales du dashboard, les listes ADMIN et les données opérationnelles excluent les données de démonstration.
