@@ -1,4 +1,4 @@
-# Architecture produit — VerifyCheck (refonte 2026-11)
+# Architecture produit — UNIVIA (refonte 2026-11)
 
 ## Utilisateurs et tâches
 
@@ -143,7 +143,7 @@ Optimisations pour un usage léger à Conakry (réseau 2G/3G intermittent) :
   système, icônes PNG < 7 Ko.
 
 
-## VerifyCheck 2.0 — gestion académique et rôles (2026-11)
+## UNIVIA 2.0 — gestion académique et rôles (2026-11)
 
 ### Routes supplémentaires
 
@@ -175,7 +175,7 @@ La migration `supabase/migrations/20261124190000_academic_management_dev_roles.s
 
 ### Jeu de test
 
-La migration insère une classe réservée `[TEST UNIQUEMENT] VerifyCheck — disponibilité 24/7`, trois étudiants fictifs et un cours 00:00–23:59 pour chaque jour (dimanche à samedi). Les lignes ont `is_demo=true`, ne sont pas visibles par ADMIN et sont omises du dashboard normal. Les données de test apparaissent uniquement après migration ; elles ne sont pas ajoutées par le navigateur.
+La migration insère une classe réservée `[TEST UNIQUEMENT] UNIVIA — disponibilité 24/7`, trois étudiants fictifs et un cours 00:00–23:59 pour chaque jour (dimanche à samedi). Les lignes ont `is_demo=true`, ne sont pas visibles par ADMIN et sont omises du dashboard normal. Les données de test apparaissent uniquement après migration ; elles ne sont pas ajoutées par le navigateur.
 
 ### Suppression et archivage
 
