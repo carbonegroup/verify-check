@@ -2,10 +2,36 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import pageStyles from "./page.module.css";
 
+const siteUrl = "https://verify-check-one.vercel.app/";
+const pageDescription =
+  "VerifyCheck accompagne les établissements scolaires dans le suivi des présences par carte QR code et la consultation des présences par classe et par cours.";
+
 export const metadata: Metadata = {
-  title: "VerifyCheck — Présence scolaire par QR code",
-  description:
-    "Suivi de présence scolaire par QR code : scan en salle et tableau de bord direction.",
+  title: "Présence scolaire par QR code",
+  description: pageDescription,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    title: "VerifyCheck — Présence scolaire par QR code",
+    description: pageDescription,
+    url: "/",
+  },
+  twitter: {
+    card: "summary",
+    title: "VerifyCheck — Présence scolaire par QR code",
+    description: pageDescription,
+  },
+};
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "VerifyCheck",
+  url: siteUrl,
+  description: pageDescription,
+  inLanguage: "fr-GN",
 };
 
 const styles: Record<string, React.CSSProperties> = {
@@ -77,20 +103,28 @@ const styles: Record<string, React.CSSProperties> = {
 
 export default function Home() {
   return (
-    <main style={styles.main}>
-      <div style={styles.card}>
-        <p style={styles.eyebrow}>VerifyCheck · Présence scolaire</p>
-        <h1 style={styles.title}>Présence scolaire par QR code</h1>
-        <p style={styles.lead}>
-          Les élèves pointent leur carte à l’entrée du cours ; la direction
-          consulte la présence réelle par classe, cours et élève.
-        </p>
-        <div style={styles.actions}>
-          <Link href="/login" className={pageStyles.primaryLink} style={styles.primary}>
-            Espace direction
-          </Link>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+        }}
+      />
+      <main style={styles.main}>
+        <div style={styles.card}>
+          <p style={styles.eyebrow}>VerifyCheck · Présence scolaire</p>
+          <h1 style={styles.title}>Présence scolaire par QR code</h1>
+          <p style={styles.lead}>
+            Les élèves pointent leur carte à l’entrée du cours ; la direction
+            consulte la présence réelle par classe, cours et élève.
+          </p>
+          <div style={styles.actions}>
+            <Link href="/login" className={pageStyles.primaryLink} style={styles.primary}>
+              Espace direction
+            </Link>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
