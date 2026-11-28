@@ -1,7 +1,7 @@
-# VerifyCheck — instructions de dépôt
+# UNIVIA — instructions de dépôt
 
 ## Produit et architecture
-VerifyCheck est une application de pointage scolaire par QR code. Le dépôt contient :
+UNIVIA est une application de pointage scolaire par QR code. Le dépôt contient :
 - application web Next.js App Router dans `src/` ;
 - PWA scanner dans `public/scanner/` ;
 - application React Native / Expo dans `mobile/` ;
